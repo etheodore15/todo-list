@@ -182,6 +182,18 @@
   <!-- SETTINGS -->
   <section id="view-settings" class="view">
     <div class="set-block">
+      <h3>On-device AI (works offline, no API key)</h3>
+      <p>Download small AI models once and everything runs on your phone — voice recognition
+         and summaries with no internet and no data leaving the device. Needs a recent phone
+         (Android 12+ Chrome, or iOS 26 Safari, for GPU speed; older devices fall back to a
+         slower CPU mode). Download over Wi-Fi.</p>
+      <button class="btn primary" id="asrBtn">Enable offline voice recognition (~80 MB)</button>
+      <p id="asrStatus"></p>
+      <button class="btn primary" id="llmBtn">Enable on-device summaries (~570 MB)</button>
+      <p id="llmStatus"></p>
+      <button class="btn ghost" id="modelsWipeBtn">Delete downloaded models</button>
+    </div>
+    <div class="set-block">
       <h3>Smart summaries (optional)</h3>
       <p>By default, summaries and priorities are generated on your phone with a built-in
          heuristic — free and fully offline. For significantly better summaries, task
@@ -202,7 +214,7 @@
          unless you enable Claude summaries.</p>
       <button class="btn ghost" id="wipeBtn">Delete all data</button>
     </div>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v4</p>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v5</p>
   </section>
 </main>
 
@@ -270,6 +282,49 @@ function showView(name){
 document.getElementById('hdrDate').textContent =
   new Date().toLocaleDateString(undefined, {weekday:'long', day:'numeric', month:'long'});
 
+/* ---------- on-device AI bridge (Whisper + Qwen3 in a Web Worker) ---------- */
+let aiWorker = null, aiSeq = 0;
+const aiPending = {}, aiProgress = {asr: null, llm: null};
+
+function aiCall(type, payload, transfer){
+  if (!aiWorker){
+    aiWorker = new Worker('ai-worker.js', {type: 'module'});
+    aiWorker.onmessage = (e) => {
+      const m = e.data;
+      if (m.type === 'progress'){
+        if (aiProgress[m.kind]) aiProgress[m.kind](m.pct);
+        return;
+      }
+      const p = aiPending[m.id];
+      if (!p) return;
+      delete aiPending[m.id];
+      m.type === 'done' ? p.resolve(m.result) : p.reject(new Error(m.message));
+    };
+    aiWorker.onerror = (e) => {
+      Object.values(aiPending).forEach(p => p.reject(new Error(e.message || 'AI worker failed')));
+      for (const k in aiPending) delete aiPending[k];
+    };
+  }
+  const id = ++aiSeq;
+  return new Promise((resolve, reject) => {
+    aiPending[id] = {resolve, reject};
+    aiWorker.postMessage({id, type, payload}, transfer || []);
+  });
+}
+
+async function localSummarizeLLM(text){
+  const {json} = await aiCall('summarize', {text});
+  const okPrio = p => ['high','medium','low'].includes(p);
+  return {
+    summary: String(json.summary || '').trim() || text.slice(0,100),
+    tasks: (Array.isArray(json.tasks) ? json.tasks : []).slice(0,6).map(t => ({
+      text: String(t && t.text != null ? t.text : t).trim(),
+      priority: okPrio(t && t.priority) ? t.priority : detectPriority(text)
+    })).filter(t => t.text),
+    priority: okPrio(json.priority) ? json.priority : detectPriority(text)
+  };
+}
+
 /* ---------- speech recognition ---------- */
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 const micBtn = document.getElementById('micBtn');
@@ -277,10 +332,13 @@ const micHint = document.getElementById('micHint');
 const liveText = document.getElementById('liveText');
 let rec = null, recording = false, baseText = '';
 
-if (!SR){
+if (!SR && !(navigator.mediaDevices && window.MediaRecorder)){
   micBtn.disabled = true;
   micBtn.style.opacity = .4;
   micHint.innerHTML = 'Voice input isn\'t supported in this browser.<br>Use Chrome on Android — or just type below.';
+} else if (!SR){
+  // no online speech API, but offline recording is possible
+  micHint.innerHTML = 'Enable offline voice recognition in Settings,<br>then tap the mic to record.';
 } else {
   rec = new SR();
   rec.lang = navigator.language || 'en-AU';
@@ -357,7 +415,68 @@ function stopRec(){
   micHint.innerHTML = 'Tap the mic and speak your idea.<br>Or type below.';
   if (rec) try{ rec.stop(); }catch(_){}
 }
-micBtn.addEventListener('click', () => recording ? stopRec() : startRec());
+
+/* ---------- offline recording path (MediaRecorder → Whisper on-device) ---------- */
+let mediaRec = null, mediaChunks = [], mediaStream = null;
+
+async function startRecLocal(){
+  baseText = liveText.value.trim();
+  try {
+    mediaStream = await navigator.mediaDevices.getUserMedia({audio: true});
+  } catch (_) {
+    toast('Microphone permission denied — allow it in site settings.');
+    return;
+  }
+  mediaChunks = [];
+  mediaRec = new MediaRecorder(mediaStream);
+  mediaRec.ondataavailable = (e) => { if (e.data.size) mediaChunks.push(e.data); };
+  mediaRec.start();
+  recording = true;
+  micBtn.classList.add('recording');
+  micBtn.textContent = '⏹';
+  micHint.textContent = 'Recording (offline)… tap again to stop.';
+}
+
+async function stopRecLocal(){
+  recording = false;
+  micBtn.classList.remove('recording');
+  micBtn.textContent = '🎤';
+  if (!mediaRec) return;
+  const rec2 = mediaRec; mediaRec = null;
+  const stopped = new Promise(res => { rec2.onstop = res; });
+  try{ rec2.stop(); }catch(_){}
+  await stopped;
+  mediaStream.getTracks().forEach(t => t.stop());
+  if (!mediaChunks.length){ micHint.innerHTML = 'Tap the mic and speak your idea.<br>Or type below.'; return; }
+
+  micBtn.disabled = true;
+  micHint.textContent = 'Transcribing on your phone…';
+  try {
+    const buf = await new Blob(mediaChunks).arrayBuffer();
+    // decode + resample to the 16 kHz mono float audio Whisper expects
+    const ctx = new OfflineAudioContext(1, 1, 16000);
+    const decoded = await ctx.decodeAudioData(buf);
+    const off = new OfflineAudioContext(1, Math.ceil(decoded.duration * 16000), 16000);
+    const src = off.createBufferSource();
+    src.buffer = decoded; src.connect(off.destination); src.start();
+    const rendered = await off.startRendering();
+    const audio = rendered.getChannelData(0);
+    const {text} = await aiCall('transcribe', {audio}, [audio.buffer]);
+    liveText.value = (baseText + ' ' + text).replace(/\s+/g,' ').trim();
+  } catch (err) {
+    toast('Transcription failed: ' + err.message);
+  }
+  micBtn.disabled = false;
+  micHint.innerHTML = 'Tap the mic and speak your idea.<br>Or type below.';
+}
+
+function useLocalASR(){
+  return store.get('localASR', false) && !!(navigator.mediaDevices && window.MediaRecorder);
+}
+micBtn.addEventListener('click', () => {
+  if (useLocalASR()) return recording ? stopRecLocal() : startRecLocal();
+  return recording ? stopRec() : startRec();
+});
 document.getElementById('clearBtn').addEventListener('click', () => {
   liveText.value = ''; baseText = '';
 });
@@ -508,14 +627,17 @@ saveIdeaBtn.addEventListener('click', async () => {
   saveIdeaBtn.disabled = true;
   saveIdeaBtn.innerHTML = '<span class="spin">◌</span> Summarizing…';
 
-  let result;
+  let result = null;
   const key = store.get('apiKey', '');
-  if (key){
-    try { result = await claudeSummarize(raw, key); }
-    catch(e){ toast('Claude unavailable — used offline summary.'); result = localSummarize(raw); }
-  } else {
-    result = localSummarize(raw);
+  if (store.get('localLLM', false)){
+    try { result = await localSummarizeLLM(raw); }
+    catch(e){ toast('On-device AI unavailable — trying fallback.'); }
   }
+  if (!result && key){
+    try { result = await claudeSummarize(raw, key); }
+    catch(e){ toast('Claude unavailable — used built-in summary.'); }
+  }
+  if (!result) result = localSummarize(raw);
 
   const idea = {id: Date.now() + '', raw, summary: result.summary, priority: result.priority, ts: Date.now()};
   ideas.unshift(idea); saveIdeas();
@@ -683,6 +805,61 @@ function quickAdd(){
 }
 document.getElementById('quickAddBtn').addEventListener('click', quickAdd);
 document.getElementById('quickAdd').addEventListener('keydown', e => { if (e.key==='Enter') quickAdd(); });
+
+/* ---------- settings: on-device AI ---------- */
+function setupModelButton(kind, btnId, statusId, storeKey, loadMsg, enabledLabel, disabledLabel){
+  const btn = document.getElementById(btnId);
+  const status = document.getElementById(statusId);
+  const refresh = () => {
+    const on = store.get(storeKey, false);
+    btn.textContent = on ? enabledLabel : disabledLabel;
+    btn.classList.toggle('primary', !on);
+    btn.classList.toggle('ghost', on);
+    if (on && !status.textContent) status.textContent = '✅ Enabled — model is cached on this device.';
+  };
+  refresh();
+  btn.addEventListener('click', async () => {
+    if (store.get(storeKey, false)){
+      store.set(storeKey, false);
+      status.textContent = 'Disabled. The downloaded model stays cached — re-enable any time.';
+      refresh();
+      return;
+    }
+    btn.disabled = true;
+    status.textContent = loadMsg;
+    aiProgress[kind] = (pct) => { status.textContent = `Downloading… ${pct}% (one-time, stays on your phone)`; };
+    try {
+      if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
+      const {device} = await aiCall('load-' + kind);
+      store.set(storeKey, true);
+      status.textContent = `✅ Ready — running on-device (${device === 'webgpu' ? 'GPU accelerated' : 'CPU mode'}).`;
+    } catch (err) {
+      status.textContent = '❌ Could not load the model: ' + err.message +
+        (location.protocol === 'http:' ? '' : ' — check your connection and free storage, then try again.');
+    }
+    aiProgress[kind] = null;
+    btn.disabled = false;
+    refresh();
+  });
+}
+setupModelButton('asr', 'asrBtn', 'asrStatus', 'localASR',
+  'Preparing Whisper (speech recognition)…',
+  'Disable offline voice recognition', 'Enable offline voice recognition (~80 MB)');
+setupModelButton('llm', 'llmBtn', 'llmStatus', 'localLLM',
+  'Preparing Qwen3 (summaries)…',
+  'Disable on-device summaries', 'Enable on-device summaries (~570 MB)');
+
+document.getElementById('modelsWipeBtn').addEventListener('click', async () => {
+  if (!confirm('Delete the downloaded AI models from this device? You can re-download them later.')) return;
+  store.set('localASR', false); store.set('localLLM', false);
+  if (aiWorker){ aiWorker.terminate(); aiWorker = null; }
+  const keys = await caches.keys();
+  await Promise.all(keys.filter(k => /transformers|onnx|webllm/i.test(k)).map(k => caches.delete(k)));
+  document.getElementById('asrStatus').textContent = '';
+  document.getElementById('llmStatus').textContent = '';
+  toast('Models deleted');
+  location.reload();
+});
 
 /* ---------- settings ---------- */
 const keyInput = document.getElementById('apiKeyInput');

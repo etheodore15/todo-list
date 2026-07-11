@@ -21,8 +21,8 @@ No app store, no build tools, no account — it runs entirely on your phone.
 4. Open **Idea → Todo** from your home screen like any other app.
    The first time you tap the mic, allow microphone access.
 
-The app works offline after the first load (except voice recognition, which uses
-Google's speech service and needs a connection).
+The app works offline after the first load. For fully offline voice recognition
+and summaries, enable the on-device AI models in Settings (see below).
 
 ## How it works
 
@@ -33,15 +33,32 @@ Google's speech service and needs a connection).
 | ✅ **Today** | Your daily todo list, auto-grouped into **Do first / Do today / If time allows**. Tick tasks off, tap the priority chip to re-prioritize, quick-add extras. Unfinished tasks carry over to the next day automatically. |
 | ⚙️ **Settings** | Optional Claude API key for smarter summaries, archive finished tasks, delete all data. |
 
+### On-device AI (fully offline, no API key)
+
+In Settings you can download two small AI models that then run entirely on your
+phone — no internet needed afterwards, nothing leaves the device:
+
+- **Offline voice recognition** — OpenAI's Whisper (base, ~80 MB) transcribes your
+  recordings on-device. Works on any modern phone browser (GPU-accelerated where
+  available, CPU fallback otherwise) and replaces Android's cloud speech service.
+- **On-device summaries** — Qwen3 0.6B (~570 MB) summarizes and prioritizes ideas
+  locally. Needs GPU acceleration (WebGPU): Chrome on Android 12+, or Safari on
+  iOS 26+. Devices without WebGPU fall back to the built-in heuristic.
+
+Models download once (use Wi-Fi) and are cached in browser storage. The inference
+runtime ([transformers.js](https://huggingface.co/docs/transformers.js) + ONNX
+Runtime) is bundled with the app in `vendor/`, so the installed app is fully
+self-contained.
+
 ### Summaries & priorities
 
 - **Default (offline, free):** a built-in heuristic splits your idea into action
-  items, picks the key sentence as the summary, and assigns priority from urgency
-  cues in your own words ("urgent", "today", "must" → high; "this week", "soon" →
-  medium; "someday", "maybe" → low).
-- **Optional (smarter):** paste an [Anthropic API key](https://console.anthropic.com/)
-  in Settings and Claude (Haiku) summarizes and prioritizes instead. If the API is
-  unreachable it falls back to the offline heuristic.
+  items, picks the key sentence as the summary, and scores priority from urgency
+  and importance cues in your own words.
+- **On-device AI:** enable the local model above — best privacy, no ongoing cost.
+- **Optional (cloud):** paste an [Anthropic API key](https://console.anthropic.com/)
+  in Settings and Claude summarizes and prioritizes instead. Order of preference
+  when enabled: on-device model → Claude → heuristic.
 
 ### Privacy
 
@@ -51,7 +68,10 @@ sent to the Anthropic API with your own key).
 
 ## Files
 
-- `index.html` — the whole app (UI + logic, no dependencies)
+- `index.html` — the whole app (UI + logic)
+- `ai-worker.js` — Web Worker running the on-device AI models
+- `vendor/` — bundled transformers.js + ONNX runtime (no CDN dependency)
 - `manifest.webmanifest` — makes it installable
 - `sw.js` — service worker for offline use
 - `icons/` — app icons
+- `tests/` — browser regression tests (Playwright)
