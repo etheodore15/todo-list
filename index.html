@@ -259,7 +259,7 @@ const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 const micBtn = document.getElementById('micBtn');
 const micHint = document.getElementById('micHint');
 const liveText = document.getElementById('liveText');
-let rec = null, recording = false, finalText = '';
+let rec = null, recording = false, baseText = '';
 
 if (!SR){
   micBtn.disabled = true;
@@ -271,25 +271,36 @@ if (!SR){
   rec.continuous = true;
   rec.interimResults = true;
 
+  // Android Chrome re-delivers the WHOLE cumulative transcript in each event
+  // (and repeats results), so never append across events — rebuild every time
+  // from the full results list, on top of whatever text existed before this
+  // recording session (baseText).
   rec.onresult = (e) => {
-    let interim = '';
-    for (let i = e.resultIndex; i < e.results.length; i++){
-      const r = e.results[i];
-      if (r.isFinal) finalText += r[0].transcript + ' ';
-      else interim += r[0].transcript;
+    let session = '', prev = '';
+    for (let i = 0; i < e.results.length; i++){
+      const t = e.results[i][0].transcript.trim();
+      if (!t || t === prev) continue;   // skip Android duplicate results
+      session += t + ' ';
+      prev = t;
     }
-    liveText.value = (finalText + interim).trim();
+    liveText.value = (baseText + ' ' + session).replace(/\s+/g,' ').trim();
   };
   rec.onerror = (e) => {
     stopRec();
     if (e.error === 'not-allowed') toast('Microphone permission denied — allow it in site settings.');
     else if (e.error !== 'aborted' && e.error !== 'no-speech') toast('Speech error: ' + e.error);
   };
-  rec.onend = () => { if (recording) { try{ rec.start(); }catch(_){} } };  // auto-restart until user stops
+  rec.onend = () => {
+    if (recording){
+      // Engine restarts with an empty results list: commit what we have first.
+      baseText = liveText.value;
+      try{ rec.start(); }catch(_){}
+    }
+  };
 }
 
 function startRec(){
-  finalText = liveText.value ? liveText.value.trim() + ' ' : '';
+  baseText = liveText.value.trim();
   recording = true;
   micBtn.classList.add('recording');
   micBtn.textContent = '⏹';
@@ -305,7 +316,7 @@ function stopRec(){
 }
 micBtn.addEventListener('click', () => recording ? stopRec() : startRec());
 document.getElementById('clearBtn').addEventListener('click', () => {
-  liveText.value = ''; finalText = '';
+  liveText.value = ''; baseText = '';
 });
 
 /* ---------- local (offline) summarizer ---------- */
@@ -423,7 +434,7 @@ saveIdeaBtn.addEventListener('click', async () => {
   });
   saveTodos();
 
-  liveText.value = ''; finalText = '';
+  liveText.value = ''; baseText = '';
   saveIdeaBtn.disabled = false;
   saveIdeaBtn.textContent = 'Summarize & Add';
   updateBadge();
