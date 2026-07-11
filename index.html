@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#10131a">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<title>Idea → Todo</title>
+<style>
+  :root{
+    --bg:#10131a; --card:#1a1f2b; --card2:#212838; --text:#e8ecf4; --muted:#8b94a7;
+    --accent:#4f8cff; --accent2:#3a6fd8; --danger:#ff5c6c; --ok:#3ecf8e;
+    --hi:#ff5c6c; --med:#ffb347; --low:#3ecf8e;
+    --radius:16px;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0; padding:0; background:var(--bg); color:var(--text);
+    font-family:-apple-system,'Segoe UI',Roboto,sans-serif; min-height:100%;}
+  body{padding-bottom:calc(90px + env(safe-area-inset-bottom));}
+  header{position:sticky; top:0; z-index:10; background:rgba(16,19,26,.92);
+    backdrop-filter:blur(8px); padding:14px 18px 10px; border-bottom:1px solid #262d3d;}
+  header h1{margin:0; font-size:1.15rem; font-weight:700; letter-spacing:.3px;}
+  header .date{color:var(--muted); font-size:.8rem; margin-top:2px;}
+  main{padding:14px; max-width:640px; margin:0 auto;}
+
+  /* Tabs */
+  nav.tabs{position:fixed; bottom:0; left:0; right:0; z-index:20; display:flex;
+    background:#151926; border-top:1px solid #262d3d;
+    padding-bottom:env(safe-area-inset-bottom);}
+  nav.tabs button{flex:1; background:none; border:none; color:var(--muted);
+    font-size:.75rem; padding:10px 0 12px; cursor:pointer; display:flex;
+    flex-direction:column; align-items:center; gap:3px;}
+  nav.tabs button .ico{font-size:1.35rem; line-height:1;}
+  nav.tabs button.active{color:var(--accent);}
+
+  .view{display:none;} .view.active{display:block;}
+
+  /* Capture */
+  .mic-wrap{display:flex; flex-direction:column; align-items:center; padding:26px 0 10px;}
+  #micBtn{width:110px; height:110px; border-radius:50%; border:none; cursor:pointer;
+    background:radial-gradient(circle at 30% 30%, var(--accent), var(--accent2));
+    color:#fff; font-size:2.6rem; box-shadow:0 6px 30px rgba(79,140,255,.35);
+    transition:transform .15s;}
+  #micBtn:active{transform:scale(.94);}
+  #micBtn.recording{background:radial-gradient(circle at 30% 30%, #ff7080, #d83a4e);
+    box-shadow:0 0 0 0 rgba(255,92,108,.6); animation:pulse 1.4s infinite;}
+  @keyframes pulse{
+    0%{box-shadow:0 0 0 0 rgba(255,92,108,.55);}
+    70%{box-shadow:0 0 0 26px rgba(255,92,108,0);}
+    100%{box-shadow:0 0 0 0 rgba(255,92,108,0);}
+  }
+  .mic-hint{color:var(--muted); font-size:.85rem; margin-top:14px; text-align:center;}
+  #liveText{width:100%; min-height:110px; margin-top:16px; background:var(--card);
+    border:1px solid #2a3245; border-radius:var(--radius); color:var(--text);
+    padding:14px; font-size:1rem; line-height:1.5; resize:vertical; outline:none;}
+  #liveText:focus{border-color:var(--accent);}
+  .cap-actions{display:flex; gap:10px; margin-top:12px;}
+  .btn{flex:1; border:none; border-radius:12px; padding:14px; font-size:.95rem;
+    font-weight:600; cursor:pointer;}
+  .btn.primary{background:var(--accent); color:#fff;}
+  .btn.ghost{background:var(--card2); color:var(--muted);}
+  .btn:disabled{opacity:.4;}
+
+  /* Cards */
+  .card{background:var(--card); border:1px solid #262d3d; border-radius:var(--radius);
+    padding:14px 14px 12px; margin-bottom:12px;}
+  .card .summary{font-weight:600; font-size:.98rem; line-height:1.45;}
+  .card .raw{color:var(--muted); font-size:.82rem; margin-top:8px; line-height:1.45;
+    max-height:3.9em; overflow:hidden;}
+  .card .raw.open{max-height:none;}
+  .card .meta{display:flex; align-items:center; gap:8px; margin-top:10px; flex-wrap:wrap;}
+  .chip{font-size:.7rem; padding:3px 9px; border-radius:20px; background:var(--card2);
+    color:var(--muted);}
+  .card .del{background:none; border:none; color:var(--muted); font-size:1rem;
+    cursor:pointer; margin-left:auto;}
+  .empty{text-align:center; color:var(--muted); padding:48px 20px; font-size:.9rem; line-height:1.6;}
+
+  /* Todo */
+  .prio-section{margin-bottom:18px;}
+  .prio-section h2{font-size:.75rem; text-transform:uppercase; letter-spacing:1.2px;
+    margin:0 0 8px 4px; display:flex; align-items:center; gap:7px;}
+  .dot{width:9px; height:9px; border-radius:50%; display:inline-block;}
+  .dot.high{background:var(--hi);} .dot.medium{background:var(--med);} .dot.low{background:var(--low);}
+  h2.hi{color:var(--hi);} h2.med{color:var(--med);} h2.lo{color:var(--low);}
+  .todo{display:flex; align-items:flex-start; gap:12px; background:var(--card);
+    border:1px solid #262d3d; border-radius:14px; padding:13px 12px; margin-bottom:8px;}
+  .todo .chk{width:24px; height:24px; min-width:24px; border-radius:8px;
+    border:2px solid var(--muted); background:none; cursor:pointer; margin-top:1px;
+    display:flex; align-items:center; justify-content:center; color:transparent; font-size:.9rem;}
+  .todo.done .chk{background:var(--ok); border-color:var(--ok); color:#0c1117;}
+  .todo .txt{flex:1; font-size:.95rem; line-height:1.4;}
+  .todo.done .txt{color:var(--muted); text-decoration:line-through;}
+  .todo .prio-btn{border:none; background:var(--card2); color:var(--muted);
+    font-size:.65rem; font-weight:700; padding:5px 8px; border-radius:8px; cursor:pointer;
+    letter-spacing:.5px;}
+  .todo .prio-btn.high{color:var(--hi);} .todo .prio-btn.medium{color:var(--med);}
+  .todo .prio-btn.low{color:var(--low);}
+  .todo .del{background:none; border:none; color:#4a5368; cursor:pointer; font-size:1rem; padding:2px;}
+  .addrow{display:flex; gap:8px; margin-bottom:16px;}
+  .addrow input{flex:1; background:var(--card); border:1px solid #2a3245; border-radius:12px;
+    color:var(--text); padding:12px 14px; font-size:.95rem; outline:none;}
+  .addrow input:focus{border-color:var(--accent);}
+  .addrow button{background:var(--accent); border:none; color:#fff; border-radius:12px;
+    width:48px; font-size:1.4rem; cursor:pointer;}
+  .progress{background:var(--card2); border-radius:20px; height:8px; margin:4px 0 18px; overflow:hidden;}
+  .progress > div{height:100%; background:linear-gradient(90deg,var(--accent),var(--ok));
+    border-radius:20px; transition:width .3s; width:0;}
+  .progress-label{color:var(--muted); font-size:.78rem; margin-bottom:6px;}
+
+  /* Settings */
+  .set-block{background:var(--card); border:1px solid #262d3d; border-radius:var(--radius);
+    padding:16px; margin-bottom:14px;}
+  .set-block h3{margin:0 0 6px; font-size:.95rem;}
+  .set-block p{color:var(--muted); font-size:.82rem; line-height:1.55; margin:6px 0;}
+  .set-block input{width:100%; background:var(--bg); border:1px solid #2a3245;
+    border-radius:10px; color:var(--text); padding:11px 12px; font-size:.88rem;
+    outline:none; margin-top:8px;}
+  .set-block .btn{margin-top:10px;}
+
+  .toast{position:fixed; left:50%; transform:translateX(-50%);
+    bottom:calc(96px + env(safe-area-inset-bottom)); background:#2b3348; color:var(--text);
+    padding:10px 18px; border-radius:24px; font-size:.85rem; opacity:0;
+    transition:opacity .25s; pointer-events:none; z-index:50; max-width:88%; text-align:center;}
+  .toast.show{opacity:1;}
+  .spin{display:inline-block; animation:spin 1s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+</style>
+</head>
+<body>
+
+<header>
+  <h1 id="hdrTitle">Idea → Todo</h1>
+  <div class="date" id="hdrDate"></div>
+</header>
+
+<main>
+  <!-- CAPTURE -->
+  <section id="view-capture" class="view active">
+    <div class="mic-wrap">
+      <button id="micBtn" aria-label="Record idea">🎤</button>
+      <div class="mic-hint" id="micHint">Tap the mic and speak your idea.<br>Or type below.</div>
+    </div>
+    <textarea id="liveText" placeholder="Your transcribed idea appears here… you can also just type."></textarea>
+    <div class="cap-actions">
+      <button class="btn ghost" id="clearBtn">Clear</button>
+      <button class="btn primary" id="saveIdeaBtn">Summarize &amp; Add</button>
+    </div>
+  </section>
+
+  <!-- IDEAS -->
+  <section id="view-ideas" class="view">
+    <div id="ideasList"></div>
+  </section>
+
+  <!-- TODAY -->
+  <section id="view-today" class="view">
+    <div class="progress-label" id="progressLabel"></div>
+    <div class="progress"><div id="progressBar"></div></div>
+    <div class="addrow">
+      <input id="quickAdd" placeholder="Quick add a task…" enterkeyhint="done">
+      <button id="quickAddBtn" aria-label="Add task">＋</button>
+    </div>
+    <div id="todoList"></div>
+  </section>
+
+  <!-- SETTINGS -->
+  <section id="view-settings" class="view">
+    <div class="set-block">
+      <h3>Smart summaries (optional)</h3>
+      <p>By default, summaries and priorities are generated on your phone with a built-in
+         heuristic — free and fully offline. For higher-quality summaries and task extraction,
+         paste an <b>Anthropic API key</b> and the app will use Claude instead.</p>
+      <input id="apiKeyInput" type="password" placeholder="sk-ant-…" autocomplete="off">
+      <button class="btn primary" id="saveKeyBtn">Save key</button>
+      <p id="keyStatus"></p>
+    </div>
+    <div class="set-block">
+      <h3>Daily reset</h3>
+      <p>Each day, finished tasks are archived and unfinished ones carry over to today automatically.</p>
+      <button class="btn ghost" id="clearDoneBtn">Archive finished tasks now</button>
+    </div>
+    <div class="set-block">
+      <h3>Your data</h3>
+      <p>Everything is stored only on this device (localStorage). Nothing is uploaded anywhere
+         unless you enable Claude summaries.</p>
+      <button class="btn ghost" id="wipeBtn">Delete all data</button>
+    </div>
+  </section>
+</main>
+
+<nav class="tabs">
+  <button data-view="capture" class="active"><span class="ico">🎤</span>Capture</button>
+  <button data-view="ideas"><span class="ico">💡</span>Ideas</button>
+  <button data-view="today"><span class="ico">✅</span>Today<span id="todayBadge"></span></button>
+  <button data-view="settings"><span class="ico">⚙️</span>Settings</button>
+</nav>
+
+<div class="toast" id="toast"></div>
+
+<script>
+'use strict';
+
+/* ---------- storage ---------- */
+const store = {
+  get(k, d){ try{ const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; }catch(e){ return d; } },
+  set(k, v){ localStorage.setItem(k, JSON.stringify(v)); }
+};
+let ideas = store.get('ideas', []);      // {id, raw, summary, priority, ts}
+let todos = store.get('todos', []);      // {id, text, priority, done, date, ideaId}
+const saveIdeas = () => store.set('ideas', ideas);
+const saveTodos = () => store.set('todos', todos);
+
+const todayStr = () => new Date().toISOString().slice(0,10);
+
+/* ---------- daily carry-over ---------- */
+(function rollover(){
+  const t = todayStr();
+  let changed = false;
+  todos.forEach(td => {
+    if (td.date < t && !td.done){ td.date = t; changed = true; }   // carry unfinished over
+  });
+  // keep done items from past days out of today's view but in storage (archive)
+  if (changed) saveTodos();
+})();
+
+/* ---------- toast ---------- */
+let toastTimer;
+function toast(msg){
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2600);
+}
+
+/* ---------- tabs ---------- */
+const views = ['capture','ideas','today','settings'];
+document.querySelectorAll('nav.tabs button').forEach(btn => {
+  btn.addEventListener('click', () => showView(btn.dataset.view));
+});
+function showView(name){
+  views.forEach(v => {
+    document.getElementById('view-' + v).classList.toggle('active', v === name);
+  });
+  document.querySelectorAll('nav.tabs button').forEach(b =>
+    b.classList.toggle('active', b.dataset.view === name));
+  if (name === 'ideas') renderIdeas();
+  if (name === 'today') renderTodos();
+}
+
+/* ---------- header date ---------- */
+document.getElementById('hdrDate').textContent =
+  new Date().toLocaleDateString(undefined, {weekday:'long', day:'numeric', month:'long'});
+
+/* ---------- speech recognition ---------- */
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+const micBtn = document.getElementById('micBtn');
+const micHint = document.getElementById('micHint');
+const liveText = document.getElementById('liveText');
+let rec = null, recording = false, finalText = '';
+
+if (!SR){
+  micBtn.disabled = true;
+  micBtn.style.opacity = .4;
+  micHint.innerHTML = 'Voice input isn\'t supported in this browser.<br>Use Chrome on Android — or just type below.';
+} else {
+  rec = new SR();
+  rec.lang = navigator.language || 'en-AU';
+  rec.continuous = true;
+  rec.interimResults = true;
+
+  rec.onresult = (e) => {
+    let interim = '';
+    for (let i = e.resultIndex; i < e.results.length; i++){
+      const r = e.results[i];
+      if (r.isFinal) finalText += r[0].transcript + ' ';
+      else interim += r[0].transcript;
+    }
+    liveText.value = (finalText + interim).trim();
+  };
+  rec.onerror = (e) => {
+    stopRec();
+    if (e.error === 'not-allowed') toast('Microphone permission denied — allow it in site settings.');
+    else if (e.error !== 'aborted' && e.error !== 'no-speech') toast('Speech error: ' + e.error);
+  };
+  rec.onend = () => { if (recording) { try{ rec.start(); }catch(_){} } };  // auto-restart until user stops
+}
+
+function startRec(){
+  finalText = liveText.value ? liveText.value.trim() + ' ' : '';
+  recording = true;
+  micBtn.classList.add('recording');
+  micBtn.textContent = '⏹';
+  micHint.textContent = 'Listening… tap again to stop.';
+  try{ rec.start(); }catch(_){}
+}
+function stopRec(){
+  recording = false;
+  micBtn.classList.remove('recording');
+  micBtn.textContent = '🎤';
+  micHint.innerHTML = 'Tap the mic and speak your idea.<br>Or type below.';
+  if (rec) try{ rec.stop(); }catch(_){}
+}
+micBtn.addEventListener('click', () => recording ? stopRec() : startRec());
+document.getElementById('clearBtn').addEventListener('click', () => {
+  liveText.value = ''; finalText = '';
+});
+
+/* ---------- local (offline) summarizer ---------- */
+const STOP = new Set(('a an the and or but so of to in on at for with about into over after is are was were be been being i me my we our you your it its this that these those do does did have has had will would can could should just really very also then than as by from not no'.split(' ')));
+
+function splitSentences(text){
+  // Voice transcripts rarely have punctuation, so split on spoken connectors too:
+  // "and then", "and I/we should…", "also", "plus", "don't forget", etc.
+  return text.replace(/\s+/g,' ').trim()
+    .split(/(?<=[.!?])\s+|,?\s+(?:and then|then|after that|plus)\s+|,?\s+and\s+(?=(?:i|we|you)\b|also\b|maybe\b|don't\b|remember\b)/i)
+    .map(s => s.trim()).filter(s => s.length > 2);
+}
+
+function localSummarize(text){
+  const sentences = splitSentences(text);
+  if (!sentences.length) return {summary: text.trim(), tasks: [], priority: 'medium'};
+
+  // word frequency scoring for extractive summary
+  const freq = {};
+  text.toLowerCase().replace(/[^a-z0-9\s']/g,' ').split(/\s+/).forEach(w => {
+    if (w && !STOP.has(w)) freq[w] = (freq[w]||0)+1;
+  });
+  const score = (s, i) =>
+    s.toLowerCase().split(/\s+/).reduce((a,w)=>a+(freq[w.replace(/[^a-z0-9']/g,'')]||0),0)
+    * (i === 0 ? 1.4 : 1)                                  // lead-sentence bias
+    * ({high:1.5, medium:1, low:0.6}[detectPriority(s)]);  // prefer the urgent clause
+  const best = sentences.reduce((a,s,i)=>score(s,i)>score(a.s,a.i)?{s,i}:a, {s:sentences[0], i:0}).s;
+  let summary = best.length > 120 ? best.slice(0,117)+'…' : best;
+  summary = summary.charAt(0).toUpperCase() + summary.slice(1);
+  if (sentences.length > 1) summary += ` (+${sentences.length-1} more)`;
+
+  // task extraction: action-ish sentences, each with its own priority
+  const ACTION = /\b(need to|have to|must|should|remember to|don't forget|call|email|buy|book|send|write|finish|fix|check|schedule|organise|organize|plan|research|look into|follow up|pay|order|clean|prepare|review|update|create|make|build|contact|ask|get|set up|cancel|renew|submit)\b/i;
+  let picked = sentences.filter(s => ACTION.test(s));
+  if (!picked.length) picked = [sentences[0]];
+  const tasks = picked.slice(0,5).map(t => {
+    const priority = detectPriority(t);
+    t = t.replace(/^(i |we |you )?(should also|need to|have to|must|should|remember to|don't forget to|don't forget|maybe|someday|maybe someday)\s*/i,'')
+         .replace(/[.!?]+$/,'').trim();
+    return {text: t.charAt(0).toUpperCase() + t.slice(1), priority};
+  }).filter(t => t.text.length > 1);
+
+  return {summary, tasks, priority: detectPriority(text)};
+}
+
+function detectPriority(text){
+  const t = text.toLowerCase();
+  if (/\b(urgent|asap|immediately|today|right away|critical|must|deadline|overdue|now|emergency|important)\b/.test(t)) return 'high';
+  if (/\b(this week|soon|should|tomorrow|follow up|priority)\b/.test(t)) return 'medium';
+  if (/\b(someday|eventually|maybe|one day|at some point|low priority|whenever)\b/.test(t)) return 'low';
+  return 'medium';
+}
+
+/* ---------- Claude summarizer (optional) ---------- */
+async function claudeSummarize(text, apiKey){
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method:'POST',
+    headers:{
+      'content-type':'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version':'2023-06-01',
+      'anthropic-dangerous-direct-browser-access':'true'
+    },
+    body: JSON.stringify({
+      model:'claude-haiku-4-5-20251001',
+      max_tokens: 500,
+      messages:[{role:'user', content:
+`Here is a voice-transcribed idea. Return ONLY JSON, no prose:
+{"summary": "<one concise sentence>", "tasks": [{"text": "<actionable task>", "priority": "high"|"medium"|"low"}, ...max 5], "priority": "high"|"medium"|"low"}
+Each task's priority reflects its own urgency/importance; the top-level priority is the idea's overall urgency.
+
+Idea: """${text}"""`}]
+    })
+  });
+  if (!res.ok) throw new Error('API ' + res.status);
+  const data = await res.json();
+  const raw = data.content.map(c => c.text || '').join('');
+  const json = JSON.parse(raw.slice(raw.indexOf('{'), raw.lastIndexOf('}')+1));
+  const okPrio = p => ['high','medium','low'].includes(p);
+  return {
+    summary: String(json.summary || '').trim() || text.slice(0,100),
+    tasks: (Array.isArray(json.tasks) ? json.tasks : []).slice(0,5).map(t => ({
+      text: String(t && t.text != null ? t.text : t).trim(),
+      priority: okPrio(t && t.priority) ? t.priority : detectPriority(text)
+    })).filter(t => t.text),
+    priority: okPrio(json.priority) ? json.priority : detectPriority(text)
+  };
+}
+
+/* ---------- save idea ---------- */
+const saveIdeaBtn = document.getElementById('saveIdeaBtn');
+saveIdeaBtn.addEventListener('click', async () => {
+  const raw = liveText.value.trim();
+  if (!raw){ toast('Nothing to save — speak or type an idea first.'); return; }
+  if (recording) stopRec();
+
+  saveIdeaBtn.disabled = true;
+  saveIdeaBtn.innerHTML = '<span class="spin">◌</span> Summarizing…';
+
+  let result;
+  const key = store.get('apiKey', '');
+  if (key){
+    try { result = await claudeSummarize(raw, key); }
+    catch(e){ toast('Claude unavailable — used offline summary.'); result = localSummarize(raw); }
+  } else {
+    result = localSummarize(raw);
+  }
+
+  const idea = {id: Date.now() + '', raw, summary: result.summary, priority: result.priority, ts: Date.now()};
+  ideas.unshift(idea); saveIdeas();
+
+  const t = todayStr();
+  result.tasks.forEach((task, i) => {
+    todos.push({id: idea.id + '-' + i, text: task.text, priority: task.priority, done:false, date:t, ideaId: idea.id});
+  });
+  saveTodos();
+
+  liveText.value = ''; finalText = '';
+  saveIdeaBtn.disabled = false;
+  saveIdeaBtn.textContent = 'Summarize & Add';
+  updateBadge();
+  toast(`Added ${result.tasks.length} task${result.tasks.length===1?'':'s'} to Today ✓`);
+  showView('today');
+});
+
+/* ---------- render ideas ---------- */
+function renderIdeas(){
+  const el = document.getElementById('ideasList');
+  if (!ideas.length){
+    el.innerHTML = '<div class="empty">💡<br><br>No ideas yet.<br>Capture one with the mic and it will appear here with its summary.</div>';
+    return;
+  }
+  el.innerHTML = '';
+  ideas.forEach(idea => {
+    const d = new Date(idea.ts);
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML = `
+      <div class="summary"></div>
+      <div class="raw"></div>
+      <div class="meta">
+        <span class="chip"><span class="dot ${idea.priority}"></span> ${idea.priority}</span>
+        <span class="chip">${d.toLocaleDateString(undefined,{day:'numeric',month:'short'})} ${d.toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'})}</span>
+        <button class="del" aria-label="Delete idea">🗑</button>
+      </div>`;
+    card.querySelector('.summary').textContent = idea.summary;
+    const rawEl = card.querySelector('.raw');
+    rawEl.textContent = idea.raw;
+    rawEl.addEventListener('click', () => rawEl.classList.toggle('open'));
+    card.querySelector('.del').addEventListener('click', () => {
+      ideas = ideas.filter(x => x.id !== idea.id); saveIdeas(); renderIdeas();
+    });
+    el.appendChild(card);
+  });
+}
+
+/* ---------- render todos ---------- */
+const PRIOS = [
+  {key:'high',   label:'Do first',  cls:'hi'},
+  {key:'medium', label:'Do today',  cls:'med'},
+  {key:'low',    label:'If time allows', cls:'lo'}
+];
+
+function todayTodos(){ return todos.filter(t => t.date === todayStr()); }
+
+function renderTodos(){
+  const el = document.getElementById('todoList');
+  const list = todayTodos();
+  el.innerHTML = '';
+
+  const done = list.filter(t=>t.done).length;
+  document.getElementById('progressLabel').textContent =
+    list.length ? `${done} of ${list.length} done` : 'No tasks yet today';
+  document.getElementById('progressBar').style.width =
+    list.length ? Math.round(done/list.length*100)+'%' : '0';
+
+  if (!list.length){
+    el.innerHTML = '<div class="empty">✅<br><br>Nothing on the list yet.<br>Capture an idea or quick-add a task above.</div>';
+    updateBadge(); return;
+  }
+
+  PRIOS.forEach(p => {
+    const items = list.filter(t => t.priority === p.key)
+                      .sort((a,b) => (a.done - b.done));
+    if (!items.length) return;
+    const sec = document.createElement('div');
+    sec.className = 'prio-section';
+    sec.innerHTML = `<h2 class="${p.cls}"><span class="dot ${p.key}"></span>${p.label}</h2>`;
+    items.forEach(td => sec.appendChild(todoRow(td)));
+    el.appendChild(sec);
+  });
+  updateBadge();
+}
+
+function todoRow(td){
+  const row = document.createElement('div');
+  row.className = 'todo' + (td.done ? ' done' : '');
+  row.innerHTML = `
+    <button class="chk" aria-label="Toggle done">✓</button>
+    <div class="txt"></div>
+    <button class="prio-btn ${td.priority}">${td.priority.toUpperCase().slice(0,3)}</button>
+    <button class="del" aria-label="Delete">✕</button>`;
+  row.querySelector('.txt').textContent = td.text;
+  row.querySelector('.chk').addEventListener('click', () => {
+    td.done = !td.done; saveTodos(); renderTodos();
+  });
+  row.querySelector('.prio-btn').addEventListener('click', () => {
+    const order = ['high','medium','low'];
+    td.priority = order[(order.indexOf(td.priority)+1) % 3];
+    saveTodos(); renderTodos();
+  });
+  row.querySelector('.del').addEventListener('click', () => {
+    todos = todos.filter(x => x.id !== td.id); saveTodos(); renderTodos();
+  });
+  return row;
+}
+
+function updateBadge(){
+  const open = todayTodos().filter(t=>!t.done).length;
+  document.getElementById('todayBadge').textContent = open ? ` (${open})` : '';
+}
+
+/* ---------- quick add ---------- */
+function quickAdd(){
+  const inp = document.getElementById('quickAdd');
+  const text = inp.value.trim();
+  if (!text) return;
+  todos.push({id:'q'+Date.now(), text, priority: detectPriority(text), done:false, date: todayStr(), ideaId:null});
+  saveTodos(); inp.value=''; renderTodos();
+}
+document.getElementById('quickAddBtn').addEventListener('click', quickAdd);
+document.getElementById('quickAdd').addEventListener('keydown', e => { if (e.key==='Enter') quickAdd(); });
+
+/* ---------- settings ---------- */
+const keyInput = document.getElementById('apiKeyInput');
+const keyStatus = document.getElementById('keyStatus');
+function refreshKeyStatus(){
+  keyStatus.textContent = store.get('apiKey','') ? '✅ Claude summaries enabled.' : 'Using offline summaries.';
+}
+refreshKeyStatus();
+document.getElementById('saveKeyBtn').addEventListener('click', () => {
+  store.set('apiKey', keyInput.value.trim());
+  keyInput.value = '';
+  refreshKeyStatus();
+  toast(store.get('apiKey','') ? 'Claude summaries enabled' : 'Key cleared — using offline summaries');
+});
+document.getElementById('clearDoneBtn').addEventListener('click', () => {
+  const t = todayStr();
+  todos = todos.filter(td => !(td.date === t && td.done));
+  saveTodos(); renderTodos(); toast('Finished tasks archived');
+});
+document.getElementById('wipeBtn').addEventListener('click', () => {
+  if (!confirm('Delete ALL ideas and tasks stored on this device?')) return;
+  ideas = []; todos = []; saveIdeas(); saveTodos();
+  renderIdeas(); renderTodos(); toast('All data deleted');
+});
+
+/* ---------- init ---------- */
+updateBadge();
+
+/* ---------- service worker ---------- */
+if ('serviceWorker' in navigator){
+  navigator.serviceWorker.register('sw.js').catch(()=>{});
+}
+</script>
+</body>
+</html>
