@@ -75,6 +75,20 @@
     color:var(--muted);}
   .card .del{background:none; border:none; color:var(--muted); font-size:1rem;
     cursor:pointer; margin-left:auto;}
+  .card .mini-tasks{margin-top:10px; border-top:1px solid #262d3d; padding-top:4px;}
+  .mini-task{display:flex; align-items:center; gap:9px; padding:6px 0; font-size:.85rem;}
+  .mini-task .mchk{width:19px; height:19px; min-width:19px; border-radius:6px;
+    border:2px solid var(--muted); background:none; cursor:pointer; color:transparent;
+    font-size:.6rem; display:flex; align-items:center; justify-content:center; padding:0;}
+  .mini-task.done .mchk{background:var(--ok); border-color:var(--ok); color:#0c1117;}
+  .mini-task.done .mtxt{color:var(--muted); text-decoration:line-through;}
+  .mini-task .mtxt{flex:1; line-height:1.35;}
+  .card.flash{animation:flash 1.8s ease-out;}
+  @keyframes flash{
+    0%, 55%{border-color:var(--accent); box-shadow:0 0 0 2px rgba(79,140,255,.45);}
+    100%{border-color:#262d3d; box-shadow:none;}
+  }
+  .todo .link-btn{background:none; border:none; font-size:.95rem; cursor:pointer; padding:2px;}
   .empty{text-align:center; color:var(--muted); padding:48px 20px; font-size:.9rem; line-height:1.6;}
 
   /* Todo */
@@ -170,8 +184,9 @@
     <div class="set-block">
       <h3>Smart summaries (optional)</h3>
       <p>By default, summaries and priorities are generated on your phone with a built-in
-         heuristic — free and fully offline. For higher-quality summaries and task extraction,
-         paste an <b>Anthropic API key</b> and the app will use Claude instead.</p>
+         heuristic — free and fully offline. For significantly better summaries, task
+         extraction, and prioritization, paste an <b>Anthropic API key</b> and the app will
+         use Claude (Opus) instead. Each capture costs a fraction of a cent.</p>
       <input id="apiKeyInput" type="password" placeholder="sk-ant-…" autocomplete="off">
       <button class="btn primary" id="saveKeyBtn">Save key</button>
       <p id="keyStatus"></p>
@@ -187,7 +202,7 @@
          unless you enable Claude summaries.</p>
       <button class="btn ghost" id="wipeBtn">Delete all data</button>
     </div>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v3</p>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v4</p>
   </section>
 </main>
 
@@ -376,29 +391,72 @@ function localSummarize(text){
   summary = summary.charAt(0).toUpperCase() + summary.slice(1);
   if (sentences.length > 1) summary += ` (+${sentences.length-1} more)`;
 
-  // task extraction: action-ish sentences, each with its own priority
+  // Every spoken clause is a candidate task — people talk to a todo app in
+  // intentions. Only fall back to the action-verb filter to trim overflow.
   const ACTION = /\b(need to|have to|must|should|remember to|don't forget|call|email|buy|book|send|write|finish|fix|check|schedule|organise|organize|plan|research|look into|follow up|pay|order|clean|prepare|review|update|create|make|build|contact|ask|get|set up|cancel|renew|submit)\b/i;
-  let picked = sentences.filter(s => ACTION.test(s));
-  if (!picked.length) picked = [sentences[0]];
-  const tasks = picked.slice(0,5).map(t => {
+  let picked = sentences;
+  if (picked.length > 6){
+    const actiony = picked.filter(s => ACTION.test(s));
+    if (actiony.length) picked = actiony;
+  }
+  const tasks = picked.slice(0,6).map(t => {
     const priority = detectPriority(t);
-    t = t.replace(/^(i |we |you )?(should also|need to|have to|must|should|remember to|don't forget to|don't forget|maybe|someday|maybe someday)\s*/i,'')
-         .replace(/[.!?]+$/,'').trim();
+    // strip spoken fillers and lead-ins so the task reads as an imperative
+    for (let pass = 0; pass < 3; pass++){
+      t = t.replace(/^(um+|uh+|okay|ok|so|well|right|actually|basically|anyway|oh)[,\s]+/i,'')
+           .replace(/^(i |we |you )?(really |also |just |probably |definitely )*(think i |want to|would like to|'d like to|was thinking (of|about)?|should also|need to|have to|must|should|remember to|don't forget to|don't forget|maybe someday|maybe|someday|it would be good to|i've got to|i got to|gotta)\s*/i,'')
+           .replace(/^to\s+/i,'').trim();
+    }
+    t = t.replace(/[.!?]+$/,'').trim();
     return {text: t.charAt(0).toUpperCase() + t.slice(1), priority};
-  }).filter(t => t.text.length > 1);
+  }).filter(t => t.text.length > 2);
 
   return {summary, tasks, priority: detectPriority(text)};
 }
 
 function detectPriority(text){
-  const t = text.toLowerCase();
-  if (/\b(urgent|asap|immediately|today|right away|critical|must|deadline|overdue|now|emergency|important)\b/.test(t)) return 'high';
-  if (/\b(this week|soon|should|tomorrow|follow up|priority)\b/.test(t)) return 'medium';
-  if (/\b(someday|eventually|maybe|one day|at some point|low priority|whenever)\b/.test(t)) return 'low';
+  // Score urgency (time pressure) and importance (consequences) instead of
+  // first-keyword-wins, so "urgently need to X today" outranks "should X".
+  const t = ' ' + text.toLowerCase() + ' ';
+  let score = 0;
+  const add = (re, pts) => { if (re.test(t)) score += pts; };
+  add(/\b(urgent(ly)?|asap|as soon as possible|immediately|right away|right now|straight away|emergency|critical|can't wait|cannot wait)\b/, 3);
+  add(/\b(today|tonight|this morning|this afternoon|this evening|end of (the )?day|before .{0,24}(close[sd]?|tonight|today|leave))\b/, 3);
+  add(/\b(deadline|overdue|due (today|tomorrow|this week|by|on)|expir(es?|ing)|running out|last day|final notice)\b/, 2);
+  add(/\b(important|essential|crucial|vital|key|big deal|really matters?)\b/, 2);
+  add(/\b(must|has to|have to)\b/, 1);
+  add(/\b(tomorrow|this week|by (mon|tues|wednes|thurs|fri|satur|sun)day|in the next (few|couple of) days|soon|quickly)\b/, 1);
+  add(/\b(blocked|blocking|waiting on me|before i can|or else|otherwise)\b/, 1);
+  add(/\b(someday|eventually|maybe|might|one day|at some point|whenever|no rush|not urgent|low priority|nice to have|would be nice|if i (get|have) time|down the track|later on|sometime)\b/, -3);
+  add(/\b(next week|next month|when i get a chance)\b/, -1);
+  if (score >= 3) return 'high';
+  if (score <= -2) return 'low';
   return 'medium';
 }
 
 /* ---------- Claude summarizer (optional) ---------- */
+const IDEA_SCHEMA = {
+  type: 'object',
+  properties: {
+    summary: {type: 'string', description: 'One clear sentence (max 14 words) capturing the core intent in plain words — not a transcript excerpt.'},
+    tasks: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          text: {type: 'string', description: 'Short imperative phrase keeping key details, e.g. "Call the accountant about the tax deadline".'},
+          priority: {type: 'string', enum: ['high','medium','low']}
+        },
+        required: ['text','priority'],
+        additionalProperties: false
+      }
+    },
+    priority: {type: 'string', enum: ['high','medium','low']}
+  },
+  required: ['summary','tasks','priority'],
+  additionalProperties: false
+};
+
 async function claudeSummarize(text, apiKey){
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method:'POST',
@@ -409,24 +467,30 @@ async function claudeSummarize(text, apiKey){
       'anthropic-dangerous-direct-browser-access':'true'
     },
     body: JSON.stringify({
-      model:'claude-haiku-4-5-20251001',
-      max_tokens: 500,
+      model:'claude-opus-4-8',
+      max_tokens: 1200,
+      output_config: {format: {type: 'json_schema', schema: IDEA_SCHEMA}},
       messages:[{role:'user', content:
-`Here is a voice-transcribed idea. Return ONLY JSON, no prose:
-{"summary": "<one concise sentence>", "tasks": [{"text": "<actionable task>", "priority": "high"|"medium"|"low"}, ...max 5], "priority": "high"|"medium"|"low"}
-Each task's priority reflects its own urgency/importance; the top-level priority is the idea's overall urgency.
+`Turn this voice-transcribed idea into a summary and todo tasks.
+
+Rules:
+- Extract every distinct action the person intends to take, as separate tasks (max 6). Merge duplicates. Fix obvious speech-transcription errors from context, but keep names as spoken.
+- Judge each task's priority by urgency (time pressure) AND importance (consequences): high = needs action today or blocks other things; medium = this week; low = someday/optional.
+- The top-level priority is the highest task priority.
+- If the idea contains no action at all (a pure thought/observation), return an empty tasks array and just summarize it.
 
 Idea: """${text}"""`}]
     })
   });
   if (!res.ok) throw new Error('API ' + res.status);
   const data = await res.json();
+  if (data.stop_reason === 'refusal') throw new Error('refused');
   const raw = data.content.map(c => c.text || '').join('');
-  const json = JSON.parse(raw.slice(raw.indexOf('{'), raw.lastIndexOf('}')+1));
+  const json = JSON.parse(raw);
   const okPrio = p => ['high','medium','low'].includes(p);
   return {
     summary: String(json.summary || '').trim() || text.slice(0,100),
-    tasks: (Array.isArray(json.tasks) ? json.tasks : []).slice(0,5).map(t => ({
+    tasks: (Array.isArray(json.tasks) ? json.tasks : []).slice(0,6).map(t => ({
       text: String(t && t.text != null ? t.text : t).trim(),
       priority: okPrio(t && t.priority) ? t.priority : detectPriority(text)
     })).filter(t => t.text),
@@ -457,8 +521,13 @@ saveIdeaBtn.addEventListener('click', async () => {
   ideas.unshift(idea); saveIdeas();
 
   const t = todayStr();
+  const norm = s => s.toLowerCase().replace(/[^a-z0-9\s]/g,'').replace(/\s+/g,' ').trim();
+  const existing = new Set(todos.filter(td => !td.done).map(td => norm(td.text)));
+  let added = 0, skipped = 0;
   result.tasks.forEach((task, i) => {
+    if (existing.has(norm(task.text))){ skipped++; return; }   // already on the list
     todos.push({id: idea.id + '-' + i, text: task.text, priority: task.priority, done:false, date:t, ideaId: idea.id});
+    added++;
   });
   saveTodos();
 
@@ -466,7 +535,9 @@ saveIdeaBtn.addEventListener('click', async () => {
   saveIdeaBtn.disabled = false;
   saveIdeaBtn.textContent = 'Summarize & Add';
   updateBadge();
-  toast(`Added ${result.tasks.length} task${result.tasks.length===1?'':'s'} to Today ✓`);
+  toast(added
+    ? `Added ${added} task${added===1?'':'s'} to Today ✓${skipped ? ` (${skipped} already listed)` : ''}`
+    : (skipped ? 'Those tasks are already on your list' : 'Idea saved — no tasks detected'));
   showView('today');
 });
 
@@ -480,14 +551,18 @@ function renderIdeas(){
   el.innerHTML = '';
   ideas.forEach(idea => {
     const d = new Date(idea.ts);
+    const linked = todos.filter(td => td.ideaId === idea.id);
+    const doneCount = linked.filter(td => td.done).length;
     const card = document.createElement('div');
     card.className = 'card';
+    card.dataset.ideaId = idea.id;
     card.innerHTML = `
       <div class="summary"></div>
       <div class="raw"></div>
       <div class="meta">
         <span class="chip"><span class="dot ${idea.priority}"></span> ${idea.priority}</span>
         <span class="chip">${d.toLocaleDateString(undefined,{day:'numeric',month:'short'})} ${d.toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'})}</span>
+        ${linked.length ? `<span class="chip">✅ ${doneCount}/${linked.length}</span>` : ''}
         <button class="del" aria-label="Delete idea">🗑</button>
       </div>`;
     card.querySelector('.summary').textContent = idea.summary;
@@ -497,8 +572,34 @@ function renderIdeas(){
     card.querySelector('.del').addEventListener('click', () => {
       ideas = ideas.filter(x => x.id !== idea.id); saveIdeas(); renderIdeas();
     });
+    if (linked.length){
+      const wrap = document.createElement('div');
+      wrap.className = 'mini-tasks';
+      linked.forEach(td => {
+        const row = document.createElement('div');
+        row.className = 'mini-task' + (td.done ? ' done' : '');
+        row.innerHTML = `<button class="mchk" aria-label="Toggle done">✓</button>
+          <span class="mtxt"></span><span class="dot ${td.priority}"></span>`;
+        row.querySelector('.mtxt').textContent = td.text;
+        row.querySelector('.mchk').addEventListener('click', () => {
+          td.done = !td.done; saveTodos(); renderIdeas(); updateBadge();
+        });
+        wrap.appendChild(row);
+      });
+      card.appendChild(wrap);
+    }
     el.appendChild(card);
   });
+}
+
+function highlightIdea(ideaId){
+  showView('ideas');
+  const card = document.querySelector(`.card[data-idea-id="${ideaId}"]`);
+  if (!card) return;
+  card.scrollIntoView({behavior:'smooth', block:'center'});
+  card.classList.remove('flash');
+  void card.offsetWidth;               // restart the animation
+  card.classList.add('flash');
 }
 
 /* ---------- render todos ---------- */
@@ -542,12 +643,17 @@ function renderTodos(){
 function todoRow(td){
   const row = document.createElement('div');
   row.className = 'todo' + (td.done ? ' done' : '');
+  const hasIdea = td.ideaId && ideas.some(i => i.id === td.ideaId);
   row.innerHTML = `
     <button class="chk" aria-label="Toggle done">✓</button>
     <div class="txt"></div>
+    ${hasIdea ? '<button class="link-btn" aria-label="Show source idea" title="Show source idea">💡</button>' : ''}
     <button class="prio-btn ${td.priority}">${td.priority.toUpperCase().slice(0,3)}</button>
     <button class="del" aria-label="Delete">✕</button>`;
   row.querySelector('.txt').textContent = td.text;
+  if (hasIdea){
+    row.querySelector('.link-btn').addEventListener('click', () => highlightIdea(td.ideaId));
+  }
   row.querySelector('.chk').addEventListener('click', () => {
     td.done = !td.done; saveTodos(); renderTodos();
   });

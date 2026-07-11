@@ -1,4 +1,4 @@
-const CACHE = 'idea-todo-v3';
+const CACHE = 'idea-todo-v4';
 const ASSETS = [
   './',
   './index.html',
