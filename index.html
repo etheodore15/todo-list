@@ -187,6 +187,7 @@
          unless you enable Claude summaries.</p>
       <button class="btn ghost" id="wipeBtn">Delete all data</button>
     </div>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v3</p>
   </section>
 </main>
 
@@ -271,19 +272,46 @@ if (!SR){
   rec.continuous = true;
   rec.interimResults = true;
 
-  // Android Chrome re-delivers the WHOLE cumulative transcript in each event
-  // (and repeats results), so never append across events — rebuild every time
-  // from the full results list, on top of whatever text existed before this
-  // recording session (baseText).
+  // Android Chrome misbehaves in several documented ways: it re-delivers the
+  // whole cumulative transcript each event, appends each growing partial as a
+  // NEW entry in the results list, repeats final results, and revises earlier
+  // words mid-utterance. So never append across events — rebuild from the full
+  // results list every time, and collapse any result that merely extends or
+  // revises the previous one into a replacement rather than a new segment.
+  const sim = (x, y) => {                           // normalized edit-distance similarity
+    const m = x.length, n = y.length;
+    if (!m || !n) return 0;
+    let prev = Array.from({length: n + 1}, (_, j) => j);
+    for (let i = 1; i <= m; i++){
+      const cur = [i];
+      for (let j = 1; j <= n; j++)
+        cur[j] = Math.min(prev[j] + 1, cur[j-1] + 1, prev[j-1] + (x[i-1] === y[j-1] ? 0 : 1));
+      prev = cur;
+    }
+    return 1 - prev[n] / Math.max(m, n);
+  };
+  const looksLikeRevision = (a, b) => {
+    if (b.startsWith(a)) return true;               // strict grown version
+    const aw = a.split(' '), bw = b.split(' ');
+    if (bw.length < aw.length) return false;
+    let same = 0;                                   // fuzzy match: engine revises words mid-utterance
+    for (let i = 0; i < aw.length; i++) if (aw[i] === bw[i] || sim(aw[i], bw[i]) >= 0.5) same++;
+    return same / aw.length >= 0.6;                 // mostly-matching lead words
+  };
   rec.onresult = (e) => {
-    let session = '', prev = '';
+    const parts = [];
     for (let i = 0; i < e.results.length; i++){
       const t = e.results[i][0].transcript.trim();
-      if (!t || t === prev) continue;   // skip Android duplicate results
-      session += t + ' ';
-      prev = t;
+      if (!t) continue;
+      const last = parts[parts.length - 1];
+      if (last){
+        const a = last.toLowerCase(), b = t.toLowerCase();
+        if (a === b || a.startsWith(b)) continue;                        // duplicate / stale shorter copy
+        if (looksLikeRevision(a, b)) { parts[parts.length - 1] = t; continue; } // grown or revised → replace
+      }
+      parts.push(t);
     }
-    liveText.value = (baseText + ' ' + session).replace(/\s+/g,' ').trim();
+    liveText.value = (baseText + ' ' + parts.join(' ')).replace(/\s+/g,' ').trim();
   };
   rec.onerror = (e) => {
     stopRec();
