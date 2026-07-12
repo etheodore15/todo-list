@@ -27,7 +27,7 @@ function composeDigest(items, me, sinceTs, todayStr){
     if (!a.length || !me) return true;
     return a.includes(me) || (t.createdBy || '').toLowerCase() === me;
   };
-  const mine = items.filter(visible);
+  const mine = items.filter(visible).filter(t => !t.someday);   // parked tasks pressure no one
   const tomorrowStr = new Date(new Date(todayStr + 'T00:00:00Z').getTime() + 86400000)
     .toISOString().slice(0, 10);
   const openToday = mine.filter(t => !t.done && t.date === todayStr).length;

@@ -171,6 +171,21 @@
     outline:none; margin-top:8px;}
   .set-block .btn{margin-top:10px;}
 
+  /* Someday + Wins (B4/B5) */
+  .side-block{background:var(--card); border:1px solid #262d3d; border-radius:var(--radius);
+    padding:12px 14px; margin:14px 0;}
+  .side-block summary{cursor:pointer; font-weight:600; font-size:.92rem;}
+  .side-note{color:var(--muted); font-size:.78rem; line-height:1.5; margin:8px 0 4px;}
+  .side-block .todo{margin-top:8px;}
+  .win-line{display:flex; gap:8px; align-items:baseline; padding:5px 0; font-size:.88rem;}
+  .win-line .when{color:var(--muted); font-size:.74rem; margin-left:auto; white-space:nowrap;}
+  .win-streak{color:var(--ok); font-size:.84rem; margin:8px 0 2px;}
+  .nudge{flex-basis:100%; margin-top:8px; padding-top:8px; border-top:1px dashed #2a3245;
+    color:var(--muted); font-size:.78rem; line-height:1.6;}
+  .nudge button{background:var(--card2); border:none; color:var(--text); font-size:.75rem;
+    padding:5px 10px; border-radius:9px; cursor:pointer; margin:2px 6px 0 0;}
+  .energy-chip{background:rgba(139,148,167,.14);}
+
   /* Just One Thing (B2) */
   #focusOverlay{position:fixed; inset:0; z-index:65; background:var(--bg);
     display:flex; flex-direction:column; align-items:center; justify-content:center;
@@ -198,6 +213,14 @@
     font-size:.85rem; margin-left:14px; cursor:pointer; padding:2px 4px;}
   .spin{display:inline-block; animation:spin 1s linear infinite;}
   @keyframes spin{to{transform:rotate(360deg);}}
+
+  /* Quiet visual mode (B7): muted palette, no motion, less visual noise */
+  body.quiet{--accent:#7d8aa5; --accent2:#6a7690; --hi:#c08d97; --med:#c2a985; --low:#93b3a4;
+    --ok:#93b3a4; --danger:#c08d97;}
+  body.quiet *{animation:none !important; transition:none !important;}
+  body.quiet #micBtn{box-shadow:none;}
+  body.quiet .progress > div{background:var(--accent);}
+
 </style>
 </head>
 <body>
@@ -238,6 +261,15 @@
     </div>
     <div id="tagFilter"></div>
     <div id="todoList"></div>
+    <details id="somedayBlock" class="side-block" style="display:none;">
+      <summary>🌙 Someday</summary>
+      <p class="side-note">Parked with no date and no pressure. Tap a task → 📅 When to bring one back.</p>
+      <div id="somedayList"></div>
+    </details>
+    <details id="winsBlock" class="side-block" style="display:none;">
+      <summary>🏆 Wins</summary>
+      <div id="winsList"></div>
+    </details>
     <button class="btn ghost" id="shareBtn" style="display:none; width:100%; margin-top:6px;">📤 Share this list</button>
   </section>
 
@@ -320,6 +352,11 @@
       <p id="keyStatus"></p>
     </div>
     <div class="set-block">
+      <h3>Quiet visual mode</h3>
+      <p>Softer colours, no pulsing or flashing, no motion — easier on the senses.</p>
+      <button class="btn primary" id="quietBtn">Turn on quiet mode</button>
+    </div>
+    <div class="set-block">
       <h3>Daily reset</h3>
       <p>Each day, finished tasks are archived and unfinished ones carry over to today automatically.</p>
       <button class="btn ghost" id="clearDoneBtn">Archive finished tasks now</button>
@@ -334,7 +371,7 @@
       <input type="file" id="importFile" accept=".json,application/json" style="display:none">
       <button class="btn ghost" id="wipeBtn">Delete all data</button>
     </div>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v25<br><span id="envInfo"></span></p>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v26<br><span id="envInfo"></span></p>
   </section>
 </main>
 
@@ -388,8 +425,16 @@ const myName = () => store.get('myName', '');
 
 function setDone(td, done){
   td.done = done;
-  if (done){ td.doneBy = myName() || null; td.doneAt = Date.now(); }
-  else { td.doneBy = null; td.doneAt = null; }
+  const log = store.get('winsLog', {});
+  const t = todayStr();
+  if (done){
+    td.doneBy = myName() || null; td.doneAt = Date.now();
+    log[t] = (log[t] || 0) + 1;
+  } else {
+    td.doneBy = null; td.doneAt = null;
+    if (log[t]) log[t]--;
+  }
+  store.set('winsLog', log);
 }
 
 function fmtWhen(ts, always){
@@ -516,11 +561,21 @@ function recurLabel(recur){
   return '↻ monthly (' + recur.day + ')';
 }
 
+/* ---------- migrations ---------- */
+(function migrate(){
+  let changed = false;
+  todos.forEach(td => {
+    if (!td.energy){ td.energy = detectEnergy(td.text); changed = true; }
+  });
+  if (changed) store.set('todos', todos);
+})();
+
 /* ---------- daily carry-over ---------- */
 (function rollover(){
   const t = todayStr();
   let changed = false;
   todos.forEach(td => {
+    if (td.someday) return;                 // parked — no dates, no pressure
     if (td.recur && td.date < t){
       // recurring: a finished instance respawns at its next occurrence,
       // an unfinished one carries over like any other task
@@ -617,6 +672,9 @@ function normalizeIdeaJson(json, text){
     tasks: (Array.isArray(json.tasks) ? json.tasks : []).slice(0,6).map(t => {
       const recur = parseRecurCode(t && t.recur);
       const date = (t && /^\d{4}-\d{2}-\d{2}$/.test(t.date || '') && t.date >= todayStr()) ? t.date : null;
+      const energy = ['low','medium','high'].includes(t && t.energy) ? t.energy
+        : detectEnergy(String(t && t.text || text));
+      const mins = parseInt(t && t.minutes, 10);
       return {
         text: String(t && t.text != null ? t.text : t).trim(),
         priority: okPrio(t && t.priority) ? t.priority : detectPriority(text),
@@ -625,7 +683,9 @@ function normalizeIdeaJson(json, text){
           .map(n => String(n).toLowerCase().trim())
           .filter(n => store.get('members', []).includes(n)).slice(0, 6),
         recur,
-        date: recur ? nextOccurrence(recur, date || todayStr()) : date
+        date: recur ? nextOccurrence(recur, date || todayStr()) : date,
+        energy,
+        minutes: (mins >= 5 && mins <= 240) ? mins : ENERGY_MIN[energy]
       };
     }).filter(t => t.text),
     priority: okPrio(json.priority) ? json.priority : detectPriority(text)
@@ -649,7 +709,8 @@ Rules:
 - Judge each task's priority by urgency (time pressure) AND importance (consequences): high = needs action today or blocks other things; medium = this week; low = someday/optional.
 - Tag each task with 1-3 short lowercase tags chosen for USEFUL SORTING: ideally one life-area tag (work, home, family, personal) plus one activity-type tag (calls, shopping, errands, admin, finance, health, car, travel, pets, social, tech). Use single common words, consistent across tasks — never invent near-synonyms of an existing tag. Every task needs at least one tag; use "general" only as a last resort.
 - Today is ${todayStr()} (${new Date().toLocaleDateString('en', {weekday: 'long', timeZone: 'UTC'})}). If the idea explicitly says WHEN a task should happen ("tomorrow", "on Friday", "on the 14th"), set that task's "date" to the resolved YYYY-MM-DD (never in the past). Otherwise leave "date" empty.
-- If the idea says a task REPEATS ("every Tuesday", "meds every morning", "rent on the 1st of every month"), set "recur" to "daily", "weekly:mon,tue,…", or "monthly:14" accordingly. Otherwise leave "recur" empty.` +
+- If the idea says a task REPEATS ("every Tuesday", "meds every morning", "rent on the 1st of every month"), set "recur" to "daily", "weekly:mon,tue,…", or "monthly:14" accordingly. Otherwise leave "recur" empty.
+- Rate each task's "energy" — the effort/executive function it demands: low = quick and near-mindless (a call, an order), medium = some focus, high = long or demanding. Estimate "minutes" it realistically takes (5-240).` +
   (known.length ? `
 - The user's existing tags, most used first: ${known.join(', ')}. STRONGLY prefer reusing these exact tags whenever they fit; only introduce a new tag when none of them applies.` : '') +
   (store.get('members', []).length ? `
@@ -710,7 +771,9 @@ async function geminiSummarize(text, key, isRetry){
           tags: {type: 'ARRAY', items: {type: 'STRING'}},
           assignees: {type: 'ARRAY', items: {type: 'STRING'}},
           date: {type: 'STRING'},
-          recur: {type: 'STRING'}
+          recur: {type: 'STRING'},
+          energy: {type: 'STRING', enum: ['low','medium','high']},
+          minutes: {type: 'INTEGER'}
         },
         required: ['text','priority','tags']
       }},
@@ -1013,7 +1076,9 @@ function localSummarize(text){
     }
     t = t.replace(/[.!?]+$/,'').trim();
     const assignees = detectAssignees(t);
-    return {text: t.charAt(0).toUpperCase() + t.slice(1), priority, tags: detectTags(t), assignees, date, recur};
+    const energy = detectEnergy(t);
+    return {text: t.charAt(0).toUpperCase() + t.slice(1), priority, tags: detectTags(t), assignees,
+            date, recur, energy, minutes: ENERGY_MIN[energy]};
   }).filter(t => t.text.length > 2);
 
   return {summary, tasks, priority: detectPriority(text)};
@@ -1076,6 +1141,22 @@ function detectAssignees(text){
   return out;
 }
 
+/* ---------- energy + duration (B3/B6) ---------- */
+const ENERGY_MIN = {low: 10, medium: 25, high: 45};   // default minutes per effort level
+const ENERGY_ICON = {low: '🔋', medium: '🔋🔋', high: '🔋🔋🔋'};
+
+function detectEnergy(text){
+  const t = ' ' + String(text).toLowerCase() + ' ';
+  if (/\b(call|ring|phone|text|message|email|book|order|pay|send|renew|cancel|confirm|reply|rsvp|water the|feed|take out|put out|drop off|pick up|print|sign)\b/.test(t)) return 'low';
+  if (/\b(clean|tidy|declutter|organis\w*|organiz\w*|write|report|plan|research|build|paint|renovat\w*|garden|mow|deep|sort out|prepare|pack|assemble|move house|essay|presentation|spreadsheet|budget)\b/.test(t)) return 'high';
+  return 'medium';
+}
+
+function fmtMins(m){
+  if (m >= 60) return Math.floor(m / 60) + 'h' + (m % 60 ? ' ' + (m % 60) + 'm' : '');
+  return m + 'm';
+}
+
 function cleanTags(arr, fallbackText){
   const tags = (Array.isArray(arr) ? arr : [])
     .map(s => String(s).toLowerCase().replace(/[^a-z0-9 -]/g,'').trim())
@@ -1098,7 +1179,9 @@ const IDEA_SCHEMA = {
           tags: {type: 'array', items: {type: 'string'}, description: '1-3 short lowercase category tags for sorting, e.g. work, home, family, health, finance, shopping, calls, errands.'},
           assignees: {type: 'array', items: {type: 'string'}, description: 'Household member names (lowercase) this task is delegated to, ONLY when the idea explicitly directs it at them. Empty otherwise.'},
           date: {type: 'string', description: 'YYYY-MM-DD the task should happen, ONLY when the idea explicitly says when. Empty otherwise.'},
-          recur: {type: 'string', description: 'Repeat rule when the idea says the task repeats: "daily", "weekly:mon,tue,…", or "monthly:14". Empty otherwise.'}
+          recur: {type: 'string', description: 'Repeat rule when the idea says the task repeats: "daily", "weekly:mon,tue,…", or "monthly:14". Empty otherwise.'},
+          energy: {type: 'string', enum: ['low','medium','high'], description: 'Effort the task demands: low = quick/mindless, high = long or demanding.'},
+          minutes: {type: 'integer', description: 'Realistic minutes the task takes (5-240).'}
         },
         required: ['text','priority','tags'],
         additionalProperties: false
@@ -1169,6 +1252,7 @@ saveIdeaBtn.addEventListener('click', async () => {
     if (existing.has(norm(task.text))){ skipped++; return; }   // already on the list
     todos.push({id: idea.id + '-' + i, text: task.text, priority: task.priority, tags: task.tags || [],
       assignees: task.assignees || [], done:false, date: task.date || t, recur: task.recur || null,
+      energy: task.energy || detectEnergy(task.text), minutes: task.minutes || null,
       ideaId: idea.id, createdBy: myName() || null, createdAt: Date.now()});
     if ((task.assignees || []).length) delegated.push(task.assignees.join(', '));
     if (task.recur) scheduled.push(recurLabel(task.recur).replace('↻ ', '↻'));
@@ -1261,9 +1345,10 @@ const PRIOS = [
   {key:'low',    label:'If time allows', cls:'lo'}
 ];
 
-function todayTodos(){ return todos.filter(t => t.date === todayStr()); }
+function todayTodos(){ return todos.filter(t => t.date === todayStr() && !t.someday); }
 
 let activeTag = null;
+let easyOnly = false;   // 🔋 easy-wins filter: only low-energy tasks
 
 function renderTagFilter(list){
   const bar = document.getElementById('tagFilter');
@@ -1284,16 +1369,36 @@ function renderTagFilter(list){
   tags.forEach(tag => mk(`${tag} (${counts[tag]})`, tag));
 }
 
+function renderEasyChip(list){
+  const bar = document.getElementById('tagFilter');
+  const lows = list.filter(t => !t.done && t.energy === 'low').length;
+  if (!lows && !easyOnly) return;
+  const b = document.createElement('button');
+  b.className = 'fchip easy' + (easyOnly ? ' active' : '');
+  b.textContent = `🔋 easy wins (${lows})`;
+  b.title = 'Only quick, low-effort tasks';
+  b.addEventListener('click', () => { easyOnly = !easyOnly; renderTodos(); });
+  bar.appendChild(b);
+  bar.style.display = '';   // the bar may be empty of tag chips but still hold this one
+}
+
 function renderTodos(){
   const el = document.getElementById('todoList');
   let list = todayTodos().filter(visibleToMe);
   renderTagFilter(list);
+  renderEasyChip(list);
   if (activeTag) list = list.filter(td => (td.tags || []).includes(activeTag));
+  if (easyOnly) list = list.filter(td => td.energy === 'low');
   el.innerHTML = '';
 
   const done = list.filter(t=>t.done).length;
+  // realistic day load, so "I'll do all 12 today" gets a gentle reality check
+  const leftMins = list.filter(t => !t.done)
+    .reduce((a, t) => a + (t.minutes || ENERGY_MIN[t.energy || 'medium']), 0);
   document.getElementById('progressLabel').textContent =
-    list.length ? `${done} of ${list.length} done` : 'No tasks yet today';
+    list.length ? `${done} of ${list.length} done` +
+      (leftMins ? ` · ~${fmtMins(leftMins)} of doing left${leftMins > 360 ? ' — that\'s a lot for one day' : ''}` : '')
+    : 'No tasks yet today';
   document.getElementById('progressBar').style.width =
     list.length ? Math.round(done/list.length*100)+'%' : '0';
 
@@ -1301,10 +1406,14 @@ function renderTodos(){
   document.getElementById('focusBtn').style.display = list.some(t => !t.done) ? '' : 'none';
 
   // tasks scheduled beyond today live in their own section at the bottom
-  let upcoming = todos.filter(t => visibleToMe(t) && t.date > todayStr() && !t.done);
+  let upcoming = todos.filter(t => visibleToMe(t) && t.date > todayStr() && !t.done && !t.someday);
   if (activeTag) upcoming = upcoming.filter(td => (td.tags || []).includes(activeTag));
+  if (easyOnly) upcoming = upcoming.filter(td => td.energy === 'low');
   upcoming.sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 :
     PRIOS.findIndex(p => p.key === a.priority) - PRIOS.findIndex(p => p.key === b.priority));
+
+  renderWins();
+  renderSomeday();
 
   if (!list.length && !upcoming.length){
     el.innerHTML = '<div class="empty">✅<br><br>Nothing on the list yet.<br>Capture an idea or quick-add a task above.</div>';
@@ -1348,6 +1457,7 @@ function editDate(td){
   const date = resolveDateInput(v);
   if (!date){ toast('Didn\'t understand that date — try "tomorrow", "friday" or 2026-07-20.'); return; }
   td.date = date;
+  td.someday = false; td.carried = 0;     // a fresh date un-parks it with a clean slate
   saveTodos(); renderTodos();
   toast(date === todayStr() ? 'Moved to today ✓' : 'Scheduled for ' + fmtDay(date) + ' 📅');
 }
@@ -1394,13 +1504,28 @@ function todoRow(td){
       sc.addEventListener('click', (e) => { e.stopPropagation(); openScopeSheet(td); });
       tg.appendChild(sc);
     }
-    if (td.date > todayStr()){
+    if (td.date > todayStr() && !td.someday){
       const dc = document.createElement('span');
       dc.className = 'ttag date-chip';
       dc.textContent = '📅 ' + fmtDay(td.date);
       dc.title = 'Tap to reschedule';
       dc.addEventListener('click', (e) => { e.stopPropagation(); editDate(td); });
       tg.appendChild(dc);
+    }
+    {
+      const ec = document.createElement('span');
+      ec.className = 'ttag energy-chip';
+      const en = td.energy || 'medium';
+      ec.textContent = ENERGY_ICON[en] + ' ~' + fmtMins(td.minutes || ENERGY_MIN[en]);
+      ec.title = 'Effort: ' + en + ' — tap to change';
+      ec.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const order = ['low','medium','high'];
+        td.energy = order[(order.indexOf(en) + 1) % 3];
+        td.minutes = ENERGY_MIN[td.energy];
+        saveTodos(); renderTodos();
+      });
+      tg.appendChild(ec);
     }
     if (td.recur){
       const rc = document.createElement('span');
@@ -1463,6 +1588,37 @@ function todoRow(td){
     at.className = 'attr';
     at.textContent = '✓ ' + (td.doneBy ? td.doneBy + ' · ' : '') + fmtWhen(td.doneAt);
     txtEl.appendChild(at);
+  }
+  // no-shame carry-over: after 5 quiet days, gently ask instead of going red
+  if (!td.done && !td.someday && (td.carried || 0) >= 5){
+    const n = document.createElement('div');
+    n.className = 'nudge';
+    n.appendChild(document.createTextNode(
+      `been on the list ${td.carried} days — still matters?`));
+    n.appendChild(document.createElement('br'));
+    const mkN = (label, fn) => {
+      const b = document.createElement('button');
+      b.textContent = label;
+      b.addEventListener('click', (e) => { e.stopPropagation(); fn(); });
+      n.appendChild(b);
+    };
+    mkN('Yes — today', () => {
+      td.carried = 0; saveTodos(); renderTodos();
+      toast('Staying on today ✓');
+    });
+    mkN('Someday', () => {
+      td.someday = true; td.carried = 0; saveTodos(); renderTodos();
+      toast('Parked in Someday — no pressure 🌙');
+    });
+    mkN('Let it go', () => {
+      const at = todos.findIndex(x => x.id === td.id);
+      todos = todos.filter(x => x.id !== td.id); saveTodos(); renderTodos();
+      toast('Let go ✓ — that\'s allowed', () => {
+        todos.splice(Math.min(at, todos.length), 0, td);
+        saveTodos(); renderTodos();
+      });
+    });
+    row.appendChild(n);
   }
   // tap the task text for history + the original transcript
   txtEl.addEventListener('click', () => {
@@ -1527,6 +1683,53 @@ function todoRow(td){
   return row;
 }
 
+/* ---------- Someday (B4) + Wins (B5) ---------- */
+function renderSomeday(){
+  const block = document.getElementById('somedayBlock');
+  const list = todos.filter(t => t.someday && !t.done && visibleToMe(t));
+  block.style.display = list.length ? '' : 'none';
+  block.querySelector('summary').textContent = `🌙 Someday (${list.length})`;
+  const el = document.getElementById('somedayList');
+  el.innerHTML = '';
+  list.forEach(td => el.appendChild(todoRow(td)));
+}
+
+function renderWins(){
+  const block = document.getElementById('winsBlock');
+  const log = store.get('winsLog', {});
+  const doneToday = todos.filter(t => t.done && t.doneAt &&
+    new Date(t.doneAt).toDateString() === new Date().toDateString() && visibleToMe(t));
+  let week = 0;
+  for (let i = 0; i < 7; i++) week += log[addDays(-i)] || 0;
+  if (!week && !doneToday.length){ block.style.display = 'none'; return; }
+  block.style.display = '';
+  // streak counts any activity and never breaks loudly — a quiet day just pauses it
+  let streak = 0, from = (log[todayStr()] || 0) > 0 ? 0 : -1;
+  while (log[addDays(from - streak)] > 0) streak++;
+  block.querySelector('summary').textContent =
+    `🏆 Wins · ${log[todayStr()] || 0} today, ${week} this week`;
+  const el = document.getElementById('winsList');
+  el.innerHTML = '';
+  if (streak >= 2){
+    const s = document.createElement('div');
+    s.className = 'win-streak';
+    s.textContent = `🔥 You've ticked something off ${streak} days running.`;
+    el.appendChild(s);
+  }
+  doneToday.sort((a, b) => b.doneAt - a.doneAt).slice(0, 12).forEach(td => {
+    const l = document.createElement('div');
+    l.className = 'win-line';
+    l.innerHTML = '✓ <span class="wtxt"></span><span class="when"></span>';
+    l.querySelector('.wtxt').textContent = td.text;
+    l.querySelector('.when').textContent = fmtWhen(td.doneAt);
+    el.appendChild(l);
+  });
+  const foot = document.createElement('p');
+  foot.className = 'side-note';
+  foot.textContent = week ? 'Every tick counts — carried-over tasks don\'t.' : '';
+  el.appendChild(foot);
+}
+
 function updateBadge(){
   const open = todayTodos().filter(t => visibleToMe(t) && !t.done).length;
   document.getElementById('todayBadge').textContent = open ? ` (${open})` : '';
@@ -1562,6 +1765,7 @@ let focusPool = [], focusIdx = 0;
 function focusEligible(){
   let list = todayTodos().filter(t => visibleToMe(t) && !t.done);
   if (activeTag) list = list.filter(td => (td.tags || []).includes(activeTag));
+  if (easyOnly) list = list.filter(td => td.energy === 'low');
   // hardest-first: the app chooses so the person doesn't have to
   return PRIOS.flatMap(p => list.filter(t => t.priority === p.key));
 }
@@ -1640,8 +1844,10 @@ function quickAdd(){
   const recur = parseRecur(text);
   const date = recur ? nextOccurrence(recur, parseTaskDate(text) || todayStr())
                      : (parseTaskDate(text) || todayStr());
+  const energy = detectEnergy(text);
   todos.push({id: uid(), text, priority: detectPriority(text), tags: detectTags(text), done:false,
-    date, recur, ideaId:null, createdBy: myName() || null, createdAt: Date.now()});
+    date, recur, energy, minutes: ENERGY_MIN[energy],
+    ideaId:null, createdBy: myName() || null, createdAt: Date.now()});
   saveTodos(); inp.value=''; renderTodos();
   if (recur) toast('Repeats ' + recurLabel(recur).replace('↻ ', '') + ' — next: ' + fmtDay(date));
   else if (date > todayStr()) toast('Scheduled for ' + fmtDay(date) + ' 📅');
@@ -1836,6 +2042,22 @@ document.getElementById('saveKeyBtn').addEventListener('click', () => {
   refreshKeyStatus();
   toast(store.get('apiKey','') ? 'Claude summaries enabled' : 'Key cleared — using offline summaries');
 });
+/* ---------- quiet visual mode (B7) ---------- */
+const quietBtn = document.getElementById('quietBtn');
+function applyQuiet(){
+  const on = store.get('quietMode', false);
+  document.body.classList.toggle('quiet', on);
+  quietBtn.textContent = on ? 'Turn off quiet mode' : 'Turn on quiet mode';
+  quietBtn.classList.toggle('primary', !on);
+  quietBtn.classList.toggle('ghost', on);
+}
+applyQuiet();
+quietBtn.addEventListener('click', () => {
+  store.set('quietMode', !store.get('quietMode', false));
+  applyQuiet();
+  toast(store.get('quietMode', false) ? 'Quiet mode on 🌿' : 'Quiet mode off');
+});
+
 document.getElementById('clearDoneBtn').addEventListener('click', () => {
   const t = todayStr();
   // recurring tasks stay — tomorrow's rollover respawns them at the next occurrence
@@ -1941,7 +2163,9 @@ function todoCore(td){
           createdBy: td.createdBy || null, createdAt: td.createdAt || null,
           doneBy: td.doneBy || null, doneAt: td.doneAt || null,
           assignees: td.assignees || [], recur: td.recur || null,
-          subtasks: (td.subtasks || []).map(s => ({text: s.text, done: !!s.done}))};
+          subtasks: (td.subtasks || []).map(s => ({text: s.text, done: !!s.done})),
+          energy: td.energy || null, minutes: td.minutes || null,
+          someday: !!td.someday, carried: td.carried || 0};
 }
 function syncMsg(text){
   const el = document.getElementById('syncMsg');

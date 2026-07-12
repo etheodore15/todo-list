@@ -58,6 +58,21 @@ and summaries, enable the on-device AI models in Settings (see below).
   single task (the app picks the highest priority one, and surfaces the next
   tiny step if the task was broken down), a huge Done button, and
   "not this one" to shuffle. No list, no overwhelm.
+- **🔋 Energy levels** — every task gets an effort estimate (low / medium /
+  high, with rough minutes). Tap the chip to correct it. A **"🔋 easy wins"**
+  filter shows only quick low-effort tasks for low-capacity moments, and the
+  progress line shows the realistic total ("~2h 15m of doing left") with a
+  gentle heads-up when the day is overloaded.
+- **No shame, no red** — nothing ever says "overdue". A task that has quietly
+  carried over for 5+ days asks once: *still matters?* → **Yes — today**,
+  **Someday** (parked, dateless, zero pressure), or **Let it go** (delete,
+  with undo). Someday tasks live in a collapsed 🌙 section until you give
+  them a new date.
+- **🏆 Wins** — a collapsed section listing what you finished today, your
+  weekly count, and a streak that counts *any* activity and never breaks
+  loudly. Closing loops, not punishment mechanics.
+- **🌿 Quiet visual mode** — Settings toggle: softer colours, zero animation
+  or flashing, for lower sensory load.
 
 ### On-device AI (fully offline, no API key)
 
