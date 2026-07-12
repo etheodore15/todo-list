@@ -98,6 +98,16 @@
     margin-top:9px; padding-top:9px; border-top:1px solid #262d3d; font-style:italic;}
   .todo .transcript .tmeta{font-style:normal; color:var(--muted); margin-bottom:5px; font-size:.76rem;}
   .todo .attr{width:100%; font-size:.68rem; color:var(--ok); margin-top:4px; opacity:.9;}
+  .scope-chip{background:rgba(79,140,255,.16); color:var(--accent); cursor:pointer;}
+  .sheet-overlay{position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:60;
+    display:flex; align-items:flex-end; justify-content:center;}
+  .sheet{background:var(--card); border:1px solid #2a3245; border-radius:18px 18px 0 0;
+    padding:18px 16px calc(18px + env(safe-area-inset-bottom)); width:100%; max-width:640px;}
+  .sheet h3{margin:0 0 12px; font-size:1rem;}
+  .sheet .btn{width:100%; margin-bottom:8px; text-align:left;}
+  .scope-member{display:flex; align-items:center; gap:10px; padding:9px 4px;
+    font-size:.95rem; color:var(--text);}
+  .scope-member input{width:18px; height:18px; accent-color:var(--accent);}
   #tagFilter{display:flex; gap:8px; overflow-x:auto; margin-bottom:14px;
     -webkit-overflow-scrolling:touch; scrollbar-width:none;}
   #tagFilter:empty{display:none;}
@@ -284,7 +294,7 @@
       <input type="file" id="importFile" accept=".json,application/json" style="display:none">
       <button class="btn ghost" id="wipeBtn">Delete all data</button>
     </div>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v21<br><span id="envInfo"></span></p>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v22<br><span id="envInfo"></span></p>
   </section>
 </main>
 
@@ -294,6 +304,17 @@
   <button data-view="today"><span class="ico">✅</span>Today<span id="todayBadge"></span></button>
   <button data-view="settings"><span class="ico">⚙️</span>Settings</button>
 </nav>
+
+<div id="scopeSheet" class="sheet-overlay" style="display:none;">
+  <div class="sheet">
+    <h3>Who is this task for?</h3>
+    <button class="btn ghost" id="scopePrivate">🔒 Private — only me, on this device</button>
+    <button class="btn ghost" id="scopeFamily">👥 Family — everyone in the household</button>
+    <div id="scopeMembers" style="margin:4px 0 10px;"></div>
+    <button class="btn primary" id="scopeAssign">Assign to selected</button>
+    <button class="btn ghost" id="scopeCancel">Cancel</button>
+  </div>
+</div>
 
 <div class="toast" id="toast"></div>
 
@@ -327,6 +348,29 @@ function fmtWhen(ts, always){
   const today = d.toDateString() === new Date().toDateString();
   const time = d.toLocaleTimeString(undefined, {hour: 'numeric', minute: '2-digit'});
   return (today && !always ? '' : d.toLocaleDateString(undefined, {day: 'numeric', month: 'short'}) + ', ') + time;
+}
+
+// Task scopes: private (this device only), family (everyone), or assigned to
+// specific members. You see a task if it's for everyone, you're assigned, or
+// you created it. Devices with no name set see everything (fail open).
+function visibleToMe(td){
+  const a = td.assignees || [];
+  if (!a.length) return true;
+  const me = myName().toLowerCase();
+  if (!me) return true;
+  return a.includes(me) || (td.createdBy || '').toLowerCase() === me;
+}
+function canReassign(td){
+  if (td.scope === 'private') return true;
+  const a = td.assignees || [];
+  if (!a.length) return true;                       // family task — any member may re-scope
+  const me = myName().toLowerCase();
+  return !!me && ((td.createdBy || '').toLowerCase() === me || a.includes(me));
+}
+function scopeLabel(td){
+  if (td.scope === 'private') return '🔒 private';
+  const a = td.assignees || [];
+  return a.length ? '→ ' + a.join(', ') : '👥 family';
 }
 
 const todayStr = () => new Date().toISOString().slice(0,10);
@@ -968,7 +1012,7 @@ function renderTagFilter(list){
 
 function renderTodos(){
   const el = document.getElementById('todoList');
-  let list = todayTodos();
+  let list = todayTodos().filter(visibleToMe);
   renderTagFilter(list);
   if (activeTag) list = list.filter(td => (td.tags || []).includes(activeTag));
   el.innerHTML = '';
@@ -1015,6 +1059,14 @@ function todoRow(td){
     const tg = document.createElement('div');
     tg.className = 'ttags';
     tg.title = 'Tap to edit tags';
+    if (store.get('householdId', '') || td.scope === 'private' || (td.assignees || []).length){
+      const sc = document.createElement('span');
+      sc.className = 'ttag scope-chip';
+      sc.textContent = scopeLabel(td);
+      sc.title = 'Tap to change who this task is for';
+      sc.addEventListener('click', (e) => { e.stopPropagation(); openScopeSheet(td); });
+      tg.appendChild(sc);
+    }
     (td.tags || []).forEach(tag => {
       const s = document.createElement('span');
       s.className = 'ttag'; s.textContent = tag;
@@ -1090,13 +1142,13 @@ function todoRow(td){
 }
 
 function updateBadge(){
-  const open = todayTodos().filter(t=>!t.done).length;
+  const open = todayTodos().filter(t => visibleToMe(t) && !t.done).length;
   document.getElementById('todayBadge').textContent = open ? ` (${open})` : '';
 }
 
 /* ---------- share ---------- */
 document.getElementById('shareBtn').addEventListener('click', async () => {
-  let list = todayTodos().filter(t => !t.done);
+  let list = todayTodos().filter(t => visibleToMe(t) && !t.done);
   if (activeTag) list = list.filter(td => (td.tags || []).includes(activeTag));
   if (!list.length){ toast('Nothing open to share.'); return; }
   const day = new Date().toLocaleDateString(undefined, {weekday: 'short', day: 'numeric', month: 'short'});
@@ -1326,6 +1378,56 @@ document.getElementById('wipeBtn').addEventListener('click', () => {
   renderIdeas(); renderTodos(); toast('All data deleted');
 });
 
+/* ---------- task scope sheet ---------- */
+let scopeTask = null;
+function openScopeSheet(td){
+  if (!canReassign(td)){ toast('Only the creator or an assignee can change this.'); return; }
+  scopeTask = td;
+  const members = store.get('members', []);
+  const wrap = document.getElementById('scopeMembers');
+  wrap.innerHTML = '';
+  if (!members.length){
+    const p = document.createElement('p');
+    p.style.cssText = 'color:var(--muted); font-size:.8rem; margin:6px 0;';
+    p.textContent = 'Add household members in Settings to delegate to individuals.';
+    wrap.appendChild(p);
+  }
+  members.forEach(m => {
+    const lab = document.createElement('label');
+    lab.className = 'scope-member';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox'; cb.value = m;
+    cb.checked = (td.assignees || []).includes(m);
+    lab.appendChild(cb);
+    lab.appendChild(document.createTextNode(m));
+    wrap.appendChild(lab);
+  });
+  document.getElementById('scopeSheet').style.display = 'flex';
+}
+function closeScopeSheet(){ document.getElementById('scopeSheet').style.display = 'none'; scopeTask = null; }
+function applyScope(scope, assignees){
+  if (!scopeTask) return;
+  scopeTask.scope = scope === 'private' ? 'private' : null;
+  scopeTask.assignees = assignees || [];
+  saveTodos(); renderTodos(); updateBadge();
+  toast(scope === 'private' ? 'Task is now private to this device 🔒'
+      : (assignees && assignees.length ? 'Assigned to ' + assignees.join(', ') + ' ✓'
+                                       : 'Shared with the whole family ✓'));
+  closeScopeSheet();
+}
+document.getElementById('scopePrivate').addEventListener('click', () => applyScope('private'));
+document.getElementById('scopeFamily').addEventListener('click', () => applyScope('family'));
+document.getElementById('scopeAssign').addEventListener('click', () => {
+  const names = [...document.querySelectorAll('#scopeMembers input:checked')].map(c => c.value);
+  const members = store.get('members', []);
+  if (!names.length || names.length === members.length) applyScope('family');
+  else applyScope('assign', names);
+});
+document.getElementById('scopeCancel').addEventListener('click', closeScopeSheet);
+document.getElementById('scopeSheet').addEventListener('click', (e) => {
+  if (e.target === document.getElementById('scopeSheet')) closeScopeSheet();
+});
+
 /* ---------- family sync (Firestore) ---------- */
 let fbFs = null, fbDb = null, syncUnsub = null, applyingRemote = false;
 const lastPush = {};   // id → serialized core, to detect what changed locally
@@ -1334,7 +1436,8 @@ function todoCore(td){
   return {text: td.text, priority: td.priority, tags: td.tags || [],
           done: !!td.done, date: td.date, ideaId: td.ideaId || null,
           createdBy: td.createdBy || null, createdAt: td.createdAt || null,
-          doneBy: td.doneBy || null, doneAt: td.doneAt || null};
+          doneBy: td.doneBy || null, doneAt: td.doneAt || null,
+          assignees: td.assignees || []};
 }
 function syncMsg(text){
   const el = document.getElementById('syncMsg');
@@ -1363,6 +1466,8 @@ async function startSync(){
     applyingRemote = true;
     snap.docChanges().forEach(ch => {
       const id = ch.doc.id;
+      const localAny = todos.find(t => t.id === id);
+      if (localAny && localAny.scope === 'private'){ delete lastPush[id]; return; }
       if (ch.type === 'removed'){
         todos = todos.filter(t => t.id !== id);
         delete lastPush[id];
@@ -1391,6 +1496,7 @@ function syncPush(){
   const hid = store.get('householdId', '');
   const seen = new Set();
   todos.forEach(td => {
+    if (td.scope === 'private') return;   // stays local; stale remote copy is deleted below
     seen.add(td.id);
     const core = JSON.stringify(todoCore(td));
     if (lastPush[td.id] !== core){
