@@ -100,7 +100,11 @@ Example output: {"summary": "Pay the electricity bill today; maybe buy shoes som
 Rules: extract ONLY actions the person actually intends to take (max 6) — never turn observations, feelings, or background context into tasks; if there is no action, "tasks" is an empty array; "summary" is one clear sentence; priority is "high" (today/blocking), "medium" (this week), or "low" (someday/optional) judged by urgency and importance; every task gets 1-3 short lowercase tags from: work, home, family, health, finance, shopping, calls, errands, car, travel, pets, social, tech, general; top-level "priority" = highest task priority.`},
     {role: 'user', content: text},
   ];
-  const out = await llm(messages, {max_new_tokens: 512, do_sample: false, return_full_text: false});
+  const out = await withTimeout(
+    llm(messages, {max_new_tokens: 320, do_sample: false, return_full_text: false}),
+    180000,
+    'on-device summarization timed out on this phone'
+  );
   let reply = out[0].generated_text;
   if (Array.isArray(reply)) reply = reply.at(-1).content;
   reply = String(reply).replace(/<think>[\s\S]*?<\/think>/g, '').trim();

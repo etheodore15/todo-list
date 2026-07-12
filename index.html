@@ -231,7 +231,7 @@
          unless you enable Claude summaries.</p>
       <button class="btn ghost" id="wipeBtn">Delete all data</button>
     </div>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v13<br><span id="envInfo"></span></p>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v14<br><span id="envInfo"></span></p>
   </section>
 </main>
 
@@ -679,8 +679,15 @@ saveIdeaBtn.addEventListener('click', async () => {
   let result = null;
   const key = store.get('apiKey', '');
   if (store.get('localLLM', false)){
-    try { result = await localSummarizeLLM(raw); }
-    catch(e){ toast('On-device AI unavailable — trying fallback.'); }
+    try {
+      saveIdeaBtn.innerHTML = '<span class="spin">◌</span> Summarizing on-device…';
+      aiProgress.llm = (pct) => {
+        saveIdeaBtn.innerHTML = `<span class="spin">◌</span> Loading AI model… ${pct}%`;
+      };
+      result = await localSummarizeLLM(raw);
+    }
+    catch(e){ toast('On-device AI unavailable (' + e.message + ') — using fallback.'); }
+    aiProgress.llm = null;
   }
   if (!result && key){
     try { result = await claudeSummarize(raw, key); }
