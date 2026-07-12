@@ -89,6 +89,13 @@ member could write via the API directly. Treat it as a shared record, not
 courtroom-grade evidence — that upgrade needs a hosted backend (on the
 roadmap).
 
+**🕊 Tone check** — on spaces created as *Co-parenting*, anything you type or
+edit is checked (using your Gemini key) before it lands on the shared list.
+Hostile or blaming wording gets a side-by-side neutral rewrite — use it, keep
+yours, or cancel. Neutral text passes silently, other space types are never
+checked, and if the API is slow or unavailable the task goes through
+untouched.
+
 ### On-device AI (fully offline, no API key)
 
 In Settings you can download two small AI models that then run entirely on your

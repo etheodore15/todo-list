@@ -188,6 +188,11 @@
     padding:5px 10px; border-radius:9px; cursor:pointer; margin:2px 6px 0 0;}
   .energy-chip{background:rgba(139,148,167,.14);}
 
+  /* tone check (C1c) */
+  .tone-block{background:var(--bg); border:1px solid #2a3245; border-radius:10px;
+    padding:10px 12px; font-size:.88rem; line-height:1.5; margin:8px 0;}
+  .tone-suggested{border-color:var(--ok);}
+
   /* history / audit log (C1) */
   #histOverlay{position:fixed; inset:0; z-index:64; background:var(--bg); overflow-y:auto;
     padding:calc(14px + env(safe-area-inset-top)) 16px calc(24px + env(safe-area-inset-bottom));
@@ -395,7 +400,7 @@
       <input type="file" id="importFile" accept=".json,application/json" style="display:none">
       <button class="btn ghost" id="wipeBtn">Delete all data</button>
     </div>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v28<br><span id="envInfo"></span></p>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v29<br><span id="envInfo"></span></p>
   </section>
 </main>
 
@@ -415,6 +420,18 @@
     <div id="scopeMembers" style="margin:4px 0 10px;"></div>
     <button class="btn primary" id="scopeAssign">Assign to selected</button>
     <button class="btn ghost" id="scopeCancel">Cancel</button>
+  </div>
+</div>
+
+<div id="toneSheet" class="sheet-overlay" style="display:none;">
+  <div class="sheet">
+    <h3>🕊 How will this land?</h3>
+    <p class="side-note" id="toneReason"></p>
+    <p class="tone-block"><b>Yours:</b><br><span id="toneOriginal"></span></p>
+    <p class="tone-block tone-suggested"><b>Suggested:</b><br><span id="toneRewrite"></span></p>
+    <button class="btn primary" id="toneUse">Use the suggested wording</button>
+    <button class="btn ghost" id="toneKeep">Keep mine as written</button>
+    <button class="btn ghost" id="toneCancel">Cancel</button>
   </div>
 </div>
 
@@ -843,6 +860,71 @@ async function geminiSummarize(text, key, isRetry){
   const parts = data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts || [];
   const raw = parts.map(p => p.text || '').join('');
   return normalizeIdeaJson(JSON.parse(raw), text);
+}
+
+/* ---------- tone check (C1c) ----------
+   Tasks on a co-parenting list are messages the other parent will read.
+   Before one lands there, ask Gemini whether the wording is hostile or
+   blaming and offer a neutral rewrite. Always fail open: no key, slow API,
+   or any error → the task goes through untouched. */
+function spaceTypeOf(hid){
+  const sp = spacesList().find(s => s.hid === hid);
+  return sp ? sp.type : null;
+}
+
+async function toneCheck(text, key){
+  try {
+    const model = await geminiModel(key);
+    const res = await Promise.race([
+      fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+        method: 'POST',
+        headers: {'content-type': 'application/json', 'x-goog-api-key': key},
+        body: JSON.stringify({
+          contents: [{role: 'user', parts: [{text:
+`You are a neutral co-parenting communication coach. This task is going onto a shared co-parenting list that the other parent reads. Decide if the wording is hostile, blaming, sarcastic, or accusatory toward the other parent. If it is, write a neutral, factual rewrite that keeps the practical request and all facts (names, dates, times) but drops blame, editorializing, and "again"-style jabs. If it is already neutral, hostile is false.
+
+Task: """${text}"""`}]}],
+          generationConfig: {responseMimeType: 'application/json', responseSchema: {
+            type: 'OBJECT',
+            properties: {hostile: {type: 'BOOLEAN'}, reason: {type: 'STRING'}, rewrite: {type: 'STRING'}},
+            required: ['hostile']
+          }}
+        })
+      }),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 8000))
+    ]);
+    if (!res.ok) return null;
+    const data = await res.json();
+    const parts = data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts || [];
+    const j = JSON.parse(parts.map(p => p.text || '').join(''));
+    if (j.hostile && j.rewrite && String(j.rewrite).trim())
+      return {rewrite: String(j.rewrite).trim(), reason: String(j.reason || '').trim()};
+  } catch (_) {}
+  return null;
+}
+
+// resolves to the text to use (possibly rewritten), or null if cancelled
+async function toneGate(text, spaceHid){
+  if (spaceTypeOf(spaceHid) !== 'coparenting') return text;
+  const key = store.get('geminiKey', '');
+  if (!key) return text;
+  const flag = await toneCheck(text, key);
+  if (!flag) return text;
+  return new Promise(resolve => openToneSheet(text, flag, resolve));
+}
+
+let toneResolve = null;
+function openToneSheet(original, flag, resolve){
+  toneResolve = resolve;
+  document.getElementById('toneOriginal').textContent = original;
+  document.getElementById('toneRewrite').textContent = flag.rewrite;
+  document.getElementById('toneReason').textContent = flag.reason || 'This might land badly.';
+  document.getElementById('toneUse').dataset.rewrite = flag.rewrite;
+  document.getElementById('toneSheet').style.display = 'flex';
+}
+function closeToneSheet(answer){
+  document.getElementById('toneSheet').style.display = 'none';
+  if (toneResolve){ toneResolve(answer); toneResolve = null; }
 }
 
 /* ---------- break it down (B1) ---------- */
@@ -1523,11 +1605,16 @@ function renderTodos(){
 }
 
 /* ---------- task editing (text, date, repeat) ---------- */
-function editText(td){
+async function editText(td){
   const v = prompt('Edit task:', td.text);
   if (v === null) return;
-  const text = v.trim();
+  let text = v.trim();
   if (!text){ toast('Task text can\'t be empty — use ✕ to delete it.'); return; }
+  if (text !== td.text && spaceTypeOf(td.space) === 'coparenting'){
+    const gated = await toneGate(text, td.space);
+    if (gated === null) return;
+    text = gated;
+  }
   const prior = td.text;
   td.text = text;
   if (prior !== text) logEvent('edited', td, 'was: "' + prior + '"');
@@ -1921,6 +2008,10 @@ function focusTickCurrent(){
   toast('Done ✓ — next one up');
   renderFocus();
 }
+document.getElementById('toneUse').addEventListener('click', (e) => closeToneSheet(e.target.dataset.rewrite));
+document.getElementById('toneKeep').addEventListener('click', () => closeToneSheet(document.getElementById('toneOriginal').textContent));
+document.getElementById('toneCancel').addEventListener('click', () => closeToneSheet(null));
+
 document.getElementById('focusBtn').addEventListener('click', openFocus);
 document.getElementById('focusClose').addEventListener('click', closeFocus);
 document.getElementById('focusDone').addEventListener('click', focusTickCurrent);
@@ -1931,16 +2022,24 @@ document.getElementById('focusSkip').addEventListener('click', () => {
 });
 
 /* ---------- quick add ---------- */
-function quickAdd(){
+async function quickAdd(){
   const inp = document.getElementById('quickAdd');
-  const text = inp.value.trim();
+  let text = inp.value.trim();
   if (!text) return;
+  const spaceForTask = newTaskSpace();
+  if (spaceTypeOf(spaceForTask) === 'coparenting'){
+    inp.disabled = true;
+    const gated = await toneGate(text, spaceForTask);
+    inp.disabled = false;
+    if (gated === null) return;   // cancelled — keep the draft in the input
+    text = gated;
+  }
   const recur = parseRecur(text);
   const date = recur ? nextOccurrence(recur, parseTaskDate(text) || todayStr())
                      : (parseTaskDate(text) || todayStr());
   const energy = detectEnergy(text);
   todos.push({id: uid(), text, priority: detectPriority(text), tags: detectTags(text), done:false,
-    date, recur, energy, minutes: ENERGY_MIN[energy], space: newTaskSpace(),
+    date, recur, energy, minutes: ENERGY_MIN[energy], space: spaceForTask,
     ideaId:null, createdBy: myName() || null, createdAt: Date.now()});
   logEvent('created', todos[todos.length - 1]);
   saveTodos(); inp.value=''; renderTodos();
