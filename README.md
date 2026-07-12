@@ -33,6 +33,20 @@ and summaries, enable the on-device AI models in Settings (see below).
 | ✅ **Today** | Your daily todo list, auto-grouped into **Do first / Do today / If time allows**. Tick tasks off, tap the priority chip to re-prioritize, quick-add extras. Unfinished tasks carry over to the next day automatically. |
 | ⚙️ **Settings** | Optional Claude API key for smarter summaries, archive finished tasks, delete all data. |
 
+### Dates, repeats, editing & undo
+
+- **Scheduled tasks** — say or type *"pay rent on friday"*, *"book the dentist for
+  the 14th"*, *"call mum tomorrow"* and the task lands in an **📅 Upcoming**
+  section instead of today. Tap the date chip (or a task → **📅 When**) to
+  reschedule any task.
+- **Repeating tasks** — *"bins every tuesday"*, *"meds every morning"*, *"rent on
+  the 1st of every month"*. A finished repeat quietly respawns at its next
+  occurrence on the daily rollover. Tap the ↻ chip (or task → **↻ Repeat**) to
+  change or remove the rule.
+- **Edit a task** — tap the task text to open its detail panel, then **✏️ Edit**.
+- **Undo** — ticking or deleting a task (or deleting an idea) shows a toast with
+  an **Undo** button for a few seconds.
+
 ### On-device AI (fully offline, no API key)
 
 In Settings you can download two small AI models that then run entirely on your

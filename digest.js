@@ -28,11 +28,15 @@ function composeDigest(items, me, sinceTs, todayStr){
     return a.includes(me) || (t.createdBy || '').toLowerCase() === me;
   };
   const mine = items.filter(visible);
+  const tomorrowStr = new Date(new Date(todayStr + 'T00:00:00Z').getTime() + 86400000)
+    .toISOString().slice(0, 10);
   const openToday = mine.filter(t => !t.done && t.date === todayStr).length;
+  const dueTomorrow = mine.filter(t => !t.done && t.date === tomorrowStr).length;
   const news = mine.filter(t => (t.createdAt || 0) > sinceTs && (t.createdBy || '').toLowerCase() !== me);
   const ticks = mine.filter(t => t.done && (t.doneAt || 0) > sinceTs && (t.doneBy || '').toLowerCase() !== me);
   let body = openToday + ' task' + (openToday === 1 ? '' : 's') + ' open today';
+  if (dueTomorrow) body += ' · ' + dueTomorrow + ' due tomorrow';
   if (news.length) body += ' · ' + news.length + ' new from the family';
   if (ticks.length) body += ' · ' + ticks.length + ' ticked off';
-  return {title: 'Idea → Todo', body, openToday, news, ticks};
+  return {title: 'Idea → Todo', body, openToday, dueTomorrow, news, ticks};
 }

@@ -4,6 +4,12 @@ const { chromium } = require('playwright');
   const ctx = await browser.newContext();
   let lastPrompt = '';
   await ctx.route('**/generativelanguage.googleapis.com/**', async route => {
+    if (route.request().method() === 'GET'){    // v18+ model discovery
+      await route.fulfill({ status: 200, contentType: 'application/json',
+        body: JSON.stringify({models: [{name: 'models/gemini-2.5-flash',
+          supportedGenerationMethods: ['generateContent']}]}) });
+      return;
+    }
     const body = JSON.parse(route.request().postData());
     lastPrompt = body.contents[0].parts[0].text;
     await route.fulfill({ status: 200, contentType: 'application/json',

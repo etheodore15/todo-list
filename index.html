@@ -97,6 +97,11 @@
   .todo .transcript{flex-basis:100%; color:var(--muted); font-size:.8rem; line-height:1.5;
     margin-top:9px; padding-top:9px; border-top:1px solid #262d3d; font-style:italic;}
   .todo .transcript .tmeta{font-style:normal; color:var(--muted); margin-bottom:5px; font-size:.76rem;}
+  .todo .tacts{display:flex; gap:8px; margin-top:10px; font-style:normal;}
+  .todo .tact{background:var(--card2); border:none; color:var(--text); font-size:.78rem;
+    padding:7px 12px; border-radius:10px; cursor:pointer;}
+  .date-chip{background:rgba(255,179,71,.14); color:var(--med);}
+  .recur-chip{background:rgba(62,207,142,.13); color:var(--ok);}
   .todo .attr{width:100%; font-size:.68rem; color:var(--ok); margin-top:4px; opacity:.9;}
   .scope-chip{background:rgba(79,140,255,.16); color:var(--accent); cursor:pointer;}
   .sheet-overlay{position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:60;
@@ -171,6 +176,9 @@
     padding:10px 18px; border-radius:24px; font-size:.85rem; opacity:0;
     transition:opacity .25s; pointer-events:none; z-index:50; max-width:88%; text-align:center;}
   .toast.show{opacity:1;}
+  .toast.action{pointer-events:auto;}
+  .toast .undo{background:none; border:none; color:var(--accent); font-weight:700;
+    font-size:.85rem; margin-left:14px; cursor:pointer; padding:2px 4px;}
   .spin{display:inline-block; animation:spin 1s linear infinite;}
   @keyframes spin{to{transform:rotate(360deg);}}
 </style>
@@ -308,7 +316,7 @@
       <input type="file" id="importFile" accept=".json,application/json" style="display:none">
       <button class="btn ghost" id="wipeBtn">Delete all data</button>
     </div>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v23<br><span id="envInfo"></span></p>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v24<br><span id="envInfo"></span></p>
   </section>
 </main>
 
@@ -388,13 +396,110 @@ function scopeLabel(td){
 }
 
 const todayStr = () => new Date().toISOString().slice(0,10);
+const addDays = (n) => new Date(Date.now() + n * 86400000).toISOString().slice(0,10);
+
+// "book the dentist for the 14th" / "pay rent on friday" / "call mum tomorrow"
+// → a concrete YYYY-MM-DD (never past), or null when no day is spoken.
+const WEEKDAYS = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+function parseTaskDate(text){
+  const t = ' ' + String(text).toLowerCase() + ' ';
+  if (/\btomorrow\b/.test(t)) return addDays(1);
+  const wd = t.match(/\b(?:on|next|by|this|for)\s+(sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b/);
+  if (wd){
+    let diff = (WEEKDAYS.indexOf(wd[1]) - new Date().getUTCDay() + 7) % 7;
+    if (diff === 0) diff = 7;                      // "on friday" said on a friday → next friday
+    return addDays(diff);
+  }
+  const dm = t.match(/\b(?:on|by|for) the (\d{1,2})(?:st|nd|rd|th)\b/);
+  if (dm){
+    const day = parseInt(dm[1], 10);
+    const now = new Date();
+    let month = now.getUTCMonth(), year = now.getUTCFullYear();
+    if (day <= now.getUTCDate()){ month++; if (month > 11){ month = 0; year++; } }
+    const cand = new Date(Date.UTC(year, month, day));
+    if (cand.getUTCDate() === day) return cand.toISOString().slice(0,10);
+  }
+  return null;
+}
+
+// What the user types into the "when?" prompt → YYYY-MM-DD or null if unparseable.
+function resolveDateInput(s){
+  s = String(s || '').trim().toLowerCase();
+  if (!s || s === 'today') return todayStr();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s < todayStr() ? todayStr() : s;
+  return parseTaskDate(' on ' + s) || parseTaskDate(s);
+}
+
+function fmtDay(dateStr){
+  if (dateStr === todayStr()) return 'today';
+  if (dateStr === addDays(1)) return 'tomorrow';
+  const d = new Date(dateStr + 'T00:00:00Z');
+  return d.toLocaleDateString(undefined, {weekday:'short', day:'numeric', month:'short', timeZone:'UTC'});
+}
+
+/* ---------- recurrence ---------- */
+// td.recur: {type:'daily'} | {type:'weekly', dow:[0-6]} | {type:'monthly', day:N}
+function parseRecur(text){
+  const t = ' ' + String(text).toLowerCase() + ' ';
+  if (/\b(every (day|morning|night|evening|afternoon)|daily|each day)\b/.test(t)) return {type: 'daily'};
+  const w = t.match(/\bevery (sunday|monday|tuesday|wednesday|thursday|friday|saturday)s?\b/) ||
+            t.match(/\bon (sunday|monday|tuesday|wednesday|thursday|friday|saturday)s\b/);
+  if (w) return {type: 'weekly', dow: [WEEKDAYS.indexOf(w[1])]};
+  if (/\b(every week|weekly)\b/.test(t)) return {type: 'weekly', dow: [new Date().getUTCDay()]};
+  const m = t.match(/\b(\d{1,2})(?:st|nd|rd|th)? of (?:every|each) month\b/) ||
+            t.match(/\bevery month on the (\d{1,2})(?:st|nd|rd|th)\b/);
+  if (m) return {type: 'monthly', day: parseInt(m[1], 10)};
+  if (/\b(every month|monthly)\b/.test(t)) return {type: 'monthly', day: new Date().getUTCDate()};
+  return null;
+}
+
+// Compact form used in the AI prompt/response: "daily" | "weekly:tue,fri" | "monthly:14"
+function parseRecurCode(s){
+  s = String(s || '').toLowerCase().trim();
+  if (!s || s === 'null' || s === 'none') return null;
+  if (s === 'daily') return {type: 'daily'};
+  let m = s.match(/^weekly:([a-z, ]+)$/);
+  if (m){
+    const dow = m[1].split(',').map(x => WEEKDAYS.findIndex(w => w.startsWith(x.trim().slice(0, 3))))
+      .filter(i => i >= 0);
+    if (dow.length) return {type: 'weekly', dow: [...new Set(dow)].sort()};
+  }
+  m = s.match(/^monthly:(\d{1,2})$/);
+  if (m && +m[1] >= 1 && +m[1] <= 31) return {type: 'monthly', day: +m[1]};
+  return null;
+}
+
+function nextOccurrence(recur, from){        // smallest YYYY-MM-DD >= from matching the rule
+  const start = new Date(from + 'T00:00:00Z').getTime();
+  for (let i = 0; i < 62; i++){
+    const d = new Date(start + i * 86400000);
+    const ds = d.toISOString().slice(0, 10);
+    if (recur.type === 'daily') return ds;
+    if (recur.type === 'weekly' && (recur.dow || []).includes(d.getUTCDay())) return ds;
+    if (recur.type === 'monthly' && d.getUTCDate() === recur.day) return ds;
+  }
+  return from;
+}
+
+function recurLabel(recur){
+  if (!recur) return '';
+  if (recur.type === 'daily') return '↻ daily';
+  if (recur.type === 'weekly') return '↻ ' + (recur.dow || []).map(i => WEEKDAYS[i].slice(0, 3)).join(', ');
+  return '↻ monthly (' + recur.day + ')';
+}
 
 /* ---------- daily carry-over ---------- */
 (function rollover(){
   const t = todayStr();
   let changed = false;
   todos.forEach(td => {
-    if (td.date < t && !td.done){ td.date = t; changed = true; }   // carry unfinished over
+    if (td.recur && td.date < t){
+      // recurring: a finished instance respawns at its next occurrence,
+      // an unfinished one carries over like any other task
+      if (td.done){ setDone(td, false); td.date = nextOccurrence(td.recur, t); }
+      else td.date = t;
+      changed = true;
+    } else if (td.date < t && !td.done){ td.date = t; changed = true; }   // carry unfinished over
   });
   // keep done items from past days out of today's view but in storage (archive)
   if (changed) saveTodos();
@@ -402,12 +507,23 @@ const todayStr = () => new Date().toISOString().slice(0,10);
 
 /* ---------- toast ---------- */
 let toastTimer;
-function toast(msg){
+function toast(msg, undoFn){
   const el = document.getElementById('toast');
   el.textContent = msg;
+  el.classList.toggle('action', !!undoFn);
+  if (undoFn){
+    const b = document.createElement('button');
+    b.className = 'undo';
+    b.textContent = 'Undo';
+    b.addEventListener('click', () => {
+      el.classList.remove('show');
+      undoFn();
+    });
+    el.appendChild(b);
+  }
   el.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.classList.remove('show'), 2600);
+  toastTimer = setTimeout(() => el.classList.remove('show'), undoFn ? 5000 : 2600);
 }
 
 /* ---------- tabs ---------- */
@@ -463,14 +579,20 @@ function normalizeIdeaJson(json, text){
   const okPrio = p => ['high','medium','low'].includes(p);
   return {
     summary: String(json.summary || '').trim() || text.slice(0,100),
-    tasks: (Array.isArray(json.tasks) ? json.tasks : []).slice(0,6).map(t => ({
-      text: String(t && t.text != null ? t.text : t).trim(),
-      priority: okPrio(t && t.priority) ? t.priority : detectPriority(text),
-      tags: cleanTags(t && t.tags, String(t && t.text || text)),
-      assignees: (Array.isArray(t && t.assignees) ? t.assignees : [])
-        .map(n => String(n).toLowerCase().trim())
-        .filter(n => store.get('members', []).includes(n)).slice(0, 6)
-    })).filter(t => t.text),
+    tasks: (Array.isArray(json.tasks) ? json.tasks : []).slice(0,6).map(t => {
+      const recur = parseRecurCode(t && t.recur);
+      const date = (t && /^\d{4}-\d{2}-\d{2}$/.test(t.date || '') && t.date >= todayStr()) ? t.date : null;
+      return {
+        text: String(t && t.text != null ? t.text : t).trim(),
+        priority: okPrio(t && t.priority) ? t.priority : detectPriority(text),
+        tags: cleanTags(t && t.tags, String(t && t.text || text)),
+        assignees: (Array.isArray(t && t.assignees) ? t.assignees : [])
+          .map(n => String(n).toLowerCase().trim())
+          .filter(n => store.get('members', []).includes(n)).slice(0, 6),
+        recur,
+        date: recur ? nextOccurrence(recur, date || todayStr()) : date
+      };
+    }).filter(t => t.text),
     priority: okPrio(json.priority) ? json.priority : detectPriority(text)
   };
 }
@@ -490,7 +612,9 @@ Rules:
 - Extract ONLY actions the person actually intends to take, as separate tasks (max 6). Never turn observations, feelings, or background context into tasks — if the idea contains no action, return an empty tasks array and just summarize it. Merge duplicates. Fix obvious speech-transcription errors from context, but keep names as spoken.
 - "summary" is one clear sentence (max 14 words) capturing the core intent.
 - Judge each task's priority by urgency (time pressure) AND importance (consequences): high = needs action today or blocks other things; medium = this week; low = someday/optional.
-- Tag each task with 1-3 short lowercase tags chosen for USEFUL SORTING: ideally one life-area tag (work, home, family, personal) plus one activity-type tag (calls, shopping, errands, admin, finance, health, car, travel, pets, social, tech). Use single common words, consistent across tasks — never invent near-synonyms of an existing tag. Every task needs at least one tag; use "general" only as a last resort.` +
+- Tag each task with 1-3 short lowercase tags chosen for USEFUL SORTING: ideally one life-area tag (work, home, family, personal) plus one activity-type tag (calls, shopping, errands, admin, finance, health, car, travel, pets, social, tech). Use single common words, consistent across tasks — never invent near-synonyms of an existing tag. Every task needs at least one tag; use "general" only as a last resort.
+- Today is ${todayStr()} (${new Date().toLocaleDateString('en', {weekday: 'long', timeZone: 'UTC'})}). If the idea explicitly says WHEN a task should happen ("tomorrow", "on Friday", "on the 14th"), set that task's "date" to the resolved YYYY-MM-DD (never in the past). Otherwise leave "date" empty.
+- If the idea says a task REPEATS ("every Tuesday", "meds every morning", "rent on the 1st of every month"), set "recur" to "daily", "weekly:mon,tue,…", or "monthly:14" accordingly. Otherwise leave "recur" empty.` +
   (known.length ? `
 - The user's existing tags, most used first: ${known.join(', ')}. STRONGLY prefer reusing these exact tags whenever they fit; only introduce a new tag when none of them applies.` : '') +
   (store.get('members', []).length ? `
@@ -549,7 +673,9 @@ async function geminiSummarize(text, key, isRetry){
           text: {type: 'STRING'},
           priority: {type: 'STRING', enum: ['high','medium','low']},
           tags: {type: 'ARRAY', items: {type: 'STRING'}},
-          assignees: {type: 'ARRAY', items: {type: 'STRING'}}
+          assignees: {type: 'ARRAY', items: {type: 'STRING'}},
+          date: {type: 'STRING'},
+          recur: {type: 'STRING'}
         },
         required: ['text','priority','tags']
       }},
@@ -777,6 +903,8 @@ function localSummarize(text){
   picked = picked.flatMap(s => s.split(AND_ACTION));
   const tasks = picked.slice(0,6).map(t => {
     const priority = detectPriority(t);
+    const recur = parseRecur(t);
+    const date = recur ? nextOccurrence(recur, parseTaskDate(t) || todayStr()) : parseTaskDate(t);
     // strip spoken fillers and lead-ins so the task reads as an imperative
     for (let pass = 0; pass < 4; pass++){
       t = t.replace(/^(um+|uh+|okay|ok|so|well|right|actually|basically|anyway|oh|and|also|then|plus)[,\s]+/i,'')
@@ -785,7 +913,7 @@ function localSummarize(text){
     }
     t = t.replace(/[.!?]+$/,'').trim();
     const assignees = detectAssignees(t);
-    return {text: t.charAt(0).toUpperCase() + t.slice(1), priority, tags: detectTags(t), assignees};
+    return {text: t.charAt(0).toUpperCase() + t.slice(1), priority, tags: detectTags(t), assignees, date, recur};
   }).filter(t => t.text.length > 2);
 
   return {summary, tasks, priority: detectPriority(text)};
@@ -868,7 +996,9 @@ const IDEA_SCHEMA = {
           text: {type: 'string', description: 'Short imperative phrase keeping key details, e.g. "Call the accountant about the tax deadline".'},
           priority: {type: 'string', enum: ['high','medium','low']},
           tags: {type: 'array', items: {type: 'string'}, description: '1-3 short lowercase category tags for sorting, e.g. work, home, family, health, finance, shopping, calls, errands.'},
-          assignees: {type: 'array', items: {type: 'string'}, description: 'Household member names (lowercase) this task is delegated to, ONLY when the idea explicitly directs it at them. Empty otherwise.'}
+          assignees: {type: 'array', items: {type: 'string'}, description: 'Household member names (lowercase) this task is delegated to, ONLY when the idea explicitly directs it at them. Empty otherwise.'},
+          date: {type: 'string', description: 'YYYY-MM-DD the task should happen, ONLY when the idea explicitly says when. Empty otherwise.'},
+          recur: {type: 'string', description: 'Repeat rule when the idea says the task repeats: "daily", "weekly:mon,tue,…", or "monthly:14". Empty otherwise.'}
         },
         required: ['text','priority','tags'],
         additionalProperties: false
@@ -934,12 +1064,15 @@ saveIdeaBtn.addEventListener('click', async () => {
   const existing = new Set(todos.filter(td => !td.done).map(td => norm(td.text)));
   let added = 0, skipped = 0;
   const delegated = [];
+  const scheduled = [];
   result.tasks.forEach((task, i) => {
     if (existing.has(norm(task.text))){ skipped++; return; }   // already on the list
     todos.push({id: idea.id + '-' + i, text: task.text, priority: task.priority, tags: task.tags || [],
-      assignees: task.assignees || [], done:false, date:t, ideaId: idea.id,
-      createdBy: myName() || null, createdAt: Date.now()});
+      assignees: task.assignees || [], done:false, date: task.date || t, recur: task.recur || null,
+      ideaId: idea.id, createdBy: myName() || null, createdAt: Date.now()});
     if ((task.assignees || []).length) delegated.push(task.assignees.join(', '));
+    if (task.recur) scheduled.push(recurLabel(task.recur).replace('↻ ', '↻'));
+    else if (task.date && task.date > t) scheduled.push(fmtDay(task.date));
     added++;
   });
   saveTodos();
@@ -949,7 +1082,7 @@ saveIdeaBtn.addEventListener('click', async () => {
   saveIdeaBtn.textContent = 'Summarize & Add';
   updateBadge();
   toast(added
-    ? `Added ${added} task${added===1?'':'s'} to Today ✓${delegated.length ? ` (→ ${delegated.join('; ')})` : ''}${skipped ? ` (${skipped} already listed)` : ''}`
+    ? `Added ${added} task${added===1?'':'s'} ✓${scheduled.length ? ` (${scheduled.join(', ')})` : ''}${delegated.length ? ` (→ ${delegated.join('; ')})` : ''}${skipped ? ` (${skipped} already listed)` : ''}`
     : (skipped ? 'Those tasks are already on your list' : 'Idea saved — no tasks detected'));
   showView('today');
 });
@@ -984,7 +1117,12 @@ function renderIdeas(){
     rawEl.textContent = idea.raw;
     rawEl.addEventListener('click', () => rawEl.classList.toggle('open'));
     card.querySelector('.del').addEventListener('click', () => {
+      const at = ideas.findIndex(x => x.id === idea.id);
       ideas = ideas.filter(x => x.id !== idea.id); saveIdeas(); renderIdeas();
+      toast('Idea deleted', () => {
+        ideas.splice(Math.min(at, ideas.length), 0, idea);
+        saveIdeas(); renderIdeas();
+      });
     });
     if (linked.length){
       const wrap = document.createElement('div');
@@ -1061,7 +1199,13 @@ function renderTodos(){
 
   document.getElementById('shareBtn').style.display = list.length ? '' : 'none';
 
-  if (!list.length){
+  // tasks scheduled beyond today live in their own section at the bottom
+  let upcoming = todos.filter(t => visibleToMe(t) && t.date > todayStr() && !t.done);
+  if (activeTag) upcoming = upcoming.filter(td => (td.tags || []).includes(activeTag));
+  upcoming.sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 :
+    PRIOS.findIndex(p => p.key === a.priority) - PRIOS.findIndex(p => p.key === b.priority));
+
+  if (!list.length && !upcoming.length){
     el.innerHTML = '<div class="empty">✅<br><br>Nothing on the list yet.<br>Capture an idea or quick-add a task above.</div>';
     updateBadge(); return;
   }
@@ -1076,7 +1220,53 @@ function renderTodos(){
     items.forEach(td => sec.appendChild(todoRow(td)));
     el.appendChild(sec);
   });
+  if (upcoming.length){
+    const sec = document.createElement('div');
+    sec.className = 'prio-section upcoming';
+    sec.innerHTML = `<h2 style="color:var(--muted)">📅 Upcoming</h2>`;
+    upcoming.forEach(td => sec.appendChild(todoRow(td)));
+    el.appendChild(sec);
+  }
   updateBadge();
+}
+
+/* ---------- task editing (text, date, repeat) ---------- */
+function editText(td){
+  const v = prompt('Edit task:', td.text);
+  if (v === null) return;
+  const text = v.trim();
+  if (!text){ toast('Task text can\'t be empty — use ✕ to delete it.'); return; }
+  td.text = text;
+  saveTodos(); renderTodos();
+  if (document.getElementById('view-ideas').classList.contains('active')) renderIdeas();
+}
+function editDate(td){
+  const v = prompt('When? ("today", "tomorrow", "friday", "the 14th" or YYYY-MM-DD):',
+    td.date > todayStr() ? td.date : 'today');
+  if (v === null) return;
+  const date = resolveDateInput(v);
+  if (!date){ toast('Didn\'t understand that date — try "tomorrow", "friday" or 2026-07-20.'); return; }
+  td.date = date;
+  saveTodos(); renderTodos();
+  toast(date === todayStr() ? 'Moved to today ✓' : 'Scheduled for ' + fmtDay(date) + ' 📅');
+}
+function editRecur(td){
+  const v = prompt('Repeat? ("every day", "every tuesday", "monthly on the 14th" — empty for no repeat):',
+    td.recur ? recurLabel(td.recur).replace('↻ ', 'every ') : '');
+  if (v === null) return;
+  const s = v.trim();
+  if (!s){
+    td.recur = null;
+    saveTodos(); renderTodos();
+    toast('Repeat removed');
+    return;
+  }
+  const recur = parseRecur(' ' + s + ' ') || parseRecurCode(s);
+  if (!recur){ toast('Didn\'t understand that — try "every day", "every tuesday" or "every month on the 14th".'); return; }
+  td.recur = recur;
+  if (!td.done) td.date = nextOccurrence(recur, td.date > todayStr() ? td.date : todayStr());
+  saveTodos(); renderTodos();
+  toast('Repeats ' + recurLabel(recur).replace('↻ ', '') + ' — next: ' + fmtDay(td.date));
 }
 
 function todoRow(td){
@@ -1102,6 +1292,22 @@ function todoRow(td){
       sc.title = 'Tap to change who this task is for';
       sc.addEventListener('click', (e) => { e.stopPropagation(); openScopeSheet(td); });
       tg.appendChild(sc);
+    }
+    if (td.date > todayStr()){
+      const dc = document.createElement('span');
+      dc.className = 'ttag date-chip';
+      dc.textContent = '📅 ' + fmtDay(td.date);
+      dc.title = 'Tap to reschedule';
+      dc.addEventListener('click', (e) => { e.stopPropagation(); editDate(td); });
+      tg.appendChild(dc);
+    }
+    if (td.recur){
+      const rc = document.createElement('span');
+      rc.className = 'ttag recur-chip';
+      rc.textContent = recurLabel(td.recur);
+      rc.title = 'Tap to change how this repeats';
+      rc.addEventListener('click', (e) => { e.stopPropagation(); editRecur(td); });
+      tg.appendChild(rc);
     }
     (td.tags || []).forEach(tag => {
       const s = document.createElement('span');
@@ -1158,6 +1364,18 @@ function todoRow(td){
       idea ? '“' + idea.raw + '”'
            : (td.ideaId ? 'Captured on another device — the transcript stays there.'
                         : 'Added manually — no voice transcript.')));
+    const acts = document.createElement('div');
+    acts.className = 'tacts';
+    const mkAct = (label, fn) => {
+      const b = document.createElement('button');
+      b.className = 'tact'; b.textContent = label;
+      b.addEventListener('click', (e) => { e.stopPropagation(); fn(td); });
+      acts.appendChild(b);
+    };
+    mkAct('✏️ Edit', editText);
+    mkAct('📅 When', editDate);
+    mkAct('↻ Repeat', editRecur);
+    div.appendChild(acts);
     row.appendChild(div);
   });
   if (hasIdea){
@@ -1165,6 +1383,7 @@ function todoRow(td){
   }
   row.querySelector('.chk').addEventListener('click', () => {
     setDone(td, !td.done); saveTodos(); renderTodos();
+    if (td.done) toast('Done ✓', () => { setDone(td, false); saveTodos(); renderTodos(); });
   });
   row.querySelector('.prio-btn').addEventListener('click', () => {
     const order = ['high','medium','low'];
@@ -1172,7 +1391,12 @@ function todoRow(td){
     saveTodos(); renderTodos();
   });
   row.querySelector('.del').addEventListener('click', () => {
+    const removed = td, at = todos.findIndex(x => x.id === td.id);
     todos = todos.filter(x => x.id !== td.id); saveTodos(); renderTodos();
+    toast('Task deleted', () => {
+      todos.splice(Math.min(at, todos.length), 0, removed);
+      saveTodos(); renderTodos(); updateBadge();
+    });
   });
   return row;
 }
@@ -1211,8 +1435,14 @@ function quickAdd(){
   const inp = document.getElementById('quickAdd');
   const text = inp.value.trim();
   if (!text) return;
-  todos.push({id: uid(), text, priority: detectPriority(text), tags: detectTags(text), done:false, date: todayStr(), ideaId:null, createdBy: myName() || null, createdAt: Date.now()});
+  const recur = parseRecur(text);
+  const date = recur ? nextOccurrence(recur, parseTaskDate(text) || todayStr())
+                     : (parseTaskDate(text) || todayStr());
+  todos.push({id: uid(), text, priority: detectPriority(text), tags: detectTags(text), done:false,
+    date, recur, ideaId:null, createdBy: myName() || null, createdAt: Date.now()});
   saveTodos(); inp.value=''; renderTodos();
+  if (recur) toast('Repeats ' + recurLabel(recur).replace('↻ ', '') + ' — next: ' + fmtDay(date));
+  else if (date > todayStr()) toast('Scheduled for ' + fmtDay(date) + ' 📅');
 }
 document.getElementById('quickAddBtn').addEventListener('click', quickAdd);
 document.getElementById('quickAdd').addEventListener('keydown', e => { if (e.key==='Enter') quickAdd(); });
@@ -1406,7 +1636,8 @@ document.getElementById('saveKeyBtn').addEventListener('click', () => {
 });
 document.getElementById('clearDoneBtn').addEventListener('click', () => {
   const t = todayStr();
-  todos = todos.filter(td => !(td.date === t && td.done));
+  // recurring tasks stay — tomorrow's rollover respawns them at the next occurrence
+  todos = todos.filter(td => !(td.date === t && td.done && !td.recur));
   saveTodos(); renderTodos(); toast('Finished tasks archived');
 });
 document.getElementById('wipeBtn').addEventListener('click', () => {
@@ -1507,7 +1738,7 @@ function todoCore(td){
           done: !!td.done, date: td.date, ideaId: td.ideaId || null,
           createdBy: td.createdBy || null, createdAt: td.createdAt || null,
           doneBy: td.doneBy || null, doneAt: td.doneAt || null,
-          assignees: td.assignees || []};
+          assignees: td.assignees || [], recur: td.recur || null};
 }
 function syncMsg(text){
   const el = document.getElementById('syncMsg');
