@@ -231,7 +231,7 @@
          unless you enable Claude summaries.</p>
       <button class="btn ghost" id="wipeBtn">Delete all data</button>
     </div>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v10</p>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v11<br><span id="envInfo"></span></p>
   </section>
 </main>
 
@@ -997,6 +997,20 @@ document.getElementById('wipeBtn').addEventListener('click', () => {
 
 /* ---------- init ---------- */
 updateBadge();
+
+// Diagnostic: show which browser engine this is running in and whether it's
+// the installed standalone app or just a browser tab.
+(function(){
+  const ua = navigator.userAgent;
+  const browser = /firefox/i.test(ua) ? 'Firefox'
+    : /samsungbrowser/i.test(ua) ? 'Samsung Internet'
+    : /edga|edg\//i.test(ua) ? 'Edge'
+    : /chrome|crios/i.test(ua) ? 'Chrome'
+    : /safari/i.test(ua) ? 'Safari' : 'unknown browser';
+  const standalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+  document.getElementById('envInfo').textContent =
+    `Running in ${browser} — ${standalone ? 'installed app ✓' : 'browser tab (not installed)'}`;
+})();
 
 // Firefox on Android has no Web Speech API and no WebGPU — warn instead of
 // letting voice input and on-device AI fail confusingly.
