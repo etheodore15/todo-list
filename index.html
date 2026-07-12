@@ -194,6 +194,7 @@
     </div>
     <div id="tagFilter"></div>
     <div id="todoList"></div>
+    <button class="btn ghost" id="shareBtn" style="display:none; width:100%; margin-top:6px;">📤 Share this list</button>
   </section>
 
   <!-- SETTINGS -->
@@ -205,6 +206,15 @@
       <button class="btn primary" id="asrBtn">Enable offline voice recognition (~80 MB)</button>
       <p id="asrStatus"></p>
       <button class="btn ghost" id="modelsWipeBtn">Delete downloaded models</button>
+    </div>
+    <div class="set-block">
+      <h3>Household members (optional)</h3>
+      <p>Add names, comma-separated, and tasks mentioning them are tagged automatically —
+         say "remind Lulu to return the library books" and it lands under her tag, so each
+         person can filter to their own tasks on the Today view.</p>
+      <input id="membersInput" placeholder="e.g. Emile, Lulu" autocomplete="off">
+      <button class="btn primary" id="saveMembersBtn">Save members</button>
+      <p id="membersStatus"></p>
     </div>
     <div class="set-block">
       <h3>Smart summaries — free (Gemini)</h3>
@@ -234,10 +244,13 @@
       <h3>Your data</h3>
       <p>Everything is stored only on this device (localStorage). Nothing is uploaded anywhere
          unless you enable Gemini or Claude summaries — then only the idea text is sent,
-         using your own key.</p>
+         using your own key. Use backups to move your data to another device or browser.</p>
+      <button class="btn ghost" id="exportBtn">Export backup</button>
+      <button class="btn ghost" id="importBtn">Import backup</button>
+      <input type="file" id="importFile" accept=".json,application/json" style="display:none">
       <button class="btn ghost" id="wipeBtn">Delete all data</button>
     </div>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v18<br><span id="envInfo"></span></p>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v19<br><span id="envInfo"></span></p>
   </section>
 </main>
 
@@ -365,7 +378,9 @@ Rules:
 - Judge each task's priority by urgency (time pressure) AND importance (consequences): high = needs action today or blocks other things; medium = this week; low = someday/optional.
 - Tag each task with 1-3 short lowercase tags chosen for USEFUL SORTING: ideally one life-area tag (work, home, family, personal) plus one activity-type tag (calls, shopping, errands, admin, finance, health, car, travel, pets, social, tech). Use single common words, consistent across tasks — never invent near-synonyms of an existing tag. Every task needs at least one tag; use "general" only as a last resort.` +
   (known.length ? `
-- The user's existing tags, most used first: ${known.join(', ')}. STRONGLY prefer reusing these exact tags whenever they fit; only introduce a new tag when none of them applies.` : '') + `
+- The user's existing tags, most used first: ${known.join(', ')}. STRONGLY prefer reusing these exact tags whenever they fit; only introduce a new tag when none of them applies.` : '') +
+  (store.get('members', []).length ? `
+- Household members: ${store.get('members', []).join(', ')}. When a task is for or about one of them (e.g. "remind Lulu to…", "book the dentist for Emile"), include that member's name (lowercase) as one of its tags. Tasks for the speaker themselves need no name tag.` : '') + `
 - The top-level priority is the highest task priority.
 
 Idea: """${text}"""`;
@@ -639,7 +654,7 @@ function localSummarize(text){
   // feelings, and context stay in the idea but produce no todo. Zero tasks is
   // a valid outcome.
   const ACTION_PHRASES = /\b(needs? to|have to|has to|must|should|remember to|don't forget|going to|gonna|want to|make sure|look into|follow up|set up|pick up|drop off|go to|sign up|book in|sort out|work on|put on)\b/i;
-  const ACTION_VERBS = /\b(call|ring|phone|text|message|email|buy|order|book|send|writ|finish|fix|repair|check|schedul|organis|organiz|plan|research|pay|clean|prepar|review|updat|creat|mak|build|contact|ask|cancel|renew|submit|tak|bring|grab|mov|sell|post|visit|regist|apply|install|download|print|wash|rins|brush|floss|redesign|design|start|try|collect|return|deliver|water|feed|walk|arrang)(e|es|s|ed|ing)?\b/i;
+  const ACTION_VERBS = /\b(call|ring|phone|text|message|email|buy|order|book|send|writ|finish|fix|repair|check|schedul|organis|organiz|plan|research|pay|clean|prepar|review|updat|creat|mak|build|contact|ask|cancel|renew|submit|tak|bring|grab|mov|sell|post|visit|regist|apply|install|download|print|wash|rins|brush|floss|remind|redesign|design|start|try|collect|return|deliver|water|feed|walk|arrang)(e|es|s|ed|ing)?\b/i;
   let picked = sentences.filter(s => ACTION_PHRASES.test(s) || ACTION_VERBS.test(s));
   // split compound actions: "...put on my pajamas and brush my teeth and rinse..."
   const AND_ACTION = /\s+and\s+(?=(?:also\s+|then\s+|maybe\s+)?(?:make sure|put on|pick up|drop off|go to|sign up|set up|call|ring|phone|text|message|email|buy|order|book|send|write|finish|fix|repair|check|schedule|organis\w*|organiz\w*|plan|research|pay|clean|prepare|review|update|create|make|build|contact|ask|cancel|renew|submit|take|bring|grab|move|sell|post|visit|register|apply|install|download|print|wash|rinse|brush|floss|start|try|collect|return|deliver|water|feed|walk|arrange)\b)/i;
@@ -696,7 +711,13 @@ const TAG_RULES = [
 ];
 function detectTags(text){
   const t = text.toLowerCase();
-  const tags = TAG_RULES.filter(([, re]) => re.test(t)).map(([tag]) => tag).slice(0, 3);
+  let tags = TAG_RULES.filter(([, re]) => re.test(t)).map(([tag]) => tag);
+  // household members get tagged first, so per-person filtering always works
+  const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  store.get('members', []).forEach(m => {
+    if (new RegExp('\\b' + esc(m) + '\\b', 'i').test(t) && !tags.includes(m)) tags.unshift(m);
+  });
+  tags = tags.slice(0, 3);
   return tags.length ? tags : ['general'];   // every task gets at least one tag
 }
 function cleanTags(arr, fallbackText){
@@ -905,6 +926,8 @@ function renderTodos(){
   document.getElementById('progressBar').style.width =
     list.length ? Math.round(done/list.length*100)+'%' : '0';
 
+  document.getElementById('shareBtn').style.display = list.length ? '' : 'none';
+
   if (!list.length){
     el.innerHTML = '<div class="empty">✅<br><br>Nothing on the list yet.<br>Capture an idea or quick-add a task above.</div>';
     updateBadge(); return;
@@ -994,6 +1017,30 @@ function updateBadge(){
   document.getElementById('todayBadge').textContent = open ? ` (${open})` : '';
 }
 
+/* ---------- share ---------- */
+document.getElementById('shareBtn').addEventListener('click', async () => {
+  let list = todayTodos().filter(t => !t.done);
+  if (activeTag) list = list.filter(td => (td.tags || []).includes(activeTag));
+  if (!list.length){ toast('Nothing open to share.'); return; }
+  const day = new Date().toLocaleDateString(undefined, {weekday: 'short', day: 'numeric', month: 'short'});
+  const title = (activeTag ? activeTag[0].toUpperCase() + activeTag.slice(1) + ' list' : 'Today') + ' — ' + day;
+  let text = title + '\n';
+  PRIOS.forEach(p => {
+    const items = list.filter(t => t.priority === p.key);
+    if (!items.length) return;
+    text += '\n' + p.label.toUpperCase() + '\n';
+    items.forEach(t => { text += '• ' + t.text + '\n'; });
+  });
+  try {
+    if (navigator.share){ await navigator.share({title, text}); return; }
+    throw new Error('no share');
+  } catch (err) {
+    if (err.name === 'AbortError') return;      // user cancelled the share sheet
+    try { await navigator.clipboard.writeText(text); toast('Copied to clipboard 📋'); }
+    catch (_) { toast('Sharing not available in this browser.'); }
+  }
+});
+
 /* ---------- quick add ---------- */
 function quickAdd(){
   const inp = document.getElementById('quickAdd');
@@ -1074,6 +1121,62 @@ document.getElementById('modelsWipeBtn').addEventListener('click', async () => {
   document.getElementById('asrStatus').textContent = '';
   toast('Models deleted');
   location.reload();
+});
+
+/* ---------- settings: household members ---------- */
+const membersInput = document.getElementById('membersInput');
+const membersStatus = document.getElementById('membersStatus');
+function refreshMembers(){
+  const m = store.get('members', []);
+  membersInput.value = m.join(', ');
+  membersStatus.textContent = m.length ? `✅ Tagging tasks for: ${m.join(', ')}.` : '';
+}
+refreshMembers();
+document.getElementById('saveMembersBtn').addEventListener('click', () => {
+  const members = membersInput.value.split(',')
+    .map(s => s.toLowerCase().replace(/[^a-z0-9 -]/g, '').trim())
+    .filter(Boolean).slice(0, 8);
+  store.set('members', members);
+  refreshMembers();
+  toast(members.length ? 'Household members saved ✓' : 'Members cleared');
+});
+
+/* ---------- settings: backup ---------- */
+document.getElementById('exportBtn').addEventListener('click', () => {
+  const backup = {
+    app: 'idea-todo', version: 1, exported: new Date().toISOString(),
+    ideas, todos, members: store.get('members', [])
+  };
+  const blob = new Blob([JSON.stringify(backup, null, 1)], {type: 'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'idea-todo-backup-' + todayStr() + '.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  toast('Backup exported — keep the file somewhere safe.');
+});
+document.getElementById('importBtn').addEventListener('click', () => {
+  document.getElementById('importFile').click();
+});
+document.getElementById('importFile').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  try {
+    const data = JSON.parse(await file.text());
+    if (data.app !== 'idea-todo' || !Array.isArray(data.ideas) || !Array.isArray(data.todos)){
+      throw new Error('not an Idea → Todo backup file');
+    }
+    const when = data.exported ? new Date(data.exported).toLocaleDateString() : 'unknown date';
+    if (!confirm(`Replace everything on this device with the backup from ${when}? (${data.todos.length} tasks, ${data.ideas.length} ideas)`)) return;
+    ideas = data.ideas; todos = data.todos;
+    saveIdeas(); saveTodos();
+    if (Array.isArray(data.members)) store.set('members', data.members);
+    refreshMembers(); renderIdeas(); renderTodos(); updateBadge();
+    toast('Backup imported ✓');
+  } catch (err) {
+    toast('Import failed: ' + err.message);
+  }
 });
 
 /* ---------- settings: Gemini key ---------- */
