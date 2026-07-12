@@ -112,7 +112,16 @@ sent to the Anthropic API with your own key).
 
 ## Family sync
 
-One person creates a free Firebase project; everyone else joins with an invite code.
+Shared lists are organised as **spaces** — one space per group: a family
+household, a co-parenting pair, a care team around someone. You can belong to
+several spaces at once (e.g. "Home" + "Mum's care"); a switcher on the Today
+view filters between them, plus a 🔒 Personal lane for tasks that never leave
+your device. New tasks land in whichever space you're viewing, and any task
+can be moved between spaces (or made private) from its scope chip. Several
+spaces can share one Firebase project.
+
+To set up the first space: one person creates a free Firebase project;
+everyone else joins with an invite code.
 
 1. Go to [console.firebase.google.com](https://console.firebase.google.com) → **Add project** (any name, disable Analytics).
 2. Build → **Firestore Database** → Create database (production mode).

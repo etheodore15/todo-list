@@ -166,9 +166,11 @@
     padding:16px; margin-bottom:14px;}
   .set-block h3{margin:0 0 6px; font-size:.95rem;}
   .set-block p{color:var(--muted); font-size:.82rem; line-height:1.55; margin:6px 0;}
-  .set-block input{width:100%; background:var(--bg); border:1px solid #2a3245;
+  .set-block input, .set-block select{width:100%; background:var(--bg); border:1px solid #2a3245;
     border-radius:10px; color:var(--text); padding:11px 12px; font-size:.88rem;
     outline:none; margin-top:8px;}
+  .space-row{border:1px solid #2a3245; border-radius:12px; padding:10px 12px; margin-bottom:10px;}
+  .space-label{font-weight:600; font-size:.95rem; margin-bottom:2px;}
   .set-block .btn{margin-top:10px;}
 
   /* Someday + Wins (B4/B5) */
@@ -254,6 +256,7 @@
     <div class="progress-label" id="progressLabel"></div>
     <div class="progress"><div id="progressBar"></div></div>
     <div id="awayBanner" style="display:none;"></div>
+    <div id="spaceFilter" style="display:flex; gap:8px; overflow-x:auto; margin-bottom:10px; scrollbar-width:none;"></div>
     <button class="btn ghost" id="focusBtn" style="display:none; width:100%; margin-bottom:12px;">🎯 Just one thing</button>
     <div class="addrow">
       <input id="quickAdd" placeholder="Quick add a task…" enterkeyhint="done">
@@ -293,18 +296,23 @@
       <p id="membersStatus"></p>
     </div>
     <div class="set-block">
-      <h3>Family sync (beta)</h3>
-      <p>Share one task list across the household — new tasks and ticks appear on everyone's
-         phone in real time, and it works offline (changes sync when you're back online).
-         Ideas and voice transcripts stay private on each device; only tasks are shared.</p>
+      <h3>Spaces — shared lists (beta)</h3>
+      <p>A space is one shared task list: your family household, a co-parenting pair, a care
+         team around someone. You can belong to several at once — tasks sync in real time to
+         everyone in that space and work offline. Ideas and voice transcripts always stay
+         private on each device; only tasks are shared.</p>
       <input id="myNameInput" placeholder="Your name (shown on tasks you add or tick)" autocomplete="off">
       <button class="btn primary" id="saveMyNameBtn">Save name</button>
       <p id="myNameStatus"></p>
+      <div id="syncActive" style="display:none;">
+        <div id="spacesList"></div>
+        <button class="btn ghost" id="addSpaceBtn">➕ Join or create another space</button>
+      </div>
       <div id="syncSetup">
         <input id="inviteInput" placeholder="Paste an invite code to join…" autocomplete="off">
-        <button class="btn primary" id="joinBtn">Join household</button>
+        <button class="btn primary" id="joinBtn">Join space</button>
         <details style="margin-top:12px;">
-          <summary style="color:var(--accent); cursor:pointer;">First device? Create the household (one-time, ~3 min)</summary>
+          <summary style="color:var(--accent); cursor:pointer;">First device? Create a space (one-time, ~3 min)</summary>
           <p style="margin-top:8px;">
             1. Go to <b>console.firebase.google.com</b> → Add project (any name, Analytics off).<br>
             2. Build → <b>Firestore Database</b> → Create database (production mode).<br>
@@ -312,15 +320,19 @@
                <a href="https://github.com/etheodore15/todo-list#family-sync" target="_blank" style="color:var(--accent)">the README</a> and Publish.<br>
             4. Project settings (⚙) → Your apps → Web (&lt;/&gt;) → Register app → copy the
                <b>firebaseConfig</b> snippet.<br>
-            5. Paste it below and tap Create.</p>
+            5. Paste it below, name the space, and tap Create.<br>
+            <span style="color:var(--muted)">Adding a second space (e.g. "Mum's care") can reuse the same
+            Firebase project — just paste the same snippet again.</span></p>
           <textarea id="fbConfigInput" placeholder="Paste the firebaseConfig snippet here…"
             style="width:100%; min-height:90px; background:var(--bg); border:1px solid #2a3245; border-radius:10px; color:var(--text); padding:10px; font-size:.8rem; margin-top:6px;"></textarea>
-          <button class="btn primary" id="createHhBtn" style="margin-top:8px;">Create household</button>
+          <input id="spaceNameInput" placeholder="Space name (e.g. Home, Mum's care)" autocomplete="off">
+          <select id="spaceTypeSel">
+            <option value="family">👥 Family / household</option>
+            <option value="coparenting">🤝 Co-parenting</option>
+            <option value="care">💙 Care team</option>
+          </select>
+          <button class="btn primary" id="createHhBtn" style="margin-top:8px;">Create space</button>
         </details>
-      </div>
-      <div id="syncActive" style="display:none;">
-        <button class="btn primary" id="shareInviteBtn">Share invite code</button>
-        <button class="btn ghost" id="leaveHhBtn">Leave household (keep my tasks)</button>
       </div>
       <p id="syncMsg"></p>
     </div>
@@ -371,7 +383,7 @@
       <input type="file" id="importFile" accept=".json,application/json" style="display:none">
       <button class="btn ghost" id="wipeBtn">Delete all data</button>
     </div>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v26<br><span id="envInfo"></span></p>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v27<br><span id="envInfo"></span></p>
   </section>
 </main>
 
@@ -387,6 +399,7 @@
     <h3>Who is this task for?</h3>
     <button class="btn ghost" id="scopePrivate">🔒 Private — only me, on this device</button>
     <button class="btn ghost" id="scopeFamily">👥 Family — everyone in the household</button>
+    <div id="scopeSpaces"></div>
     <div id="scopeMembers" style="margin:4px 0 10px;"></div>
     <button class="btn primary" id="scopeAssign">Assign to selected</button>
     <button class="btn ghost" id="scopeCancel">Cancel</button>
@@ -465,6 +478,12 @@ function canReassign(td){
 function scopeLabel(td){
   if (td.scope === 'private') return '🔒 private';
   const a = td.assignees || [];
+  const spaces = store.get('spaces', []);
+  if (spaces.length && (td.space || null) === null) return '🔒 private';
+  const sp = spaces.find(s => s.hid === td.space);
+  if (sp && spaces.length > 1)
+    return ({family:'👥',coparenting:'🤝',care:'💙'}[sp.type] || '👥') + ' ' + sp.name +
+      (a.length ? ' → ' + a.join(', ') : '');
   return a.length ? '→ ' + a.join(', ') : '👥 family';
 }
 
@@ -1253,7 +1272,7 @@ saveIdeaBtn.addEventListener('click', async () => {
     todos.push({id: idea.id + '-' + i, text: task.text, priority: task.priority, tags: task.tags || [],
       assignees: task.assignees || [], done:false, date: task.date || t, recur: task.recur || null,
       energy: task.energy || detectEnergy(task.text), minutes: task.minutes || null,
-      ideaId: idea.id, createdBy: myName() || null, createdAt: Date.now()});
+      space: newTaskSpace(), ideaId: idea.id, createdBy: myName() || null, createdAt: Date.now()});
     if ((task.assignees || []).length) delegated.push(task.assignees.join(', '));
     if (task.recur) scheduled.push(recurLabel(task.recur).replace('↻ ', '↻'));
     else if (task.date && task.date > t) scheduled.push(fmtDay(task.date));
@@ -1348,7 +1367,42 @@ const PRIOS = [
 function todayTodos(){ return todos.filter(t => t.date === todayStr() && !t.someday); }
 
 let activeTag = null;
-let easyOnly = false;   // 🔋 easy-wins filter: only low-energy tasks
+let easyOnly = false;      // 🔋 easy-wins filter: only low-energy tasks
+let activeSpace = 'all';   // 'all' | 'personal' | space hid
+
+function inActiveSpace(td){
+  if (activeSpace === 'all') return true;
+  if (activeSpace === 'personal') return (td.space || null) === null;
+  return td.space === activeSpace;
+}
+
+// the space a NEW task lands in: the one being viewed, else the default
+function newTaskSpace(){
+  if (activeSpace === 'personal') return null;
+  if (activeSpace !== 'all') return activeSpace;
+  return store.get('defaultSpace', null) || null;
+}
+
+function renderSpaceFilter(){
+  const bar = document.getElementById('spaceFilter');
+  const spaces = spacesList();
+  bar.innerHTML = '';
+  if (spaces.length < 1){ bar.style.display = 'none'; return; }
+  if (spaces.length === 1 && !todos.some(t => (t.space || null) === null && !t.done)){
+    bar.style.display = 'none'; return;   // one space, nothing personal — no switcher needed
+  }
+  bar.style.display = 'flex';
+  const mk = (label, val) => {
+    const b = document.createElement('button');
+    b.className = 'fchip' + (activeSpace === val ? ' active' : '');
+    b.textContent = label;
+    b.addEventListener('click', () => { activeSpace = val; renderTodos(); });
+    bar.appendChild(b);
+  };
+  mk('All', 'all');
+  spaces.forEach(sp => mk(`${SPACE_ICON[sp.type] || '👥'} ${sp.name}`, sp.hid));
+  mk('🔒 Personal', 'personal');
+}
 
 function renderTagFilter(list){
   const bar = document.getElementById('tagFilter');
@@ -1384,7 +1438,8 @@ function renderEasyChip(list){
 
 function renderTodos(){
   const el = document.getElementById('todoList');
-  let list = todayTodos().filter(visibleToMe);
+  renderSpaceFilter();
+  let list = todayTodos().filter(visibleToMe).filter(inActiveSpace);
   renderTagFilter(list);
   renderEasyChip(list);
   if (activeTag) list = list.filter(td => (td.tags || []).includes(activeTag));
@@ -1406,7 +1461,8 @@ function renderTodos(){
   document.getElementById('focusBtn').style.display = list.some(t => !t.done) ? '' : 'none';
 
   // tasks scheduled beyond today live in their own section at the bottom
-  let upcoming = todos.filter(t => visibleToMe(t) && t.date > todayStr() && !t.done && !t.someday);
+  let upcoming = todos.filter(t => visibleToMe(t) && t.date > todayStr() && !t.done && !t.someday)
+    .filter(inActiveSpace);
   if (activeTag) upcoming = upcoming.filter(td => (td.tags || []).includes(activeTag));
   if (easyOnly) upcoming = upcoming.filter(td => td.energy === 'low');
   upcoming.sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 :
@@ -1496,7 +1552,7 @@ function todoRow(td){
     const tg = document.createElement('div');
     tg.className = 'ttags';
     tg.title = 'Tap to edit tags';
-    if (store.get('householdId', '') || td.scope === 'private' || (td.assignees || []).length){
+    if (store.get('spaces', []).length || td.scope === 'private' || (td.assignees || []).length){
       const sc = document.createElement('span');
       sc.className = 'ttag scope-chip';
       sc.textContent = scopeLabel(td);
@@ -1686,7 +1742,7 @@ function todoRow(td){
 /* ---------- Someday (B4) + Wins (B5) ---------- */
 function renderSomeday(){
   const block = document.getElementById('somedayBlock');
-  const list = todos.filter(t => t.someday && !t.done && visibleToMe(t));
+  const list = todos.filter(t => t.someday && !t.done && visibleToMe(t) && inActiveSpace(t));
   block.style.display = list.length ? '' : 'none';
   block.querySelector('summary').textContent = `🌙 Someday (${list.length})`;
   const el = document.getElementById('somedayList');
@@ -1763,7 +1819,7 @@ document.getElementById('shareBtn').addEventListener('click', async () => {
 let focusPool = [], focusIdx = 0;
 
 function focusEligible(){
-  let list = todayTodos().filter(t => visibleToMe(t) && !t.done);
+  let list = todayTodos().filter(t => visibleToMe(t) && !t.done && inActiveSpace(t));
   if (activeTag) list = list.filter(td => (td.tags || []).includes(activeTag));
   if (easyOnly) list = list.filter(td => td.energy === 'low');
   // hardest-first: the app chooses so the person doesn't have to
@@ -1846,7 +1902,7 @@ function quickAdd(){
                      : (parseTaskDate(text) || todayStr());
   const energy = detectEnergy(text);
   todos.push({id: uid(), text, priority: detectPriority(text), tags: detectTags(text), done:false,
-    date, recur, energy, minutes: ENERGY_MIN[energy],
+    date, recur, energy, minutes: ENERGY_MIN[energy], space: newTaskSpace(),
     ideaId:null, createdBy: myName() || null, createdAt: Date.now()});
   saveTodos(); inp.value=''; renderTodos();
   if (recur) toast('Repeats ' + recurLabel(recur).replace('↻ ', '') + ' — next: ' + fmtDay(date));
@@ -2108,6 +2164,26 @@ let scopeTask = null;
 function openScopeSheet(td){
   if (!canReassign(td)){ toast('Only the creator or an assignee can change this.'); return; }
   scopeTask = td;
+  // with several spaces, offer to move the task between them
+  const spWrap = document.getElementById('scopeSpaces');
+  spWrap.innerHTML = '';
+  const spaces = spacesList();
+  document.getElementById('scopeFamily').style.display = spaces.length > 1 ? 'none' : '';
+  if (spaces.length > 1){
+    spaces.forEach(sp => {
+      const b = document.createElement('button');
+      b.className = 'btn ghost';
+      b.textContent = `${SPACE_ICON[sp.type] || '👥'} ${sp.name}` +
+        (td.space === sp.hid ? ' — current space' : ' — move it here');
+      b.addEventListener('click', () => {
+        td.space = sp.hid; td.scope = null;
+        saveTodos(); renderTodos(); updateBadge();
+        toast(`In "${sp.name}" now ✓`);
+        closeScopeSheet();
+      });
+      spWrap.appendChild(b);
+    });
+  }
   const members = store.get('members', []);
   const wrap = document.getElementById('scopeMembers');
   wrap.innerHTML = '';
@@ -2134,6 +2210,8 @@ function applyScope(scope, assignees){
   if (!scopeTask) return;
   scopeTask.scope = scope === 'private' ? 'private' : null;
   scopeTask.assignees = assignees || [];
+  if (scope === 'private') scopeTask.space = null;
+  else if (scopeTask.space == null) scopeTask.space = store.get('defaultSpace', null);
   saveTodos(); renderTodos(); updateBadge();
   toast(scope === 'private' ? 'Task is now private to this device 🔒'
       : (assignees && assignees.length ? 'Assigned to ' + assignees.join(', ') + ' ✓'
@@ -2153,9 +2231,48 @@ document.getElementById('scopeSheet').addEventListener('click', (e) => {
   if (e.target === document.getElementById('scopeSheet')) closeScopeSheet();
 });
 
-/* ---------- family sync (Firestore) ---------- */
-let fbFs = null, fbDb = null, syncUnsub = null, applyingRemote = false;
-const lastPush = {};   // id → serialized core, to detect what changed locally
+/* ---------- spaces + sync (Firestore) ----------
+   A "space" is one shared list: a family household, a co-parenting pair, a
+   care team. You can belong to several at once; each syncs to its own
+   Firestore (possibly different projects). Tasks carry td.space (a space id,
+   or null = personal, this device only). One codebase — the space TYPE is
+   what later switches on audience packs (see ROADMAP.md). */
+let fbFs = null, fbInitApp = null, applyingRemote = false;
+const spaceRt = {};    // hid → {db, unsub, lastPush: {id → serialized core}}
+
+const SPACE_ICON = {family: '👥', coparenting: '🤝', care: '💙'};
+const spacesList = () => store.get('spaces', []);
+const spaceName = (hid) => { const sp = spacesList().find(s => s.hid === hid); return sp ? sp.name : null; };
+
+// legacy mirror: sw digest + older code paths read fbConfig/householdId —
+// keep them pointing at the default space
+function syncLegacyMirror(){
+  const def = spacesList().find(s => s.hid === store.get('defaultSpace', '')) || spacesList()[0] || null;
+  store.set('defaultSpace', def ? def.hid : null);
+  store.set('fbConfig', def ? def.cfg : null);
+  store.set('householdId', def ? def.hid : '');
+}
+
+// one-time migration from the single-household model
+(function migrateSpaces(){
+  if (store.get('spaces', null) !== null) return;
+  const cfg = store.get('fbConfig', null), hid = store.get('householdId', '');
+  const spaces = (cfg && hid) ? [{hid, name: 'Family', type: 'family', cfg}] : [];
+  store.set('spaces', spaces);
+  if (spaces.length){
+    store.set('defaultSpace', hid);
+    todos.forEach(td => { if (td.space === undefined && td.scope !== 'private') td.space = hid; });
+    store.set('todos', todos);
+  }
+})();
+
+// joining/creating the FIRST space adopts existing shareable tasks into it,
+// matching the old "everything local syncs up" behaviour
+function adoptOrphans(hid){
+  if (spacesList().length !== 1) return;
+  todos.forEach(td => { if (td.space == null && td.scope !== 'private') td.space = hid; });
+  store.set('todos', todos);
+}
 
 function todoCore(td){
   return {text: td.text, priority: td.priority, tags: td.tags || [],
@@ -2172,75 +2289,96 @@ function syncMsg(text){
   if (el) el.textContent = text;
 }
 function refreshSyncUI(){
-  const on = !!store.get('householdId', '');
-  document.getElementById('syncSetup').style.display = on ? 'none' : '';
-  document.getElementById('syncActive').style.display = on ? '' : 'none';
+  const spaces = spacesList();
+  document.getElementById('syncSetup').style.display = spaces.length ? 'none' : '';
+  document.getElementById('syncActive').style.display = spaces.length ? '' : 'none';
+  renderSpacesList();
 }
 
-async function startSync(){
-  const cfg = store.get('fbConfig', null);
-  const hid = store.get('householdId', '');
-  if (!cfg || !hid || fbDb) return;
-  syncMsg('Connecting…');
+async function loadFbModules(){
+  if (fbFs) return;
   const appMod = await import('./vendor/firebase-app.js');
   fbFs = await import('./vendor/firebase-firestore.js');
-  const app = appMod.initializeApp(cfg);
-  fbDb = fbFs.initializeFirestore(app, {localCache: fbFs.persistentLocalCache()});
-  // seed lastPush from current local state, then push everything local once
-  todos.forEach(td => { lastPush[td.id] = null; });
+  fbInitApp = appMod.initializeApp;
+}
+
+async function startSpaceSync(sp){
+  if (spaceRt[sp.hid]) return;
+  await loadFbModules();
+  const rt = spaceRt[sp.hid] = {db: null, unsub: null, lastPush: {}};
+  const app = fbInitApp(sp.cfg, 'space-' + sp.hid);
+  rt.db = fbFs.initializeFirestore(app, {localCache: fbFs.persistentLocalCache()});
+  // seed lastPush so everything local for this space pushes once
+  todos.forEach(td => { if ((td.space || null) === sp.hid) rt.lastPush[td.id] = null; });
   syncPush();
-  const col = fbFs.collection(fbDb, 'households', hid, 'items');
-  syncUnsub = fbFs.onSnapshot(col, snap => {
+  const col = fbFs.collection(rt.db, 'households', sp.hid, 'items');
+  rt.unsub = fbFs.onSnapshot(col, snap => {
     applyingRemote = true;
     snap.docChanges().forEach(ch => {
       const id = ch.doc.id;
       const localAny = todos.find(t => t.id === id);
-      if (localAny && localAny.scope === 'private'){ delete lastPush[id]; return; }
+      // local task is private or has moved to another space → this copy is stale
+      if (localAny && (localAny.scope === 'private' || (localAny.space || null) !== sp.hid)){
+        delete rt.lastPush[id]; return;
+      }
       if (ch.type === 'removed'){
         todos = todos.filter(t => t.id !== id);
-        delete lastPush[id];
+        delete rt.lastPush[id];
         return;
       }
       const d = ch.doc.data();
       const local = todos.find(t => t.id === id);
-      if (!local) todos.push({id, ...d});
-      else if ((d.updated || 0) >= (local.updated || 0)) Object.assign(local, d);
+      if (!local) todos.push({id, ...d, space: sp.hid});
+      else if ((d.updated || 0) >= (local.updated || 0)) Object.assign(local, d, {space: sp.hid});
       const cur = todos.find(t => t.id === id);
-      lastPush[id] = JSON.stringify(todoCore(cur));
+      rt.lastPush[id] = JSON.stringify(todoCore(cur));
       noteFamilyActivity(cur);
     });
     store.set('todos', todos);          // persist without re-triggering a push
     applyingRemote = false;
     renderTodos(); updateBadge();
     if (document.getElementById('view-ideas').classList.contains('active')) renderIdeas();
-    syncMsg('✅ Household sync active — changes appear on every device.');
+    const n = spacesList().length;
+    syncMsg(`✅ ${n === 1 ? 'Sync active' : n + ' spaces syncing'} — changes appear on every device.`);
   }, err => {
-    syncMsg('❌ Sync error: ' + err.message +
+    syncMsg('❌ Sync error (' + sp.name + '): ' + err.message +
       (String(err.message).match(/permission/i) ? ' — check the Firestore rules step in the README.' : ''));
   });
 }
 
+async function startSync(){
+  for (const sp of spacesList()){
+    try { await startSpaceSync(sp); }
+    catch (err) { syncMsg('❌ ' + sp.name + ': ' + err.message); }
+  }
+}
+
 function syncPush(){
-  if (!fbDb || applyingRemote) return;
-  const hid = store.get('householdId', '');
-  const seen = new Set();
-  todos.forEach(td => {
-    if (td.scope === 'private') return;   // stays local; stale remote copy is deleted below
-    seen.add(td.id);
-    const core = JSON.stringify(todoCore(td));
-    if (lastPush[td.id] !== core){
-      td.updated = Date.now();
-      lastPush[td.id] = core;
-      fbFs.setDoc(fbFs.doc(fbDb, 'households', hid, 'items', td.id),
-        {...todoCore(td), updated: td.updated}, {merge: true})
-        .catch(err => syncMsg('❌ Sync error: ' + err.message));
-    }
-  });
-  Object.keys(lastPush).forEach(id => {
-    if (!seen.has(id)){
-      delete lastPush[id];
-      fbFs.deleteDoc(fbFs.doc(fbDb, 'households', hid, 'items', id)).catch(() => {});
-    }
+  if (applyingRemote) return;
+  spacesList().forEach(sp => {
+    const rt = spaceRt[sp.hid];
+    if (!rt || !rt.db) return;
+    const seen = new Set();
+    todos.forEach(td => {
+      if (td.scope === 'private' || (td.space || null) !== sp.hid) return;
+      seen.add(td.id);
+      const core = JSON.stringify(todoCore(td));
+      if (rt.lastPush[td.id] !== core){
+        td.updated = Date.now();
+        rt.lastPush[td.id] = core;
+        fbFs.setDoc(fbFs.doc(rt.db, 'households', sp.hid, 'items', td.id),
+          {...todoCore(td), updated: td.updated}, {merge: true})
+          .catch(err => syncMsg('❌ Sync error: ' + err.message));
+      }
+    });
+    // anything we pushed before but no longer belongs here (deleted, moved
+    // space, made private) comes off the remote list
+    Object.keys(rt.lastPush).forEach(id => {
+      if (!seen.has(id)){
+        delete rt.lastPush[id];
+        fbFs.deleteDoc(fbFs.doc(rt.db, 'households', sp.hid, 'items', id)).catch(() => {});
+      }
+    });
   });
 }
 
@@ -2253,8 +2391,9 @@ function parseFbConfig(text){
   if (!apiKey || !projectId) throw new Error('could not find apiKey and projectId in that snippet');
   return {apiKey, projectId};
 }
-function inviteEncode(cfg, hid){
-  return 'ITODO1-' + btoa(JSON.stringify({k: cfg.apiKey, p: cfg.projectId, h: hid}))
+function inviteEncode(cfg, hid, name, type){
+  return 'ITODO1-' + btoa(JSON.stringify({k: cfg.apiKey, p: cfg.projectId, h: hid,
+    n: name || spaceName(hid) || undefined, t: type || (spacesList().find(s => s.hid === hid) || {}).type || undefined}))
     .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 function inviteDecode(code){
@@ -2262,45 +2401,44 @@ function inviteDecode(code){
   if (!m) throw new Error('that does not look like an invite code');
   const j = JSON.parse(atob(m[1].replace(/-/g, '+').replace(/_/g, '/')));
   if (!j.k || !j.p || !j.h) throw new Error('invite code is incomplete');
-  return {cfg: {apiKey: j.k, projectId: j.p}, hid: j.h};
+  return {cfg: {apiKey: j.k, projectId: j.p}, hid: j.h,
+          name: j.n || 'Family', type: SPACE_ICON[j.t] ? j.t : 'family'};
 }
 
-document.getElementById('createHhBtn').addEventListener('click', async () => {
-  try {
-    const cfg = parseFbConfig(document.getElementById('fbConfigInput').value);
-    const hid = 'hh-' + uid() + Math.random().toString(36).slice(2, 10);
-    store.set('fbConfig', cfg);
-    store.set('householdId', hid);
-    refreshSyncUI();
-    await startSync();
-    const appMod = await import('./vendor/firebase-app.js');
-    await fbFs.setDoc(fbFs.doc(fbDb, 'households', hid),
-      {created: Date.now(), members: store.get('members', [])}, {merge: true});
-    toast('Household created ✓ — now share the invite code');
-    updateSwConfig();
-  } catch (err) {
-    syncMsg('❌ ' + err.message);
-  }
-});
+async function addSpace(sp){
+  const spaces = spacesList();
+  if (spaces.some(s => s.hid === sp.hid)){ toast('Already a member of that space.'); return false; }
+  spaces.push(sp);
+  store.set('spaces', spaces);
+  adoptOrphans(sp.hid);
+  syncLegacyMirror();
+  refreshSyncUI();
+  await startSpaceSync(sp);
+  updateSwConfig();
+  return true;
+}
 
-document.getElementById('joinBtn').addEventListener('click', async () => {
-  try {
-    const {cfg, hid} = inviteDecode(document.getElementById('inviteInput').value);
-    store.set('fbConfig', cfg);
-    store.set('householdId', hid);
-    document.getElementById('inviteInput').value = '';
-    refreshSyncUI();
-    await startSync();
-    toast('Joined the household ✓');
-    updateSwConfig();
-  } catch (err) {
-    syncMsg('❌ ' + err.message);
-  }
-});
+function leaveSpace(hid){
+  const sp = spacesList().find(s => s.hid === hid);
+  if (!sp) return;
+  if (!confirm(`Leave "${sp.name}"? Your tasks stay on this device but stop syncing to it.`)) return;
+  const rt = spaceRt[hid];
+  if (rt && rt.unsub) rt.unsub();
+  delete spaceRt[hid];
+  store.set('spaces', spacesList().filter(s => s.hid !== hid));
+  todos.forEach(td => { if (td.space === hid) td.space = null; });   // keep them, personal now
+  store.set('todos', todos);
+  if (activeSpace === hid) activeSpace = 'all';
+  syncLegacyMirror();
+  refreshSyncUI(); renderTodos(); updateBadge();
+  syncMsg(spacesList().length ? '' : 'Left the space.');
+  toast('Left "' + sp.name + '" — your tasks are still here.');
+  updateSwConfig();
+}
 
-document.getElementById('shareInviteBtn').addEventListener('click', async () => {
-  const code = inviteEncode(store.get('fbConfig', {}), store.get('householdId', ''));
-  const text = 'Join our Idea → Todo household:\n1. Install the app: https://etheodore15.github.io/todo-list/\n2. Settings → Family sync → paste this invite code:\n\n' + code;
+async function shareSpaceInvite(sp){
+  const code = inviteEncode(sp.cfg, sp.hid, sp.name, sp.type);
+  const text = `Join the "${sp.name}" space on Idea → Todo:\n1. Install the app: https://etheodore15.github.io/todo-list/\n2. Settings → Spaces → paste this invite code:\n\n` + code;
   try {
     if (navigator.share){ await navigator.share({title: 'Idea → Todo invite', text}); return; }
     throw new Error('no share');
@@ -2309,23 +2447,70 @@ document.getElementById('shareInviteBtn').addEventListener('click', async () => 
     try { await navigator.clipboard.writeText(text); toast('Invite copied to clipboard 📋'); }
     catch (_) { prompt('Copy this invite code:', code); }
   }
+}
+
+function renderSpacesList(){
+  const el = document.getElementById('spacesList');
+  if (!el) return;
+  el.innerHTML = '';
+  spacesList().forEach((sp, i) => {
+    const row = document.createElement('div');
+    row.className = 'space-row';
+    const label = document.createElement('div');
+    label.className = 'space-label';
+    label.textContent = `${SPACE_ICON[sp.type] || '👥'} ${sp.name}`;
+    row.appendChild(label);
+    const share = document.createElement('button');
+    share.className = 'btn primary';
+    if (i === 0) share.id = 'shareInviteBtn';
+    share.textContent = 'Share invite code';
+    share.addEventListener('click', () => shareSpaceInvite(sp));
+    row.appendChild(share);
+    const leave = document.createElement('button');
+    leave.className = 'btn ghost';
+    if (i === 0) leave.id = 'leaveHhBtn';
+    leave.textContent = 'Leave (keep my tasks)';
+    leave.addEventListener('click', () => leaveSpace(sp.hid));
+    row.appendChild(leave);
+    el.appendChild(row);
+  });
+}
+
+document.getElementById('createHhBtn').addEventListener('click', async () => {
+  try {
+    const cfg = parseFbConfig(document.getElementById('fbConfigInput').value);
+    const hid = 'hh-' + uid() + Math.random().toString(36).slice(2, 10);
+    const name = (document.getElementById('spaceNameInput').value.trim() || 'Family').slice(0, 24);
+    const type = document.getElementById('spaceTypeSel').value || 'family';
+    const sp = {hid, name, type, cfg};
+    if (!await addSpace(sp)) return;
+    await fbFs.setDoc(fbFs.doc(spaceRt[hid].db, 'households', hid),
+      {created: Date.now(), name, type, members: store.get('members', [])}, {merge: true});
+    document.getElementById('spaceNameInput').value = '';
+    toast(`Space "${name}" created ✓ — now share the invite code`);
+  } catch (err) {
+    syncMsg('❌ ' + err.message);
+  }
 });
 
-document.getElementById('leaveHhBtn').addEventListener('click', () => {
-  if (!confirm('Leave the household? Your tasks stay on this device but will stop syncing.')) return;
-  if (syncUnsub) syncUnsub();
-  syncUnsub = null; fbDb = null;
-  store.set('fbConfig', null);
-  store.set('householdId', '');
-  Object.keys(lastPush).forEach(k => delete lastPush[k]);
-  refreshSyncUI();
-  syncMsg('Left the household.');
-  toast('Sync stopped — your tasks are still here.');
-  updateSwConfig();
+document.getElementById('joinBtn').addEventListener('click', async () => {
+  try {
+    const {cfg, hid, name, type} = inviteDecode(document.getElementById('inviteInput').value);
+    document.getElementById('inviteInput').value = '';
+    if (await addSpace({hid, name, type, cfg})) toast(`Joined "${name}" ✓`);
+  } catch (err) {
+    syncMsg('❌ ' + err.message);
+  }
 });
 
+document.getElementById('addSpaceBtn').addEventListener('click', () => {
+  const el = document.getElementById('syncSetup');
+  el.style.display = el.style.display === 'none' ? '' : 'none';
+});
+
+syncLegacyMirror();
 refreshSyncUI();
-if (store.get('householdId', '')) startSync().catch(err => syncMsg('❌ ' + err.message));
+if (spacesList().length) startSync().catch(err => syncMsg('❌ ' + err.message));
 
 /* ---------- daily digest (needs installed PWA + periodic background sync) ---------- */
 async function updateSwConfig(){
