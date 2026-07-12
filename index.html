@@ -231,7 +231,7 @@
          unless you enable Claude summaries.</p>
       <button class="btn ghost" id="wipeBtn">Delete all data</button>
     </div>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v11<br><span id="envInfo"></span></p>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v12<br><span id="envInfo"></span></p>
   </section>
 </main>
 
@@ -1022,10 +1022,10 @@ if (/firefox/i.test(navigator.userAgent)){
   document.getElementById('view-capture').prepend(warn);
 }
 
-// Warm up enabled on-device models in the background so the first
-// capture of the session doesn't pay the model-load wait.
+// Warm up only the (small) speech model at launch. The LLM loads lazily on
+// first summarize — pre-loading both at once caused out-of-memory tab
+// crashes on phones during transcription.
 if (store.get('localASR', false)) aiCall('load-asr').catch(() => {});
-if (store.get('localLLM', false)) aiCall('load-llm').catch(() => {});
 
 /* ---------- service worker ---------- */
 if ('serviceWorker' in navigator){

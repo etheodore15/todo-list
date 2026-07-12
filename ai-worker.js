@@ -57,8 +57,10 @@ async function loadASR(){
   const dev = await pickDevice();
   asr = await withTimeout(pipeline('automatic-speech-recognition', ASR_MODEL, {
     device: dev,
-    // fp32 encoder is the safe choice across mobile GPUs; q4 decoder keeps it small
-    dtype: dev === 'webgpu' ? {encoder_model: 'fp32', decoder_model_merged: 'q4'} : 'q8',
+    // fp16 encoder halves GPU memory when the GPU supports it; fp32 otherwise
+    dtype: dev === 'webgpu'
+      ? {encoder_model: gpuHasF16 ? 'fp16' : 'fp32', decoder_model_merged: 'q4'}
+      : 'q8',
     progress_callback: progressCb('asr'),
   }), 300000, LOAD_TIMEOUT_MSG);
 }
@@ -138,6 +140,12 @@ self.onmessage = async (e) => {
       case 'summarize':
         await loadLLM();
         result = {json: await summarize(payload.text)};
+        // On low-memory phones, free the LLM after use (reloads from cache
+        // next time) — keeping it resident risks tab-killing OOM.
+        if ((navigator.deviceMemory || 8) <= 4){
+          try { await llm.dispose(); } catch (_) {}
+          llm = null;
+        }
         break;
       default:
         throw new Error('unknown message type: ' + type);
