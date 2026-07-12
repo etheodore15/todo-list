@@ -18,14 +18,12 @@ audience features.
 
 | # | Feature | Notes |
 |---|---------|-------|
-| A1 | **Edit task text** (tap-and-hold or ✏️ in expansion) | Table stakes; syncs like any change |
-| A2 | **Future dates** — tasks scheduled beyond today; "Today / Upcoming" split; AI extracts dates ("book dentist for the 14th") | Currently everything lands on today. Prereq for schedules, appointments, custody days |
-| A3 | **Recurrence** — "bins every Tuesday", "meds every morning"; AI + heuristic parse `recur` rules; on rollover, spawn next instance | THE caregiving/ADHD staple. Store rule on task; daily rollover engine already exists |
-| A4 | **Reminders (honest version)** — extend the daily digest to N checks/day with "due soon" items; in-app "due now" highlights | True minute-exact alarms are not reliably possible in a PWA; a TWA (Play Store wrapper) later unlocks real notifications. Say so in the UI rather than overpromise |
-| A5 | **Undo** — toast with undo after tick/delete | ADHD misfires are common; forgiveness is a feature |
-| A6 | **Multiple spaces** — belong to more than one household (e.g. "Home" + "Mum's care" + "Co-parenting"), with a space switcher | Architectural: `households[]` instead of single `householdId`; tasks keyed per space. Prereq for co-parenting and caregiving coexisting with family use |
-
-**Effort:** A1/A5 trivial; A2/A3 medium; A4 small; A6 the big one (~2–3 sessions).
+| A1 ✅ v24 | **Edit task text** (tap-and-hold or ✏️ in expansion) | Table stakes; syncs like any change |
+| A2 ✅ v24 | **Future dates** — tasks scheduled beyond today; "Today / Upcoming" split; AI extracts dates ("book dentist for the 14th") | Currently everything lands on today. Prereq for schedules, appointments, custody days |
+| A3 ✅ v24 | **Recurrence** — "bins every Tuesday", "meds every morning"; AI + heuristic parse `recur` rules; on rollover, spawn next instance | THE caregiving/ADHD staple. Store rule on task; daily rollover engine already exists |
+| A4 ◐ v24 | **Reminders (honest version)** — extend the daily digest to N checks/day with "due soon" items; in-app "due now" highlights | Digest now includes a due-tomorrow count; per-day check frequency is browser-controlled (Periodic Background Sync), so more granularity waits for the TWA wrapper |
+| A5 ✅ v24 | **Undo** — toast with undo after tick/delete | ADHD misfires are common; forgiveness is a feature |
+| A6 ✅ v27 | **Multiple spaces** — belong to more than one household (e.g. "Home" + "Mum's care" + "Co-parenting"), with a space switcher | Spaces carry a name and a `type` (family/coparenting/care); tasks keyed per space + a Personal lane; migration from the single-household model. Per-space member lists still TODO (currently one global list) |
 
 ---
 
@@ -36,17 +34,17 @@ The voice brain-dump we already have is the #1 ADHD feature; these amplify it.
 
 | # | Feature | Why it matters |
 |---|---------|----------------|
-| B1 | **Break it down** — button on any task: AI splits it into 3–7 tiny first-step-obvious subtasks ("clean the kitchen" → "put 5 things in the dishwasher", …) | Task initiation is *the* ADHD blocker. Gemini does this superbly; subtasks nest under the parent with their own ticks |
-| B2 | **Just One Thing mode** — full-screen single task view: the one next thing, huge tick button, "not this one" shuffle | Overwhelm kills lists. Choosing is hard; the app chooses |
-| B3 | **Energy levels** — tasks auto-tagged 🔋 low / 🔋🔋 medium / 🔋🔋🔋 high effort (AI + heuristic); "I've got 10 minutes and no energy" filter | Matching tasks to capacity beats priority when executive function is low |
-| B4 | **No-shame carry-over** — tasks never go red or say "overdue"; a task carried 5 days quietly offers: "still matters? → today / someday / let it go" | Guilt spirals cause app abandonment; this is why ADHD users quit Todoist |
-| B5 | **Wins view** — "Done today/this week" list with gentle celebration; streaks count *any* activity, never break loudly | Dopamine needs closing loops, not punishment mechanics |
-| B6 | **Time-blindness aids** — AI estimates duration per task ("~15 min"); day view shows total load vs realistic capacity warning | "I'll do all 12 today" is time blindness; surfacing load helps |
-| B7 | **Focus/quiet visual mode** — reduced-motion, reduced-clutter theme toggle | Sensory load matters; cheap to do with CSS |
+| B1 ✅ v25 | **Break it down** — button on any task: AI splits it into 3–7 tiny first-step-obvious subtasks ("clean the kitchen" → "put 5 things in the dishwasher", …) | Task initiation is *the* ADHD blocker. Gemini does this superbly; subtasks nest under the parent with their own ticks |
+| B2 ✅ v25 | **Just One Thing mode** — full-screen single task view: the one next thing, huge tick button, "not this one" shuffle | Overwhelm kills lists. Choosing is hard; the app chooses |
+| B3 ✅ v26 | **Energy levels** — tasks auto-tagged 🔋 low / 🔋🔋 medium / 🔋🔋🔋 high effort (AI + heuristic); "I've got 10 minutes and no energy" filter | Matching tasks to capacity beats priority when executive function is low |
+| B4 ✅ v26 | **No-shame carry-over** — tasks never go red or say "overdue"; a task carried 5 days quietly offers: "still matters? → today / someday / let it go" | Guilt spirals cause app abandonment; this is why ADHD users quit Todoist |
+| B5 ✅ v26 | **Wins view** — "Done today/this week" list with gentle celebration; streaks count *any* activity, never break loudly | Dopamine needs closing loops, not punishment mechanics |
+| B6 ✅ v26 | **Time-blindness aids** — AI estimates duration per task ("~15 min"); day view shows total load vs realistic capacity warning | "I'll do all 12 today" is time blindness; surfacing load helps |
+| B7 ✅ v26 | **Focus/quiet visual mode** — reduced-motion, reduced-clutter theme toggle | Sensory load matters; cheap to do with CSS |
 
-**Effort:** B1/B3/B6 ride the existing AI pipeline (~1 session together);
-B2/B4/B5/B7 are UI work (~2 sessions). **This pack is the fastest path to a
-differentiated product** and markets itself in ADHD communities.
+**Phase B shipped** (v25–v26): the ADHD pack is live and ready to validate
+in ADHD communities. Next up: C1, whose spine (spaces ✅, audit log, exports)
+is now unblocked by A6.
 
 ---
 
