@@ -188,6 +188,18 @@
     padding:5px 10px; border-radius:9px; cursor:pointer; margin:2px 6px 0 0;}
   .energy-chip{background:rgba(139,148,167,.14);}
 
+  /* history / audit log (C1) */
+  #histOverlay{position:fixed; inset:0; z-index:64; background:var(--bg); overflow-y:auto;
+    padding:calc(14px + env(safe-area-inset-top)) 16px calc(24px + env(safe-area-inset-bottom));
+    max-width:640px; margin:0 auto;}
+  .hist-head{display:flex; align-items:center; gap:8px;}
+  .hist-head b{flex:1; font-size:1.05rem;}
+  .hist-head .btn{flex:0 0 auto; width:auto; padding:9px 12px; font-size:.8rem; margin:0;}
+  .hist-line{display:flex; gap:10px; padding:9px 2px; border-bottom:1px solid #1f2634;
+    font-size:.86rem; line-height:1.45; align-items:baseline;}
+  .hist-line .hwhen{color:var(--muted); font-size:.72rem; white-space:nowrap; min-width:88px;}
+  .hist-line .hdetail{color:var(--muted); font-size:.78rem;}
+
   /* Just One Thing (B2) */
   #focusOverlay{position:fixed; inset:0; z-index:65; background:var(--bg);
     display:flex; flex-direction:column; align-items:center; justify-content:center;
@@ -383,7 +395,7 @@
       <input type="file" id="importFile" accept=".json,application/json" style="display:none">
       <button class="btn ghost" id="wipeBtn">Delete all data</button>
     </div>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v27<br><span id="envInfo"></span></p>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v28<br><span id="envInfo"></span></p>
   </section>
 </main>
 
@@ -404,6 +416,18 @@
     <button class="btn primary" id="scopeAssign">Assign to selected</button>
     <button class="btn ghost" id="scopeCancel">Cancel</button>
   </div>
+</div>
+
+<div id="histOverlay" style="display:none;">
+  <div class="hist-head">
+    <b id="histTitle">History</b>
+    <button class="btn ghost" id="histCsvBtn">⬇ CSV</button>
+    <button class="btn ghost" id="histPrintBtn">🖨 Print / PDF</button>
+    <button class="fo-close" id="histClose" aria-label="Close" style="position:static;">✕</button>
+  </div>
+  <p class="side-note" style="margin:8px 2px;">Append-only record — entries can't be edited or removed,
+    and deleting a task leaves a delete entry. Everyone in the space sees the same history.</p>
+  <div id="histList"></div>
 </div>
 
 <div id="focusOverlay" style="display:none;">
@@ -436,7 +460,7 @@ const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 
 
 const myName = () => store.get('myName', '');
 
-function setDone(td, done){
+function setDone(td, done, silent){
   td.done = done;
   const log = store.get('winsLog', {});
   const t = todayStr();
@@ -448,6 +472,7 @@ function setDone(td, done){
     if (log[t]) log[t]--;
   }
   store.set('winsLog', log);
+  if (!silent) logEvent(done ? 'ticked' : 'unticked', td);
 }
 
 function fmtWhen(ts, always){
@@ -599,7 +624,7 @@ function recurLabel(recur){
       // recurring: a finished instance respawns at its next occurrence,
       // an unfinished one carries over like any other task
       if (td.done){
-        setDone(td, false);
+        setDone(td, false, true);          // respawn, not a real un-tick — no audit noise
         td.date = nextOccurrence(td.recur, t);
         (td.subtasks || []).forEach(s => { s.done = false; });
       } else td.date = t;
@@ -1273,6 +1298,7 @@ saveIdeaBtn.addEventListener('click', async () => {
       assignees: task.assignees || [], done:false, date: task.date || t, recur: task.recur || null,
       energy: task.energy || detectEnergy(task.text), minutes: task.minutes || null,
       space: newTaskSpace(), ideaId: idea.id, createdBy: myName() || null, createdAt: Date.now()});
+    logEvent('created', todos[todos.length - 1]);
     if ((task.assignees || []).length) delegated.push(task.assignees.join(', '));
     if (task.recur) scheduled.push(recurLabel(task.recur).replace('↻ ', '↻'));
     else if (task.date && task.date > t) scheduled.push(fmtDay(task.date));
@@ -1502,7 +1528,9 @@ function editText(td){
   if (v === null) return;
   const text = v.trim();
   if (!text){ toast('Task text can\'t be empty — use ✕ to delete it.'); return; }
+  const prior = td.text;
   td.text = text;
+  if (prior !== text) logEvent('edited', td, 'was: "' + prior + '"');
   saveTodos(); renderTodos();
   if (document.getElementById('view-ideas').classList.contains('active')) renderIdeas();
 }
@@ -1512,8 +1540,10 @@ function editDate(td){
   if (v === null) return;
   const date = resolveDateInput(v);
   if (!date){ toast('Didn\'t understand that date — try "tomorrow", "friday" or 2026-07-20.'); return; }
+  const prior = td.date;
   td.date = date;
   td.someday = false; td.carried = 0;     // a fresh date un-parks it with a clean slate
+  if (prior !== date) logEvent('rescheduled', td, 'to ' + date);
   saveTodos(); renderTodos();
   toast(date === todayStr() ? 'Moved to today ✓' : 'Scheduled for ' + fmtDay(date) + ' 📅');
 }
@@ -1663,14 +1693,19 @@ function todoRow(td){
       toast('Staying on today ✓');
     });
     mkN('Someday', () => {
-      td.someday = true; td.carried = 0; saveTodos(); renderTodos();
+      td.someday = true; td.carried = 0;
+      logEvent('parked', td);
+      saveTodos(); renderTodos();
       toast('Parked in Someday — no pressure 🌙');
     });
     mkN('Let it go', () => {
       const at = todos.findIndex(x => x.id === td.id);
-      todos = todos.filter(x => x.id !== td.id); saveTodos(); renderTodos();
+      todos = todos.filter(x => x.id !== td.id);
+      logEvent('deleted', td);
+      saveTodos(); renderTodos();
       toast('Let go ✓ — that\'s allowed', () => {
         todos.splice(Math.min(at, todos.length), 0, td);
+        logEvent('restored', td);
         saveTodos(); renderTodos();
       });
     });
@@ -1730,9 +1765,12 @@ function todoRow(td){
   });
   row.querySelector('.del').addEventListener('click', () => {
     const removed = td, at = todos.findIndex(x => x.id === td.id);
-    todos = todos.filter(x => x.id !== td.id); saveTodos(); renderTodos();
+    todos = todos.filter(x => x.id !== td.id);
+    logEvent('deleted', removed);
+    saveTodos(); renderTodos();
     toast('Task deleted', () => {
       todos.splice(Math.min(at, todos.length), 0, removed);
+      logEvent('restored', removed);
       saveTodos(); renderTodos(); updateBadge();
     });
   });
@@ -1904,6 +1942,7 @@ function quickAdd(){
   todos.push({id: uid(), text, priority: detectPriority(text), tags: detectTags(text), done:false,
     date, recur, energy, minutes: ENERGY_MIN[energy], space: newTaskSpace(),
     ideaId:null, createdBy: myName() || null, createdAt: Date.now()});
+  logEvent('created', todos[todos.length - 1]);
   saveTodos(); inp.value=''; renderTodos();
   if (recur) toast('Repeats ' + recurLabel(recur).replace('↻ ', '') + ' — next: ' + fmtDay(date));
   else if (date > todayStr()) toast('Scheduled for ' + fmtDay(date) + ' 📅');
@@ -2176,7 +2215,9 @@ function openScopeSheet(td){
       b.textContent = `${SPACE_ICON[sp.type] || '👥'} ${sp.name}` +
         (td.space === sp.hid ? ' — current space' : ' — move it here');
       b.addEventListener('click', () => {
+        const from = td.space;
         td.space = sp.hid; td.scope = null;
+        if (from !== sp.hid) logEvent('moved', td, 'to "' + sp.name + '"');
         saveTodos(); renderTodos(); updateBadge();
         toast(`In "${sp.name}" now ✓`);
         closeScopeSheet();
@@ -2265,6 +2306,30 @@ function syncLegacyMirror(){
     store.set('todos', todos);
   }
 })();
+
+/* ---------- audit log (C1a) ----------
+   Append-only record of who did what, when — the co-parenting/caregiving
+   evidence trail. Events are kept locally (bounded) and, for tasks in a
+   space, pushed to that space's append-only `events` subcollection so every
+   member sees the same history. Deletes leave tombstone events even though
+   the task list tidies. */
+function logEvent(kind, td, detail){
+  const ev = {id: uid(), ts: Date.now(), who: myName() || null, kind,
+              taskId: td.id, text: td.text, space: td.space || null, detail: detail || null};
+  const evs = store.get('events', []);
+  evs.push(ev);
+  if (evs.length > 2000) evs.splice(0, evs.length - 2000);
+  store.set('events', evs);
+  if (ev.space && spaceRt[ev.space] && spaceRt[ev.space].db){
+    fbFs.setDoc(fbFs.doc(spaceRt[ev.space].db, 'households', ev.space, 'events', ev.id), ev)
+      .catch(() => {});
+  }
+  return ev;
+}
+
+const EVENT_LABEL = {created: '➕ added', edited: '✏️ edited', ticked: '✓ ticked off',
+  unticked: '↩ un-ticked', deleted: '🗑 deleted', restored: '↩ restored',
+  rescheduled: '📅 rescheduled', parked: '🌙 parked for someday', moved: '📦 moved'};
 
 // joining/creating the FIRST space adopts existing shareable tasks into it,
 // matching the old "everything local syncs up" behaviour
@@ -2449,6 +2514,115 @@ async function shareSpaceInvite(sp){
   }
 }
 
+/* ---------- history view + exports (C1a/C1b) ---------- */
+let histEvents = [], histSpace = null;
+
+async function openHistory(sp){
+  histSpace = sp;
+  const seen = new Set();
+  histEvents = [];
+  const add = (ev) => { if (ev && ev.id && !seen.has(ev.id)){ seen.add(ev.id); histEvents.push(ev); } };
+  store.get('events', []).filter(e => e.space === sp.hid).forEach(add);
+  document.getElementById('histTitle').textContent = `${SPACE_ICON[sp.type] || '👥'} ${sp.name} — history`;
+  document.getElementById('histList').innerHTML = '<p class="side-note">Loading…</p>';
+  document.getElementById('histOverlay').style.display = 'block';
+  // one-shot remote fetch: the first snapshot carries the full collection
+  const rt = spaceRt[sp.hid];
+  if (rt && rt.db){
+    await new Promise(res => {
+      let unsub = null, done = false;
+      const finish = () => { if (!done){ done = true; if (unsub) unsub(); res(); } };
+      unsub = fbFs.onSnapshot(fbFs.collection(rt.db, 'households', sp.hid, 'events'), snap => {
+        snap.docChanges().forEach(ch => { if (ch.type !== 'removed') add({id: ch.doc.id, ...ch.doc.data()}); });
+        finish();
+      }, finish);
+      setTimeout(finish, 5000);
+    });
+  }
+  histEvents.sort((a, b) => b.ts - a.ts);
+  renderHistory();
+}
+
+function renderHistory(){
+  const el = document.getElementById('histList');
+  el.innerHTML = '';
+  if (!histEvents.length){
+    el.innerHTML = '<p class="side-note">No history yet — actions on this space\'s tasks will appear here.</p>';
+    return;
+  }
+  histEvents.slice(0, 500).forEach(ev => {
+    const l = document.createElement('div');
+    l.className = 'hist-line';
+    const when = document.createElement('span');
+    when.className = 'hwhen';
+    when.textContent = new Date(ev.ts).toLocaleDateString(undefined, {day: 'numeric', month: 'short'}) +
+      ' ' + new Date(ev.ts).toLocaleTimeString(undefined, {hour: 'numeric', minute: '2-digit'});
+    const body = document.createElement('span');
+    body.style.flex = '1';
+    const who = document.createElement('b');
+    who.textContent = ev.who || 'someone';
+    body.appendChild(who);
+    body.appendChild(document.createTextNode(' ' + (EVENT_LABEL[ev.kind] || ev.kind) + ' “' + ev.text + '”'));
+    if (ev.detail){
+      const d = document.createElement('span');
+      d.className = 'hdetail';
+      d.textContent = ' — ' + ev.detail;
+      body.appendChild(d);
+    }
+    l.appendChild(when); l.appendChild(body);
+    el.appendChild(l);
+  });
+}
+
+function auditCsv(events, spName){
+  const esc = (s) => '"' + String(s == null ? '' : s).replace(/"/g, '""') + '"';
+  const rows = [['timestamp', 'date', 'time', 'who', 'action', 'task', 'detail'].join(',')];
+  [...events].sort((a, b) => a.ts - b.ts).forEach(ev => {
+    const d = new Date(ev.ts);
+    rows.push([ev.ts, d.toLocaleDateString(), d.toLocaleTimeString(), esc(ev.who || ''),
+      ev.kind, esc(ev.text), esc(ev.detail || '')].join(','));
+  });
+  return rows.join('\n');
+}
+
+document.getElementById('histClose').addEventListener('click', () => {
+  document.getElementById('histOverlay').style.display = 'none';
+});
+document.getElementById('histCsvBtn').addEventListener('click', () => {
+  if (!histSpace) return;
+  const blob = new Blob([auditCsv(histEvents, histSpace.name)], {type: 'text/csv'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `idea-todo-history-${histSpace.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${todayStr()}.csv`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  toast('History exported as CSV ⬇');
+});
+document.getElementById('histPrintBtn').addEventListener('click', () => {
+  if (!histSpace) return;
+  const w = window.open('', '_blank');
+  if (!w){ toast('Pop-ups are blocked — allow them to print.'); return; }
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+  const rows = [...histEvents].sort((a, b) => a.ts - b.ts).map(ev => {
+    const d = new Date(ev.ts);
+    return `<tr><td>${d.toLocaleDateString()} ${d.toLocaleTimeString()}</td><td>${esc(ev.who || '')}</td>` +
+      `<td>${esc((EVENT_LABEL[ev.kind] || ev.kind).replace(/^[^\s]+\s/, ''))}</td><td>${esc(ev.text)}</td><td>${esc(ev.detail || '')}</td></tr>`;
+  }).join('');
+  w.document.write(`<!DOCTYPE html><html><head><title>${esc(histSpace.name)} — task history</title>
+<style>body{font-family:Georgia,serif; margin:32px; color:#111;}
+h1{font-size:18px;} p{font-size:12px; color:#555;}
+table{border-collapse:collapse; width:100%; font-size:12px;}
+th,td{border:1px solid #999; padding:5px 7px; text-align:left; vertical-align:top;}
+th{background:#eee;}</style></head><body>
+<h1>${esc(histSpace.name)} — shared task history</h1>
+<p>Exported ${new Date().toLocaleString()} from Idea → Todo. Append-only record of task activity in this space.</p>
+<table><tr><th>When</th><th>Who</th><th>Action</th><th>Task</th><th>Detail</th></tr>${rows}</table>
+</body></html>`);
+  w.document.close();
+  w.focus();
+  w.print();
+});
+
 function renderSpacesList(){
   const el = document.getElementById('spacesList');
   if (!el) return;
@@ -2466,6 +2640,11 @@ function renderSpacesList(){
     share.textContent = 'Share invite code';
     share.addEventListener('click', () => shareSpaceInvite(sp));
     row.appendChild(share);
+    const hist = document.createElement('button');
+    hist.className = 'btn ghost hist-btn';
+    hist.textContent = '📜 History & export';
+    hist.addEventListener('click', () => openHistory(sp));
+    row.appendChild(hist);
     const leave = document.createElement('button');
     leave.className = 'btn ghost';
     if (i === 0) leave.id = 'leaveHhBtn';

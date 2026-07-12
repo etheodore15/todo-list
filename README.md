@@ -74,6 +74,21 @@ and summaries, enable the on-device AI models in Settings (see below).
 - **🌿 Quiet visual mode** — Settings toggle: softer colours, zero animation
   or flashing, for lower sensory load.
 
+### History & records (co-parenting / care teams)
+
+Every space keeps an **append-only history**: who added, edited, ticked,
+rescheduled, moved, or deleted each task, with timestamps. Deleting a task
+leaves a delete entry — the list tidies, the record doesn't. Everyone in the
+space sees the same history (Settings → the space → **📜 History & export**),
+and one tap exports it as **CSV** or a printable **PDF** — useful where a
+shared, provable record matters (mediation, care coordination).
+
+*Honesty note:* the history is append-only at the app **and** at the
+Firestore rules level, but because members hold the space keys, a determined
+member could write via the API directly. Treat it as a shared record, not
+courtroom-grade evidence — that upgrade needs a hosted backend (on the
+roadmap).
+
 ### On-device AI (fully offline, no API key)
 
 In Settings you can download two small AI models that then run entirely on your
@@ -137,10 +152,19 @@ service cloud.firestore {
       match /items/{item} {
         allow read, write: if true;
       }
+      match /events/{event} {
+        allow read, create: if true;   // append-only history
+        allow update, delete: if false;
+      }
     }
   }
 }
 ```
+
+> Upgrading from a version before v28? Re-paste these rules (the `events`
+> block is new) so the shared history works. The `update, delete: if false`
+> line is what makes the history append-only at the server, not just in the
+> app.
 
 Households are addressed by long random IDs that only your invite code contains —
 the rules forbid listing them, so knowing the invite is what grants access.
