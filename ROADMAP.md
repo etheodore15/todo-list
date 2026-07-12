@@ -111,6 +111,27 @@ A (foundation) ──→ B (ADHD pack) ──→ ship & validate in ADHD communi
    clear "not legal advice / not a medical device" line. B carries none of
    that weight — another reason it goes first.
 
+## Architecture decision: space types, not forks
+
+One repo, one deployed app. The audiences are served by a `type` on each
+space (A6) — `family`, `coparenting`, `care` — which switches on the relevant
+pack: co-parenting spaces get the audit log / tone check / exports, care
+spaces get meds and handoffs, and the ADHD "brain-friendly mode" is a
+personal setting independent of any space. Rationale:
+
+- Every hard-won fix (speech quirks, Gemini discovery, sync engine) ships
+  once instead of being ported across four drifting branches.
+- C1 and C2 share ~80% of their spine; B features help all audiences.
+  Forks throw that leverage away.
+- Real users cross audiences (an ADHD co-parent coordinating care for a
+  parent) — one install, several spaces.
+- If a niche takes off commercially, differentiate with build-time branding
+  config (name/icon/theme/default space type) from the same history — the
+  standard white-label pattern — never with divergent code.
+
+Git branches remain for development (feature branches merging to `main`),
+not product lines.
+
 ## Honest limitations to design around
 
 - **Timed reminders:** PWAs can't reliably fire minute-exact alarms; the daily
