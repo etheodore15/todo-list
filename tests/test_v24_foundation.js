@@ -53,7 +53,7 @@ const { chromium } = require('playwright');
   // ---------- A1: edit text from the detail panel ----------
   const milk = page.locator('.todo', { hasText: 'buy milk' });
   await milk.locator('.ttext').click();                      // expand detail
-  check('A1: detail panel has action buttons', await milk.locator('.tact').count() === 3);
+  check('A1: detail panel has action buttons', await milk.locator('.tact').count() >= 3);
   page.once('dialog', d => d.accept('buy oat milk'));
   await milk.locator('.tact', { hasText: 'Edit' }).click();
   await page.waitForTimeout(200);

@@ -47,6 +47,18 @@ and summaries, enable the on-device AI models in Settings (see below).
 - **Undo** — ticking or deleting a task (or deleting an idea) shows a toast with
   an **Undo** button for a few seconds.
 
+### Brain-friendly mode (ADHD & neurodivergent-first)
+
+- **🪄 Break it down** — on any task's detail panel. AI splits the task into
+  3–7 tiny steps where the first is doable in under two minutes ("clean the
+  kitchen" → "put 5 things in the dishwasher"…). Tick steps off individually;
+  finishing the last one ticks the whole task. Works best with a Gemini key;
+  the built-in mode splits compound tasks.
+- **🎯 Just one thing** — button at the top of Today. Full-screen view of a
+  single task (the app picks the highest priority one, and surfaces the next
+  tiny step if the task was broken down), a huge Done button, and
+  "not this one" to shuffle. No list, no overwhelm.
+
 ### On-device AI (fully offline, no API key)
 
 In Settings you can download two small AI models that then run entirely on your

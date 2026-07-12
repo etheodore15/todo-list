@@ -171,6 +171,23 @@
     outline:none; margin-top:8px;}
   .set-block .btn{margin-top:10px;}
 
+  /* Just One Thing (B2) */
+  #focusOverlay{position:fixed; inset:0; z-index:65; background:var(--bg);
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    padding:32px 26px calc(32px + env(safe-area-inset-bottom)); text-align:center;}
+  .fo-close{position:absolute; top:calc(14px + env(safe-area-inset-top)); right:16px;
+    background:var(--card); border:1px solid #2a3245; color:var(--muted); font-size:1.1rem;
+    width:42px; height:42px; border-radius:50%; cursor:pointer;}
+  .fo-label{color:var(--muted); font-size:.8rem; text-transform:uppercase; letter-spacing:2px;
+    margin-bottom:18px;}
+  .fo-task{font-size:1.55rem; font-weight:700; line-height:1.35; max-width:520px;}
+  .fo-tags{display:flex; gap:6px; margin-top:14px; flex-wrap:wrap; justify-content:center;}
+  .fo-steps{margin-top:18px; max-width:420px; width:100%; text-align:left;}
+  .fo-done{margin-top:34px; width:min(100%,340px); border:none; border-radius:18px;
+    padding:20px; font-size:1.25rem; font-weight:700; cursor:pointer;
+    background:var(--ok); color:#0c1117;}
+  .fo-skip{margin-top:14px; background:none; border:none; color:var(--muted);
+    font-size:.9rem; cursor:pointer; padding:10px;}
   .toast{position:fixed; left:50%; transform:translateX(-50%);
     bottom:calc(96px + env(safe-area-inset-bottom)); background:#2b3348; color:var(--text);
     padding:10px 18px; border-radius:24px; font-size:.85rem; opacity:0;
@@ -214,6 +231,7 @@
     <div class="progress-label" id="progressLabel"></div>
     <div class="progress"><div id="progressBar"></div></div>
     <div id="awayBanner" style="display:none;"></div>
+    <button class="btn ghost" id="focusBtn" style="display:none; width:100%; margin-bottom:12px;">🎯 Just one thing</button>
     <div class="addrow">
       <input id="quickAdd" placeholder="Quick add a task…" enterkeyhint="done">
       <button id="quickAddBtn" aria-label="Add task">＋</button>
@@ -316,7 +334,7 @@
       <input type="file" id="importFile" accept=".json,application/json" style="display:none">
       <button class="btn ghost" id="wipeBtn">Delete all data</button>
     </div>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v24<br><span id="envInfo"></span></p>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v25<br><span id="envInfo"></span></p>
   </section>
 </main>
 
@@ -336,6 +354,16 @@
     <button class="btn primary" id="scopeAssign">Assign to selected</button>
     <button class="btn ghost" id="scopeCancel">Cancel</button>
   </div>
+</div>
+
+<div id="focusOverlay" style="display:none;">
+  <button class="fo-close" id="focusClose" aria-label="Close">✕</button>
+  <div class="fo-label">Just this one thing</div>
+  <div class="fo-task" id="focusTask"></div>
+  <div class="fo-tags" id="focusTags"></div>
+  <div class="fo-steps" id="focusSteps"></div>
+  <button class="fo-done" id="focusDone">✓ Done</button>
+  <button class="fo-skip" id="focusSkip">Not this one → show me another</button>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -496,10 +524,17 @@ function recurLabel(recur){
     if (td.recur && td.date < t){
       // recurring: a finished instance respawns at its next occurrence,
       // an unfinished one carries over like any other task
-      if (td.done){ setDone(td, false); td.date = nextOccurrence(td.recur, t); }
-      else td.date = t;
+      if (td.done){
+        setDone(td, false);
+        td.date = nextOccurrence(td.recur, t);
+        (td.subtasks || []).forEach(s => { s.done = false; });
+      } else td.date = t;
       changed = true;
-    } else if (td.date < t && !td.done){ td.date = t; changed = true; }   // carry unfinished over
+    } else if (td.date < t && !td.done){
+      td.date = t;
+      td.carried = (td.carried || 0) + 1;   // how many days it has quietly carried over
+      changed = true;
+    }
   });
   // keep done items from past days out of today's view but in storage (archive)
   if (changed) saveTodos();
@@ -701,6 +736,71 @@ async function geminiSummarize(text, key, isRetry){
   const parts = data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts || [];
   const raw = parts.map(p => p.text || '').join('');
   return normalizeIdeaJson(JSON.parse(raw), text);
+}
+
+/* ---------- break it down (B1) ---------- */
+async function geminiBreakdown(text, key, isRetry){
+  const model = await geminiModel(key);
+  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+    method: 'POST',
+    headers: {'content-type': 'application/json', 'x-goog-api-key': key},
+    body: JSON.stringify({
+      contents: [{role: 'user', parts: [{text:
+`Break this todo task into tiny concrete steps for someone who finds starting hard.
+
+Rules:
+- 3 to 7 steps, in doing order. Each starts with a verb, max 9 words.
+- The FIRST step must be trivially small — doable in under two minutes with zero decisions ("put 5 things in the dishwasher", "open the insurance email").
+- Each later step stays small (under ~10 minutes) and self-contained.
+- Keep the person's own names and details. No explanations, no numbering.
+
+Task: """${text}"""`}]}],
+      generationConfig: {responseMimeType: 'application/json', responseSchema: {
+        type: 'OBJECT',
+        properties: {steps: {type: 'ARRAY', items: {type: 'STRING'}}},
+        required: ['steps']
+      }}
+    })
+  });
+  if (res.status === 404 && !isRetry){
+    store.set('geminiModel', '');
+    return geminiBreakdown(text, key, true);
+  }
+  if (!res.ok) throw new Error('API ' + res.status + (await apiErrMsg(res)));
+  const data = await res.json();
+  const parts = data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts || [];
+  const steps = (JSON.parse(parts.map(p => p.text || '').join('')).steps || [])
+    .map(s => String(s).trim()).filter(s => s.length > 2).slice(0, 7);
+  if (steps.length < 2) throw new Error('no usable steps');
+  return steps;
+}
+
+// Offline fallback: a compound task splits on its own connectors.
+function localBreakdown(text){
+  const parts = String(text).split(/,\s+(?:and\s+|then\s+)?|\s+and\s+(?:then\s+)?|\s*;\s*/i)
+    .map(s => s.replace(/[.!?]+$/, '').trim()).filter(s => s.length > 2);
+  return parts.length >= 2 ? parts.slice(0, 7).map(s => s.charAt(0).toUpperCase() + s.slice(1)) : null;
+}
+
+async function breakDown(td){
+  if ((td.subtasks || []).length &&
+      !confirm('This task already has steps — replace them?')) return;
+  const key = store.get('geminiKey', '');
+  let steps = null;
+  if (key){
+    toast('Breaking it down…');
+    try { steps = await geminiBreakdown(td.text, key); }
+    catch (e) { toast('Gemini unavailable (' + e.message + ') — trying built-in split.'); }
+  }
+  if (!steps) steps = localBreakdown(td.text);
+  if (!steps){
+    toast(key ? 'Couldn\'t split this one — try rewording the task.'
+              : 'Built-in mode only splits compound tasks — add a free Gemini key in Settings for smart breakdowns.');
+    return;
+  }
+  td.subtasks = steps.map(s => ({text: s, done: false}));
+  saveTodos(); renderTodos();
+  toast('Broken into ' + steps.length + ' small steps ✓');
 }
 
 /* ---------- speech recognition ---------- */
@@ -1198,6 +1298,7 @@ function renderTodos(){
     list.length ? Math.round(done/list.length*100)+'%' : '0';
 
   document.getElementById('shareBtn').style.display = list.length ? '' : 'none';
+  document.getElementById('focusBtn').style.display = list.some(t => !t.done) ? '' : 'none';
 
   // tasks scheduled beyond today live in their own section at the bottom
   let upcoming = todos.filter(t => visibleToMe(t) && t.date > todayStr() && !t.done);
@@ -1332,6 +1433,30 @@ function todoRow(td){
     });
     txtEl.appendChild(tg);
   }
+  // tiny steps from "break it down"
+  if ((td.subtasks || []).length){
+    const wrap = document.createElement('div');
+    wrap.className = 'subtasks';
+    td.subtasks.forEach(st => {
+      const r = document.createElement('div');
+      r.className = 'mini-task' + (st.done ? ' done' : '');
+      r.innerHTML = `<button class="mchk" aria-label="Toggle step">✓</button><span class="mtxt"></span>`;
+      r.querySelector('.mtxt').textContent = st.text;
+      r.querySelector('.mchk').addEventListener('click', (e) => {
+        e.stopPropagation();
+        st.done = !st.done;
+        if (st.done && td.subtasks.every(s => s.done) && !td.done){
+          setDone(td, true);
+          toast('All steps done — task ticked off 🎉', () => {
+            setDone(td, false); st.done = false; saveTodos(); renderTodos();
+          });
+        }
+        saveTodos(); renderTodos();
+      });
+      wrap.appendChild(r);
+    });
+    txtEl.appendChild(wrap);
+  }
   // who ticked it, right on the row
   if (td.done && (td.doneBy || td.doneAt)){
     const at = document.createElement('div');
@@ -1375,6 +1500,7 @@ function todoRow(td){
     mkAct('✏️ Edit', editText);
     mkAct('📅 When', editDate);
     mkAct('↻ Repeat', editRecur);
+    mkAct('🪄 Break down', breakDown);
     div.appendChild(acts);
     row.appendChild(div);
   });
@@ -1428,6 +1554,82 @@ document.getElementById('shareBtn').addEventListener('click', async () => {
     try { await navigator.clipboard.writeText(text); toast('Copied to clipboard 📋'); }
     catch (_) { toast('Sharing not available in this browser.'); }
   }
+});
+
+/* ---------- Just One Thing (B2) ---------- */
+let focusPool = [], focusIdx = 0;
+
+function focusEligible(){
+  let list = todayTodos().filter(t => visibleToMe(t) && !t.done);
+  if (activeTag) list = list.filter(td => (td.tags || []).includes(activeTag));
+  // hardest-first: the app chooses so the person doesn't have to
+  return PRIOS.flatMap(p => list.filter(t => t.priority === p.key));
+}
+
+function openFocus(){
+  focusPool = focusEligible();
+  if (!focusPool.length){ toast('Nothing open right now — nice.'); return; }
+  focusIdx = 0;
+  renderFocus();
+  document.getElementById('focusOverlay').style.display = 'flex';
+}
+function closeFocus(){
+  document.getElementById('focusOverlay').style.display = 'none';
+  renderTodos();
+}
+function renderFocus(){
+  const td = focusPool[focusIdx];
+  document.getElementById('focusTask').textContent = td.text;
+  const tg = document.getElementById('focusTags');
+  tg.innerHTML = '';
+  (td.tags || []).forEach(tag => {
+    const s = document.createElement('span');
+    s.className = 'ttag'; s.textContent = tag;
+    tg.appendChild(s);
+  });
+  // if it's been broken down, surface the next tiny step — that's the real "one thing"
+  const stepsEl = document.getElementById('focusSteps');
+  stepsEl.innerHTML = '';
+  const next = (td.subtasks || []).find(s => !s.done);
+  if (next){
+    const r = document.createElement('div');
+    r.className = 'mini-task';
+    r.innerHTML = `<button class="mchk" aria-label="Toggle step">✓</button><span class="mtxt"></span>`;
+    r.querySelector('.mtxt').textContent = 'Start here: ' + next.text;
+    r.querySelector('.mchk').addEventListener('click', () => {
+      next.done = true;
+      if (td.subtasks.every(s => s.done)) return focusTickCurrent();
+      saveTodos(); renderFocus();
+    });
+    stepsEl.appendChild(r);
+  }
+  document.getElementById('focusSkip').style.display = focusPool.length > 1 ? '' : 'none';
+}
+function focusTickCurrent(){
+  if (!focusPool.length) return;
+  const td = focusPool[focusIdx];
+  setDone(td, true);
+  (td.subtasks || []).forEach(s => { s.done = true; });
+  saveTodos(); updateBadge();
+  focusPool.splice(focusIdx, 1);
+  if (!focusPool.length){
+    document.getElementById('focusTask').textContent = 'That was the last one 🎉';
+    document.getElementById('focusTags').innerHTML = '';
+    document.getElementById('focusSteps').innerHTML = '';
+    setTimeout(closeFocus, 1400);
+    return;
+  }
+  focusIdx = focusIdx % focusPool.length;
+  toast('Done ✓ — next one up');
+  renderFocus();
+}
+document.getElementById('focusBtn').addEventListener('click', openFocus);
+document.getElementById('focusClose').addEventListener('click', closeFocus);
+document.getElementById('focusDone').addEventListener('click', focusTickCurrent);
+document.getElementById('focusSkip').addEventListener('click', () => {
+  if (!focusPool.length) return;
+  focusIdx = (focusIdx + 1) % focusPool.length;
+  renderFocus();
 });
 
 /* ---------- quick add ---------- */
@@ -1738,7 +1940,8 @@ function todoCore(td){
           done: !!td.done, date: td.date, ideaId: td.ideaId || null,
           createdBy: td.createdBy || null, createdAt: td.createdAt || null,
           doneBy: td.doneBy || null, doneAt: td.doneAt || null,
-          assignees: td.assignees || [], recur: td.recur || null};
+          assignees: td.assignees || [], recur: td.recur || null,
+          subtasks: (td.subtasks || []).map(s => ({text: s.text, done: !!s.done}))};
 }
 function syncMsg(text){
   const el = document.getElementById('syncMsg');
