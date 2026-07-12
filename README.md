@@ -41,9 +41,9 @@ phone — no internet needed afterwards, nothing leaves the device:
 - **Offline voice recognition** — OpenAI's Whisper (base, ~80 MB) transcribes your
   recordings on-device. Works on any modern phone browser (GPU-accelerated where
   available, CPU fallback otherwise) and replaces Android's cloud speech service.
-- **On-device summaries** — Qwen3 0.6B (~570 MB) summarizes and prioritizes ideas
-  locally. Needs GPU acceleration (WebGPU): Chrome on Android 12+, or Safari on
-  iOS 26+. Devices without WebGPU fall back to the built-in heuristic.
+- **On-device summaries** — Qwen2.5 0.5B (~480 MB) summarizes, prioritizes, and tags
+  ideas locally. Needs GPU acceleration (WebGPU): Chrome on Android 12+, or Safari
+  on iOS 26+. Devices without WebGPU fall back to the built-in heuristic.
 
 Models download once (use Wi-Fi) and are cached in browser storage. The inference
 runtime ([transformers.js](https://huggingface.co/docs/transformers.js) + ONNX

@@ -8,8 +8,18 @@ import { pipeline, env } from './vendor/transformers.min.js';
 env.backends.onnx.wasm.wasmPaths = new URL('./vendor/', self.location.href).href;
 
 const ASR_MODEL = 'onnx-community/whisper-base';
-let LLM_MODEL = 'onnx-community/Qwen3-0.6B-ONNX';
+// Qwen2.5-0.5B: proven architecture in this runtime, strong at structured
+// JSON, and smaller than Qwen3-0.6B whose 570MB q4f16 file could wedge
+// phone browsers during GPU session creation.
+let LLM_MODEL = 'onnx-community/Qwen2.5-0.5B-Instruct';
 let llmDtypeOverride = null; // test hook
+
+function withTimeout(promise, ms, what){
+  return Promise.race([
+    promise,
+    new Promise((_, rej) => setTimeout(() => rej(new Error(what)), ms)),
+  ]);
+}
 
 let asr = null, llm = null, device = null, gpuHasF16 = false;
 
@@ -40,15 +50,17 @@ function progressCb(kind){
   };
 }
 
+const LOAD_TIMEOUT_MSG = 'timed out preparing the model — the phone likely ran out of free memory. Close other apps and browser tabs, then retry.';
+
 async function loadASR(){
   if (asr) return;
   const dev = await pickDevice();
-  asr = await pipeline('automatic-speech-recognition', ASR_MODEL, {
+  asr = await withTimeout(pipeline('automatic-speech-recognition', ASR_MODEL, {
     device: dev,
     // fp32 encoder is the safe choice across mobile GPUs; q4 decoder keeps it small
     dtype: dev === 'webgpu' ? {encoder_model: 'fp32', decoder_model_merged: 'q4'} : 'q8',
     progress_callback: progressCb('asr'),
-  });
+  }), 300000, LOAD_TIMEOUT_MSG);
 }
 
 async function loadLLM(){
@@ -57,20 +69,34 @@ async function loadLLM(){
   if (dev !== 'webgpu' && !llmDtypeOverride){
     throw new Error('this device has no GPU acceleration (WebGPU) — on-device summaries need a recent Android Chrome or iOS 26+ Safari');
   }
-  llm = await pipeline('text-generation', LLM_MODEL, {
+  llm = await withTimeout(pipeline('text-generation', LLM_MODEL, {
     device: dev,
-    // q4f16 (570MB) needs GPU fp16 shader support; fall back to q4 otherwise
-    dtype: llmDtypeOverride || (gpuHasF16 ? 'q4f16' : 'q4'),
+    // q4f16 needs GPU fp16 shader support; q8 runs on any backend
+    dtype: llmDtypeOverride || (gpuHasF16 ? 'q4f16' : 'q8'),
     progress_callback: progressCb('llm'),
-  });
+  }), 300000, LOAD_TIMEOUT_MSG);
+  pruneOldModels();
+}
+
+// One-time migration: reclaim the cached Qwen3 download from earlier versions.
+async function pruneOldModels(){
+  try {
+    const cache = await caches.open('transformers-cache');
+    for (const req of await cache.keys()){
+      if (req.url.includes('Qwen3-0.6B')) await cache.delete(req);
+    }
+  } catch (_) {}
 }
 
 async function summarize(text){
   const messages = [
     {role: 'system', content:
-`You turn a voice-transcribed idea into a summary and todo tasks. Reply with ONLY a JSON object, no other text:
-{"summary": "<one clear sentence, max 14 words>", "tasks": [{"text": "<short imperative task>", "priority": "high"|"medium"|"low", "tags": ["<category>"]}], "priority": "high"|"medium"|"low"}
-Rules: extract ONLY actions the person actually intends to take (max 6) — never turn observations, feelings, or background context into tasks; if there is no action, "tasks" is an empty array; judge each task's priority by urgency and importance (high = today/blocking, medium = this week, low = someday/optional); give each task 1-3 short lowercase category tags for sorting (e.g. work, home, family, health, finance, shopping, calls, errands, car, travel, pets, social, tech) — every task needs at least one tag, use "general" if nothing fits; top-level priority = highest task priority. /no_think`},
+`You turn a voice-transcribed idea into a summary and todo tasks. Reply with ONLY a JSON object containing ALL of these fields: "summary", "tasks", "priority".
+
+Example input: "the garden looks great and I need to pay the electricity bill today and maybe buy new shoes sometime"
+Example output: {"summary": "Pay the electricity bill today; maybe buy shoes someday.", "tasks": [{"text": "Pay the electricity bill", "priority": "high", "tags": ["finance"]}, {"text": "Buy new shoes", "priority": "low", "tags": ["shopping"]}], "priority": "high"}
+
+Rules: extract ONLY actions the person actually intends to take (max 6) — never turn observations, feelings, or background context into tasks; if there is no action, "tasks" is an empty array; "summary" is one clear sentence; priority is "high" (today/blocking), "medium" (this week), or "low" (someday/optional) judged by urgency and importance; every task gets 1-3 short lowercase tags from: work, home, family, health, finance, shopping, calls, errands, car, travel, pets, social, tech, general; top-level "priority" = highest task priority.`},
     {role: 'user', content: text},
   ];
   const out = await llm(messages, {max_new_tokens: 512, do_sample: false, return_full_text: false});

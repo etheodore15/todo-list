@@ -204,7 +204,7 @@
          slower CPU mode). Download over Wi-Fi.</p>
       <button class="btn primary" id="asrBtn">Enable offline voice recognition (~80 MB)</button>
       <p id="asrStatus"></p>
-      <button class="btn primary" id="llmBtn">Enable on-device summaries (~570 MB)</button>
+      <button class="btn primary" id="llmBtn">Enable on-device summaries (~480 MB)</button>
       <p id="llmStatus"></p>
       <button class="btn ghost" id="modelsWipeBtn">Delete downloaded models</button>
     </div>
@@ -229,7 +229,7 @@
          unless you enable Claude summaries.</p>
       <button class="btn ghost" id="wipeBtn">Delete all data</button>
     </div>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v8</p>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v9</p>
   </section>
 </main>
 
@@ -940,6 +940,8 @@ function setupModelButton(kind, btnId, statusId, storeKey, loadMsg, enabledLabel
     } catch (err) {
       status.textContent = '❌ Could not load the model: ' + err.message +
         ' — tap the button to retry (already-downloaded parts resume from cache).';
+      // reset the worker so a retry starts from a clean state
+      if (aiWorker){ aiWorker.terminate(); aiWorker = null; }
     }
     clearInterval(reassure);
     if (wakeLock) try { wakeLock.release(); } catch(_){}
@@ -952,8 +954,8 @@ setupModelButton('asr', 'asrBtn', 'asrStatus', 'localASR',
   'Preparing Whisper (speech recognition)…',
   'Disable offline voice recognition', 'Enable offline voice recognition (~80 MB)');
 setupModelButton('llm', 'llmBtn', 'llmStatus', 'localLLM',
-  'Preparing Qwen3 (summaries)…',
-  'Disable on-device summaries', 'Enable on-device summaries (~570 MB)');
+  'Preparing the summary model…',
+  'Disable on-device summaries', 'Enable on-device summaries (~480 MB)');
 
 document.getElementById('modelsWipeBtn').addEventListener('click', async () => {
   if (!confirm('Delete the downloaded AI models from this device? You can re-download them later.')) return;
