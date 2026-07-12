@@ -96,6 +96,31 @@ yours, or cancel. Neutral text passes silently, other space types are never
 checked, and if the API is slow or unavailable the task goes through
 untouched.
 
+### Care team features (spaces created as *Care team*)
+
+- **Routines & meds** — say *"give mum her Ramipril at 8am every morning"*:
+  the task repeats daily with a 🕗 time chip, and every tick is attributed
+  (who gave it, when) — a de-facto medication administration record in the
+  space history. A routine not ticked by end of day is recorded as
+  **⚠️ missed** in the history and respawns fresh — yesterday's missed dose
+  never merges into today's.
+- **📝 Care journal** — voice-capture an observation (*"mum seemed dizzy this
+  morning"*) as an idea, then tap **Share to [care space]** on the idea card.
+  Ideas stay private unless you share them; shared notes join the space's
+  append-only history alongside meds and tasks.
+- **🩺 Doctor briefing** — in the care space's History view: one tap has
+  Gemini turn the last 4 weeks of notes, medication adherence, and open
+  concerns into a printable one-page brief to hand to the GP. Coordination
+  summary only — it never gives medical advice.
+- **Shift handoff** — reopening a space's history shows a *"since you last
+  looked"* divider, so whoever comes on duty sees exactly what the others
+  did.
+
+> **Scope note:** care features coordinate a family/care team. They are not a
+> medical device, give no dosing or clinical advice, and pairing dose times
+> with a phone's native alarm is still recommended (PWAs can't fire
+> minute-exact alarms).
+
 ### On-device AI (fully offline, no API key)
 
 In Settings you can download two small AI models that then run entirely on your

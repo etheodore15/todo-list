@@ -74,11 +74,11 @@ subject, not a user.
 
 | # | Feature | Why it matters |
 |---|---------|----------------|
-| C2a | **Care recipient profile** — a space "about Mum": tasks/notes attach to her, members are the care team (siblings, carers) | Reuses spaces (A6) + members; recipient isn't a device holder |
-| C2b | **Routines & meds** — recurring timed tasks ("Ramipril 8am daily") with tick attribution = a de-facto medication administration record; missed-dose visibility in the digest | Rides A3 recurrence + existing attribution. The audit log (C1a) makes it trustworthy |
-| C2c | **Care notes** — voice-captured observations ("she seemed dizzy this morning") shared to the care space as a journal (opt-in per note — extends the ideas-stay-private rule with a "share to space" action) | Handover between siblings/carers is the daily pain; voice capture shines here |
-| C2d | **Doctor visit briefing** — button: Gemini summarizes the last N weeks of notes + med adherence + open concerns into a one-page printable brief | Turns scattered notes into the thing you actually bring to the GP; unique and demo-able |
-| C2e | **Shift handoff digest** — "what happened since you were last on" per member | Extends the existing family-activity banner + digest machinery |
+| C2a ◐ v30 | **Care recipient profile** — a space "about Mum": tasks/notes attach to her, members are the care team (siblings, carers) | The care space itself (name + type) is the profile for now; a dedicated recipient card (age, conditions, key contacts) still TODO |
+| C2b ✅ v30 | **Routines & meds** — recurring timed tasks ("Ramipril 8am daily") with tick attribution = a de-facto medication administration record; missed-dose visibility (⚠️ missed events in the history) | Rides A3 recurrence + existing attribution. The audit log (C1a) makes it trustworthy |
+| C2c ✅ v30 | **Care notes** — voice-captured observations ("she seemed dizzy this morning") shared to the care space as a journal (opt-in per note — extends the ideas-stay-private rule with a "share to space" action) | Handover between siblings/carers is the daily pain; voice capture shines here |
+| C2d ✅ v30 | **Doctor visit briefing** — button: Gemini summarizes the last N weeks of notes + med adherence + open concerns into a one-page printable brief | Turns scattered notes into the thing you actually bring to the GP; unique and demo-able |
+| C2e ✅ v30 | **Shift handoff** — "since you last looked" divider in each space's history | Extends the existing family-activity banner + history machinery |
 
 **Effort:** C2a rides A6; C2b rides A3+C1a; C2c ~1 session; C2d ~1 session;
 C2e small. Caregiving reuses co-parenting's audit spine almost entirely.

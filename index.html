@@ -102,6 +102,7 @@
     padding:7px 12px; border-radius:10px; cursor:pointer;}
   .date-chip{background:rgba(255,179,71,.14); color:var(--med);}
   .recur-chip{background:rgba(62,207,142,.13); color:var(--ok);}
+  .time-chip{background:rgba(79,140,255,.12); color:var(--accent);}
   .todo .attr{width:100%; font-size:.68rem; color:var(--ok); margin-top:4px; opacity:.9;}
   .scope-chip{background:rgba(79,140,255,.16); color:var(--accent); cursor:pointer;}
   .sheet-overlay{position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:60;
@@ -400,7 +401,7 @@
       <input type="file" id="importFile" accept=".json,application/json" style="display:none">
       <button class="btn ghost" id="wipeBtn">Delete all data</button>
     </div>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v29<br><span id="envInfo"></span></p>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v30<br><span id="envInfo"></span></p>
   </section>
 </main>
 
@@ -438,6 +439,7 @@
 <div id="histOverlay" style="display:none;">
   <div class="hist-head">
     <b id="histTitle">History</b>
+    <button class="btn ghost" id="histBriefBtn" style="display:none;">🩺 Doctor briefing</button>
     <button class="btn ghost" id="histCsvBtn">⬇ CSV</button>
     <button class="btn ghost" id="histPrintBtn">🖨 Print / PDF</button>
     <button class="fo-close" id="histClose" aria-label="Close" style="position:static;">✕</button>
@@ -571,6 +573,28 @@ function fmtDay(dateStr){
   return d.toLocaleDateString(undefined, {weekday:'short', day:'numeric', month:'short', timeZone:'UTC'});
 }
 
+/* ---------- time of day (C2b) ---------- */
+// "give mum her ramipril at 8am" → "08:00"; null when no time is spoken
+function parseTaskTime(text){
+  const t = String(text).toLowerCase();
+  const m = t.match(/\b(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/) ||
+            t.match(/\bat\s+(\d{1,2})(?::(\d{2}))?\b/);
+  if (!m) return null;
+  let h = parseInt(m[1], 10);
+  const min = m[2] ? parseInt(m[2], 10) : 0;
+  if (h > 23 || min > 59) return null;
+  if (m[3] === 'pm' && h < 12) h += 12;
+  if (m[3] === 'am' && h === 12) h = 0;
+  return String(h).padStart(2, '0') + ':' + String(min).padStart(2, '0');
+}
+function fmtTime(hhmm){
+  if (!hhmm) return '';
+  const [h, m] = hhmm.split(':').map(Number);
+  const ap = h >= 12 ? 'pm' : 'am';
+  const h12 = h % 12 || 12;
+  return h12 + (m ? ':' + String(m).padStart(2, '0') : '') + ap;
+}
+
 /* ---------- recurrence ---------- */
 // td.recur: {type:'daily'} | {type:'weekly', dow:[0-6]} | {type:'monthly', day:N}
 function parseRecur(text){
@@ -631,19 +655,26 @@ function recurLabel(recur){
   if (changed) store.set('todos', todos);
 })();
 
-/* ---------- daily carry-over ---------- */
-(function rollover(){
+/* ---------- daily carry-over ----------
+   Invoked at boot from the sync section, after spaces/audit are set up —
+   it logs missed care routines, which needs those. */
+function rollover(){
   const t = todayStr();
   let changed = false;
   todos.forEach(td => {
     if (td.someday) return;                 // parked — no dates, no pressure
     if (td.recur && td.date < t){
-      // recurring: a finished instance respawns at its next occurrence,
-      // an unfinished one carries over like any other task
+      // recurring: a finished instance respawns at its next occurrence.
+      // Unfinished: care-space routines (meds!) record a MISSED entry and jump
+      // to the next occurrence — yesterday's 8am dose must not merge into
+      // today's. Other recurring tasks carry over like any task.
       if (td.done){
         setDone(td, false, true);          // respawn, not a real un-tick — no audit noise
         td.date = nextOccurrence(td.recur, t);
         (td.subtasks || []).forEach(s => { s.done = false; });
+      } else if (spaceTypeOf(td.space) === 'care'){
+        logEvent('missed', td, 'scheduled ' + td.date + (td.time ? ' ' + fmtTime(td.time) : ''));
+        td.date = nextOccurrence(td.recur, t);
       } else td.date = t;
       changed = true;
     } else if (td.date < t && !td.done){
@@ -654,7 +685,7 @@ function recurLabel(recur){
   });
   // keep done items from past days out of today's view but in storage (archive)
   if (changed) saveTodos();
-})();
+}
 
 /* ---------- toast ---------- */
 let toastTimer;
@@ -745,6 +776,7 @@ function normalizeIdeaJson(json, text){
           .filter(n => store.get('members', []).includes(n)).slice(0, 6),
         recur,
         date: recur ? nextOccurrence(recur, date || todayStr()) : date,
+        time: /^([01]\d|2[0-3]):[0-5]\d$/.test(t && t.time || '') ? t.time : parseTaskTime(String(t && t.text || '')),
         energy,
         minutes: (mins >= 5 && mins <= 240) ? mins : ENERGY_MIN[energy]
       };
@@ -771,7 +803,8 @@ Rules:
 - Tag each task with 1-3 short lowercase tags chosen for USEFUL SORTING: ideally one life-area tag (work, home, family, personal) plus one activity-type tag (calls, shopping, errands, admin, finance, health, car, travel, pets, social, tech). Use single common words, consistent across tasks — never invent near-synonyms of an existing tag. Every task needs at least one tag; use "general" only as a last resort.
 - Today is ${todayStr()} (${new Date().toLocaleDateString('en', {weekday: 'long', timeZone: 'UTC'})}). If the idea explicitly says WHEN a task should happen ("tomorrow", "on Friday", "on the 14th"), set that task's "date" to the resolved YYYY-MM-DD (never in the past). Otherwise leave "date" empty.
 - If the idea says a task REPEATS ("every Tuesday", "meds every morning", "rent on the 1st of every month"), set "recur" to "daily", "weekly:mon,tue,…", or "monthly:14" accordingly. Otherwise leave "recur" empty.
-- Rate each task's "energy" — the effort/executive function it demands: low = quick and near-mindless (a call, an order), medium = some focus, high = long or demanding. Estimate "minutes" it realistically takes (5-240).` +
+- Rate each task's "energy" — the effort/executive function it demands: low = quick and near-mindless (a call, an order), medium = some focus, high = long or demanding. Estimate "minutes" it realistically takes (5-240).
+- If the idea says a TIME OF DAY ("meds at 8am", "pick up at 3:30pm"), set that task's "time" to the 24h HH:MM. Otherwise leave "time" empty.` +
   (known.length ? `
 - The user's existing tags, most used first: ${known.join(', ')}. STRONGLY prefer reusing these exact tags whenever they fit; only introduce a new tag when none of them applies.` : '') +
   (store.get('members', []).length ? `
@@ -833,6 +866,7 @@ async function geminiSummarize(text, key, isRetry){
           assignees: {type: 'ARRAY', items: {type: 'STRING'}},
           date: {type: 'STRING'},
           recur: {type: 'STRING'},
+          time: {type: 'STRING'},
           energy: {type: 'STRING', enum: ['low','medium','high']},
           minutes: {type: 'INTEGER'}
         },
@@ -1204,7 +1238,7 @@ function localSummarize(text){
     const assignees = detectAssignees(t);
     const energy = detectEnergy(t);
     return {text: t.charAt(0).toUpperCase() + t.slice(1), priority, tags: detectTags(t), assignees,
-            date, recur, energy, minutes: ENERGY_MIN[energy]};
+            date, recur, time: parseTaskTime(t), energy, minutes: ENERGY_MIN[energy]};
   }).filter(t => t.text.length > 2);
 
   return {summary, tasks, priority: detectPriority(text)};
@@ -1306,6 +1340,7 @@ const IDEA_SCHEMA = {
           assignees: {type: 'array', items: {type: 'string'}, description: 'Household member names (lowercase) this task is delegated to, ONLY when the idea explicitly directs it at them. Empty otherwise.'},
           date: {type: 'string', description: 'YYYY-MM-DD the task should happen, ONLY when the idea explicitly says when. Empty otherwise.'},
           recur: {type: 'string', description: 'Repeat rule when the idea says the task repeats: "daily", "weekly:mon,tue,…", or "monthly:14". Empty otherwise.'},
+          time: {type: 'string', description: '24h HH:MM time of day, ONLY when the idea says when ("meds at 8am"). Empty otherwise.'},
           energy: {type: 'string', enum: ['low','medium','high'], description: 'Effort the task demands: low = quick/mindless, high = long or demanding.'},
           minutes: {type: 'integer', description: 'Realistic minutes the task takes (5-240).'}
         },
@@ -1379,6 +1414,7 @@ saveIdeaBtn.addEventListener('click', async () => {
     todos.push({id: idea.id + '-' + i, text: task.text, priority: task.priority, tags: task.tags || [],
       assignees: task.assignees || [], done:false, date: task.date || t, recur: task.recur || null,
       energy: task.energy || detectEnergy(task.text), minutes: task.minutes || null,
+      time: task.time || null,
       space: newTaskSpace(), ideaId: idea.id, createdBy: myName() || null, createdAt: Date.now()});
     logEvent('created', todos[todos.length - 1]);
     if ((task.assignees || []).length) delegated.push(task.assignees.join(', '));
@@ -1427,6 +1463,22 @@ function renderIdeas(){
     const rawEl = card.querySelector('.raw');
     rawEl.textContent = idea.raw;
     rawEl.addEventListener('click', () => rawEl.classList.toggle('open'));
+    // C2c: opt-in care journal — ideas stay private unless shared to a care space
+    store.get('spaces', []).filter(s => s.type === 'care').forEach(sp => {
+      const shared = (idea.sharedTo || []).includes(sp.hid);
+      const b = document.createElement('button');
+      b.className = 'chip share-note';
+      b.style.cssText = 'border:none; cursor:pointer;' + (shared ? ' color:var(--ok);' : '');
+      b.textContent = shared ? `✓ in ${sp.name} journal` : `📝 Share to ${sp.name}`;
+      b.disabled = shared;
+      b.addEventListener('click', () => {
+        logEvent('note', {id: 'note-' + idea.id, text: idea.raw.slice(0, 600), space: sp.hid});
+        idea.sharedTo = [...(idea.sharedTo || []), sp.hid];
+        saveIdeas(); renderIdeas();
+        toast(`Shared to the ${sp.name} journal 📝`);
+      });
+      card.querySelector('.meta').insertBefore(b, card.querySelector('.del'));
+    });
     card.querySelector('.del').addEventListener('click', () => {
       const at = ideas.findIndex(x => x.id === idea.id);
       ideas = ideas.filter(x => x.id !== idea.id); saveIdeas(); renderIdeas();
@@ -1586,7 +1638,8 @@ function renderTodos(){
 
   PRIOS.forEach(p => {
     const items = list.filter(t => t.priority === p.key)
-                      .sort((a,b) => (a.done - b.done));
+                      .sort((a,b) => (a.done - b.done) ||
+                        ((a.time || '99') < (b.time || '99') ? -1 : (a.time || '99') > (b.time || '99') ? 1 : 0));
     if (!items.length) return;
     const sec = document.createElement('div');
     sec.className = 'prio-section';
@@ -1684,6 +1737,12 @@ function todoRow(td){
       dc.title = 'Tap to reschedule';
       dc.addEventListener('click', (e) => { e.stopPropagation(); editDate(td); });
       tg.appendChild(dc);
+    }
+    if (td.time){
+      const tc = document.createElement('span');
+      tc.className = 'ttag time-chip';
+      tc.textContent = '🕗 ' + fmtTime(td.time);
+      tg.appendChild(tc);
     }
     {
       const ec = document.createElement('span');
@@ -2039,7 +2098,7 @@ async function quickAdd(){
                      : (parseTaskDate(text) || todayStr());
   const energy = detectEnergy(text);
   todos.push({id: uid(), text, priority: detectPriority(text), tags: detectTags(text), done:false,
-    date, recur, energy, minutes: ENERGY_MIN[energy], space: spaceForTask,
+    date, recur, time: parseTaskTime(text), energy, minutes: ENERGY_MIN[energy], space: spaceForTask,
     ideaId:null, createdBy: myName() || null, createdAt: Date.now()});
   logEvent('created', todos[todos.length - 1]);
   saveTodos(); inp.value=''; renderTodos();
@@ -2422,13 +2481,32 @@ function logEvent(kind, td, detail){
   if (ev.space && spaceRt[ev.space] && spaceRt[ev.space].db){
     fbFs.setDoc(fbFs.doc(spaceRt[ev.space].db, 'households', ev.space, 'events', ev.id), ev)
       .catch(() => {});
+  } else if (ev.space){
+    // sync for that space isn't up yet (e.g. rollover at boot) — queue it
+    const pend = store.get('pendingEv', []);
+    pend.push(ev);
+    if (pend.length > 500) pend.splice(0, pend.length - 500);
+    store.set('pendingEv', pend);
   }
   return ev;
 }
 
+function flushPendingEvents(sp){
+  const pend = store.get('pendingEv', []);
+  if (!pend.length) return;
+  const rest = [];
+  pend.forEach(ev => {
+    if (ev.space === sp.hid)
+      fbFs.setDoc(fbFs.doc(spaceRt[sp.hid].db, 'households', sp.hid, 'events', ev.id), ev).catch(() => {});
+    else rest.push(ev);
+  });
+  store.set('pendingEv', rest);
+}
+
 const EVENT_LABEL = {created: '➕ added', edited: '✏️ edited', ticked: '✓ ticked off',
   unticked: '↩ un-ticked', deleted: '🗑 deleted', restored: '↩ restored',
-  rescheduled: '📅 rescheduled', parked: '🌙 parked for someday', moved: '📦 moved'};
+  rescheduled: '📅 rescheduled', parked: '🌙 parked for someday', moved: '📦 moved',
+  missed: '⚠️ missed', note: '📝 noted'};
 
 // joining/creating the FIRST space adopts existing shareable tasks into it,
 // matching the old "everything local syncs up" behaviour
@@ -2443,7 +2521,7 @@ function todoCore(td){
           done: !!td.done, date: td.date, ideaId: td.ideaId || null,
           createdBy: td.createdBy || null, createdAt: td.createdAt || null,
           doneBy: td.doneBy || null, doneAt: td.doneAt || null,
-          assignees: td.assignees || [], recur: td.recur || null,
+          assignees: td.assignees || [], recur: td.recur || null, time: td.time || null,
           subtasks: (td.subtasks || []).map(s => ({text: s.text, done: !!s.done})),
           energy: td.energy || null, minutes: td.minutes || null,
           someday: !!td.someday, carried: td.carried || 0};
@@ -2475,6 +2553,7 @@ async function startSpaceSync(sp){
   // seed lastPush so everything local for this space pushes once
   todos.forEach(td => { if ((td.space || null) === sp.hid) rt.lastPush[td.id] = null; });
   syncPush();
+  flushPendingEvents(sp);
   const col = fbFs.collection(rt.db, 'households', sp.hid, 'items');
   rt.unsub = fbFs.onSnapshot(col, snap => {
     applyingRemote = true;
@@ -2614,15 +2693,21 @@ async function shareSpaceInvite(sp){
 }
 
 /* ---------- history view + exports (C1a/C1b) ---------- */
-let histEvents = [], histSpace = null;
+let histEvents = [], histSpace = null, histPrevSeen = 0;
 
 async function openHistory(sp){
   histSpace = sp;
+  // shift handoff: remember when this member last looked at this space
+  const seenMap = store.get('histSeen', {});
+  histPrevSeen = seenMap[sp.hid] || 0;
+  seenMap[sp.hid] = Date.now();
+  store.set('histSeen', seenMap);
   const seen = new Set();
   histEvents = [];
   const add = (ev) => { if (ev && ev.id && !seen.has(ev.id)){ seen.add(ev.id); histEvents.push(ev); } };
   store.get('events', []).filter(e => e.space === sp.hid).forEach(add);
   document.getElementById('histTitle').textContent = `${SPACE_ICON[sp.type] || '👥'} ${sp.name} — history`;
+  document.getElementById('histBriefBtn').style.display = sp.type === 'care' ? '' : 'none';
   document.getElementById('histList').innerHTML = '<p class="side-note">Loading…</p>';
   document.getElementById('histOverlay').style.display = 'block';
   // one-shot remote fetch: the first snapshot carries the full collection
@@ -2649,7 +2734,17 @@ function renderHistory(){
     el.innerHTML = '<p class="side-note">No history yet — actions on this space\'s tasks will appear here.</p>';
     return;
   }
+  let dividerDone = !histPrevSeen ||
+    !histEvents.some(e => e.ts > histPrevSeen && (e.who || '').toLowerCase() !== myName().toLowerCase());
   histEvents.slice(0, 500).forEach(ev => {
+    // events are newest-first: the divider goes under the last "new" entry
+    if (!dividerDone && ev.ts <= histPrevSeen){
+      const d = document.createElement('p');
+      d.className = 'side-note hist-divider';
+      d.textContent = '— everything above happened since you last looked —';
+      el.appendChild(d);
+      dividerDone = true;
+    }
     const l = document.createElement('div');
     l.className = 'hist-line';
     const when = document.createElement('span');
@@ -2683,6 +2778,104 @@ function auditCsv(events, spName){
   });
   return rows.join('\n');
 }
+
+/* ---------- doctor visit briefing (C2d) ----------
+   Turns the last 4 weeks of the care space — journal notes, med adherence
+   from tick/missed events, open tasks — into a one-page printable brief.
+   Coordination summary only: no dosing advice, no medical claims. */
+function briefingInput(sp){
+  const since = Date.now() - 28 * 86400000;
+  const evs = histEvents.filter(e => e.ts >= since);
+  const line = (e) => new Date(e.ts).toLocaleDateString() + ' — ' + (e.who || 'someone') + ': ' + e.text +
+    (e.detail ? ' (' + e.detail + ')' : '');
+  return {
+    notes: evs.filter(e => e.kind === 'note').map(line),
+    ticked: evs.filter(e => e.kind === 'ticked').map(line),
+    missed: evs.filter(e => e.kind === 'missed').map(line),
+    open: todos.filter(t => t.space === sp.hid && !t.done)
+      .map(t => t.text + (t.recur ? ' (' + recurLabel(t.recur).replace('↻ ', 'repeats ') + (t.time ? ' at ' + fmtTime(t.time) : '') + ')' : ''))
+  };
+}
+
+async function geminiBriefing(sp, key){
+  const inp = briefingInput(sp);
+  const model = await geminiModel(key);
+  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+    method: 'POST',
+    headers: {'content-type': 'application/json', 'x-goog-api-key': key},
+    body: JSON.stringify({
+      contents: [{role: 'user', parts: [{text:
+`You prepare a family's notes for a doctor visit. From this care team's last 4 weeks of shared records about the person they care for, write a concise brief the family can hand to the GP. Plain factual language, no diagnoses, no medication advice — just organize what was observed and done. Dates matter.
+
+Journal notes:
+${inp.notes.join('\n') || '(none)'}
+
+Routine/medication tasks completed:
+${inp.ticked.join('\n') || '(none)'}
+
+Routine/medication tasks MISSED:
+${inp.missed.join('\n') || '(none)'}
+
+Currently open tasks:
+${inp.open.join('\n') || '(none)'}`}]}],
+      generationConfig: {responseMimeType: 'application/json', responseSchema: {
+        type: 'OBJECT',
+        properties: {
+          overview: {type: 'STRING'},
+          observations: {type: 'ARRAY', items: {type: 'STRING'}},
+          routines: {type: 'ARRAY', items: {type: 'STRING'}},
+          concerns: {type: 'ARRAY', items: {type: 'STRING'}},
+          questions: {type: 'ARRAY', items: {type: 'STRING'}}
+        },
+        required: ['overview','observations','routines','concerns','questions']
+      }}
+    })
+  });
+  if (!res.ok) throw new Error('API ' + res.status + (await apiErrMsg(res)));
+  const data = await res.json();
+  const parts = data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts || [];
+  return JSON.parse(parts.map(p => p.text || '').join(''));
+}
+
+function briefingHtml(sp, b){
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+  const sec = (title, arr) => (arr && arr.length)
+    ? `<h2>${title}</h2><ul>${arr.map(x => '<li>' + esc(x) + '</li>').join('')}</ul>` : '';
+  return `<!DOCTYPE html><html><head><title>${esc(sp.name)} — doctor visit brief</title>
+<style>body{font-family:Georgia,serif; margin:36px; color:#111; max-width:720px;}
+h1{font-size:19px; margin-bottom:2px;} h2{font-size:14px; margin:18px 0 6px;}
+p,li{font-size:13px; line-height:1.55;} ul{margin:0; padding-left:20px;}
+.meta{color:#555; font-size:11px;}</style></head><body>
+<h1>${esc(sp.name)} — visit brief</h1>
+<p class="meta">Covers the last 4 weeks of shared care records · prepared ${new Date().toLocaleDateString()} with Idea → Todo.
+Family coordination summary, not medical advice.</p>
+<p>${esc(b.overview)}</p>
+${sec('Observations', b.observations)}
+${sec('Routines & medications (as recorded)', b.routines)}
+${sec('Concerns to raise', b.concerns)}
+${sec('Questions for the doctor', b.questions)}
+</body></html>`;
+}
+
+document.getElementById('histBriefBtn').addEventListener('click', async () => {
+  if (!histSpace) return;
+  const key = store.get('geminiKey', '');
+  if (!key){ toast('Add a free Gemini key in Settings to generate briefings.'); return; }
+  const btn = document.getElementById('histBriefBtn');
+  btn.disabled = true; btn.textContent = '🩺 Preparing…';
+  try {
+    const b = await geminiBriefing(histSpace, key);
+    const w = window.open('', '_blank');
+    if (!w){ toast('Pop-ups are blocked — allow them to print.'); }
+    else {
+      w.document.write(briefingHtml(histSpace, b));
+      w.document.close(); w.focus(); w.print();
+    }
+  } catch (err) {
+    toast('Could not generate the brief: ' + err.message);
+  }
+  btn.disabled = false; btn.textContent = '🩺 Doctor briefing';
+});
 
 document.getElementById('histClose').addEventListener('click', () => {
   document.getElementById('histOverlay').style.display = 'none';
@@ -2786,6 +2979,7 @@ document.getElementById('addSpaceBtn').addEventListener('click', () => {
   el.style.display = el.style.display === 'none' ? '' : 'none';
 });
 
+rollover();
 syncLegacyMirror();
 refreshSyncUI();
 if (spacesList().length) startSync().catch(err => syncMsg('❌ ' + err.message));
