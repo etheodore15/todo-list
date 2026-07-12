@@ -41,24 +41,26 @@ phone — no internet needed afterwards, nothing leaves the device:
 - **Offline voice recognition** — OpenAI's Whisper (base, ~80 MB) transcribes your
   recordings on-device. Works on any modern phone browser (GPU-accelerated where
   available, CPU fallback otherwise) and replaces Android's cloud speech service.
-- **On-device summaries** — Qwen2.5 0.5B (~480 MB) summarizes, prioritizes, and tags
-  ideas locally. Needs GPU acceleration (WebGPU): Chrome on Android 12+, or Safari
-  on iOS 26+. Devices without WebGPU fall back to the built-in heuristic.
+  The model downloads once (use Wi-Fi) and is cached in browser storage; the
+  inference runtime ([transformers.js](https://huggingface.co/docs/transformers.js)
+  + ONNX Runtime) is bundled with the app in `vendor/`.
 
-Models download once (use Wi-Fi) and are cached in browser storage. The inference
-runtime ([transformers.js](https://huggingface.co/docs/transformers.js) + ONNX
-Runtime) is bundled with the app in `vendor/`, so the installed app is fully
-self-contained.
-
-### Summaries & priorities
+### Summaries, priorities & tags
 
 - **Default (offline, free):** a built-in heuristic splits your idea into action
-  items, picks the key sentence as the summary, and scores priority from urgency
-  and importance cues in your own words.
-- **On-device AI:** enable the local model above — best privacy, no ongoing cost.
-- **Optional (cloud):** paste an [Anthropic API key](https://console.anthropic.com/)
-  in Settings and Claude summarizes and prioritizes instead. Order of preference
-  when enabled: on-device model → Claude → heuristic.
+  items, picks the key sentence as the summary, and scores priority and tags from
+  cues in your own words.
+- **Free smart summaries (recommended):** paste a free
+  [Google Gemini API key](https://aistudio.google.com/apikey) in Settings — no
+  credit card needed — and Gemini generates the summary, tasks, priorities, and
+  tags. Far smarter than the heuristic.
+- **Optional (paid):** an [Anthropic API key](https://console.anthropic.com/) uses
+  Claude instead. Order of preference when keys are set: Gemini → Claude →
+  built-in heuristic (which also covers you offline).
+
+> On-device LLM summaries were tried (Qwen3, LFM2, Qwen2.5 via WebGPU) and removed:
+> current ~0.5B models need more memory than phone browser tabs reliably provide.
+> The vendored runtime still supports it, so this may return as models shrink.
 
 ### Privacy
 
