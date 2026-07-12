@@ -57,10 +57,9 @@ async function loadASR(){
   const dev = await pickDevice();
   asr = await withTimeout(pipeline('automatic-speech-recognition', ASR_MODEL, {
     device: dev,
-    // fp16 encoder halves GPU memory when the GPU supports it; fp32 otherwise
-    dtype: dev === 'webgpu'
-      ? {encoder_model: gpuHasF16 ? 'fp16' : 'fp32', decoder_model_merged: 'q4'}
-      : 'q8',
+    // fp32 encoder always: fp16 whisper encoders produce NaNs on many phone
+    // GPUs (decoder then emits zero tokens → "token ids must be non-empty")
+    dtype: dev === 'webgpu' ? {encoder_model: 'fp32', decoder_model_merged: 'q4'} : 'q8',
     progress_callback: progressCb('asr'),
   }), 300000, LOAD_TIMEOUT_MSG);
 }
@@ -133,8 +132,16 @@ self.onmessage = async (e) => {
         break;
       case 'transcribe': {
         await loadASR();
-        const out = await asr(payload.audio, {language: 'english', task: 'transcribe'});
-        result = {text: String(out.text || '').trim()};
+        let text = '';
+        try {
+          const out = await asr(payload.audio, {language: 'english', task: 'transcribe'});
+          text = String(out.text || '').trim();
+        } catch (err) {
+          // empty generation (silence / decoder produced nothing) → empty text,
+          // which the UI reports as "didn't catch that" instead of an error
+          if (!/non[- ]?empty/i.test(err && err.message || '')) throw err;
+        }
+        result = {text};
         break;
       }
       case 'summarize':

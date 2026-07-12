@@ -231,7 +231,7 @@
          unless you enable Claude summaries.</p>
       <button class="btn ghost" id="wipeBtn">Delete all data</button>
     </div>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v12<br><span id="envInfo"></span></p>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v13<br><span id="envInfo"></span></p>
   </section>
 </main>
 
@@ -480,7 +480,11 @@ async function stopRecLocal(){
     const rendered = await off.startRendering();
     const audio = rendered.getChannelData(0);
     const {text} = await aiCall('transcribe', {audio}, [audio.buffer]);
-    liveText.value = (baseText + ' ' + text).replace(/\s+/g,' ').trim();
+    if (text){
+      liveText.value = (baseText + ' ' + text).replace(/\s+/g,' ').trim();
+    } else {
+      toast("Didn't catch any speech — try again, a little closer to the mic.");
+    }
   } catch (err) {
     toast('Transcription failed: ' + err.message);
   }
