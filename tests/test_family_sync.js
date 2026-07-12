@@ -84,6 +84,8 @@ export function onSnapshot(col, cb, errCb){
   // Device A: create the household
   const A = await mkDevice();
   await A.click('nav.tabs button[data-view="settings"]');
+  await A.fill('#myNameInput', 'Emile');
+  await A.click('#saveMyNameBtn');
   await A.click('#syncSetup summary');
   await A.fill('#fbConfigInput', 'const firebaseConfig = { apiKey: "AIzaFake123", projectId: "fake-project" };');
   await A.click('#createHhBtn');
@@ -103,6 +105,8 @@ export function onSnapshot(col, cb, errCb){
   // Device B: join via invite
   const B = await mkDevice();
   await B.click('nav.tabs button[data-view="settings"]');
+  await B.fill('#myNameInput', 'Lulu');
+  await B.click('#saveMyNameBtn');
   await B.fill('#inviteInput', invite);
   await B.click('#joinBtn');
   await B.waitForTimeout(1000);
@@ -123,6 +127,26 @@ export function onSnapshot(col, cb, errCb){
   await A.waitForTimeout(1200);
   const doneA = await A.locator('.todo.done .ttext').allTextContents();
   check('A: tick on B syncs', doneA.some(t => /buy milk/.test(t)));
+
+  // ATTRIBUTION: A sees who ticked (Lulu) on the row
+  const attrA = await A.locator('.todo.done .attr').textContent();
+  console.log('row attribution on A:', JSON.stringify(attrA));
+  check('A: row shows who ticked and when', /✓ Lulu · /.test(attrA));
+
+  // ATTRIBUTION: expansion on A shows creator (Emile) and ticker (Lulu)
+  await A.locator('.todo.done .ttext').click();
+  const metaA = await A.locator('.todo.done .transcript').textContent();
+  console.log('expansion on A:', JSON.stringify(metaA.slice(0, 120)));
+  check('A: expansion shows Added by Emile', /Added by Emile · /.test(metaA));
+  check('A: expansion shows Ticked off by Lulu', /Ticked off by Lulu · /.test(metaA));
+  await A.locator('.todo.done .ttext').click();
+
+  // un-ticking clears attribution everywhere
+  await B.locator('.todo', { hasText: 'buy milk' }).locator('.chk').click();
+  await A.waitForTimeout(1200);
+  check('A: untick clears attribution', (await A.locator('.todo .attr').count()) === 0);
+  await B.locator('.todo', { hasText: 'buy milk' }).locator('.chk').click();
+  await A.waitForTimeout(1200);
 
   // A deletes a task → disappears on B
   A.once('dialog', d => d.accept());

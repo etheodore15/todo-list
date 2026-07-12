@@ -96,6 +96,8 @@
     color:var(--muted); letter-spacing:.3px;}
   .todo .transcript{flex-basis:100%; color:var(--muted); font-size:.8rem; line-height:1.5;
     margin-top:9px; padding-top:9px; border-top:1px solid #262d3d; font-style:italic;}
+  .todo .transcript .tmeta{font-style:normal; color:var(--muted); margin-bottom:5px; font-size:.76rem;}
+  .todo .attr{width:100%; font-size:.68rem; color:var(--ok); margin-top:4px; opacity:.9;}
   #tagFilter{display:flex; gap:8px; overflow-x:auto; margin-bottom:14px;
     -webkit-overflow-scrolling:touch; scrollbar-width:none;}
   #tagFilter:empty{display:none;}
@@ -221,6 +223,9 @@
       <p>Share one task list across the household — new tasks and ticks appear on everyone's
          phone in real time, and it works offline (changes sync when you're back online).
          Ideas and voice transcripts stay private on each device; only tasks are shared.</p>
+      <input id="myNameInput" placeholder="Your name (shown on tasks you add or tick)" autocomplete="off">
+      <button class="btn primary" id="saveMyNameBtn">Save name</button>
+      <p id="myNameStatus"></p>
       <div id="syncSetup">
         <input id="inviteInput" placeholder="Paste an invite code to join…" autocomplete="off">
         <button class="btn primary" id="joinBtn">Join household</button>
@@ -279,7 +284,7 @@
       <input type="file" id="importFile" accept=".json,application/json" style="display:none">
       <button class="btn ghost" id="wipeBtn">Delete all data</button>
     </div>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v20<br><span id="envInfo"></span></p>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v21<br><span id="envInfo"></span></p>
   </section>
 </main>
 
@@ -307,6 +312,22 @@ const saveTodos = () => { store.set('todos', todos); syncPush(); };
 
 // ids must be globally unique once tasks sync across devices
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+
+const myName = () => store.get('myName', '');
+
+function setDone(td, done){
+  td.done = done;
+  if (done){ td.doneBy = myName() || null; td.doneAt = Date.now(); }
+  else { td.doneBy = null; td.doneAt = null; }
+}
+
+function fmtWhen(ts, always){
+  if (!ts) return '';
+  const d = new Date(ts);
+  const today = d.toDateString() === new Date().toDateString();
+  const time = d.toLocaleTimeString(undefined, {hour: 'numeric', minute: '2-digit'});
+  return (today && !always ? '' : d.toLocaleDateString(undefined, {day: 'numeric', month: 'short'}) + ', ') + time;
+}
 
 const todayStr = () => new Date().toISOString().slice(0,10);
 
@@ -838,7 +859,7 @@ saveIdeaBtn.addEventListener('click', async () => {
   let added = 0, skipped = 0;
   result.tasks.forEach((task, i) => {
     if (existing.has(norm(task.text))){ skipped++; return; }   // already on the list
-    todos.push({id: idea.id + '-' + i, text: task.text, priority: task.priority, tags: task.tags || [], done:false, date:t, ideaId: idea.id});
+    todos.push({id: idea.id + '-' + i, text: task.text, priority: task.priority, tags: task.tags || [], done:false, date:t, ideaId: idea.id, createdBy: myName() || null, createdAt: Date.now()});
     added++;
   });
   saveTodos();
@@ -895,7 +916,7 @@ function renderIdeas(){
           <span class="mtxt"></span><span class="dot ${td.priority}"></span>`;
         row.querySelector('.mtxt').textContent = td.text;
         row.querySelector('.mchk').addEventListener('click', () => {
-          td.done = !td.done; saveTodos(); renderIdeas(); updateBadge();
+          setDone(td, !td.done); saveTodos(); renderIdeas(); updateBadge();
         });
         wrap.appendChild(row);
       });
@@ -1017,23 +1038,45 @@ function todoRow(td){
     });
     txtEl.appendChild(tg);
   }
-  // tap the task text to show the original transcript it came from
+  // who ticked it, right on the row
+  if (td.done && (td.doneBy || td.doneAt)){
+    const at = document.createElement('div');
+    at.className = 'attr';
+    at.textContent = '✓ ' + (td.doneBy ? td.doneBy + ' · ' : '') + fmtWhen(td.doneAt);
+    txtEl.appendChild(at);
+  }
+  // tap the task text for history + the original transcript
   txtEl.addEventListener('click', () => {
     const open = row.querySelector('.transcript');
     if (open){ open.remove(); return; }
     const idea = ideas.find(i => i.id === td.ideaId);
     const div = document.createElement('div');
     div.className = 'transcript';
-    div.textContent = idea ? '“' + idea.raw + '”'
-      : (td.ideaId ? 'Captured on another device — the transcript stays there.'
-                   : 'Added manually — no voice transcript.');
+    const lines = [];
+    if (td.createdBy || td.createdAt)
+      lines.push('➕ Added' + (td.createdBy ? ' by ' + td.createdBy : '') + (td.createdAt ? ' · ' + fmtWhen(td.createdAt, true) : ''));
+    if (td.done && (td.doneBy || td.doneAt))
+      lines.push('✓ Ticked off' + (td.doneBy ? ' by ' + td.doneBy : '') + (td.doneAt ? ' · ' + fmtWhen(td.doneAt, true) : ''));
+    if (lines.length){
+      const meta = document.createElement('div');
+      meta.className = 'tmeta';
+      lines.forEach((l, i) => {
+        if (i) meta.appendChild(document.createElement('br'));
+        meta.appendChild(document.createTextNode(l));
+      });
+      div.appendChild(meta);
+    }
+    div.appendChild(document.createTextNode(
+      idea ? '“' + idea.raw + '”'
+           : (td.ideaId ? 'Captured on another device — the transcript stays there.'
+                        : 'Added manually — no voice transcript.')));
     row.appendChild(div);
   });
   if (hasIdea){
     row.querySelector('.link-btn').addEventListener('click', () => highlightIdea(td.ideaId));
   }
   row.querySelector('.chk').addEventListener('click', () => {
-    td.done = !td.done; saveTodos(); renderTodos();
+    setDone(td, !td.done); saveTodos(); renderTodos();
   });
   row.querySelector('.prio-btn').addEventListener('click', () => {
     const order = ['high','medium','low'];
@@ -1080,7 +1123,7 @@ function quickAdd(){
   const inp = document.getElementById('quickAdd');
   const text = inp.value.trim();
   if (!text) return;
-  todos.push({id: uid(), text, priority: detectPriority(text), tags: detectTags(text), done:false, date: todayStr(), ideaId:null});
+  todos.push({id: uid(), text, priority: detectPriority(text), tags: detectTags(text), done:false, date: todayStr(), ideaId:null, createdBy: myName() || null, createdAt: Date.now()});
   saveTodos(); inp.value=''; renderTodos();
 }
 document.getElementById('quickAddBtn').addEventListener('click', quickAdd);
@@ -1155,6 +1198,20 @@ document.getElementById('modelsWipeBtn').addEventListener('click', async () => {
   document.getElementById('asrStatus').textContent = '';
   toast('Models deleted');
   location.reload();
+});
+
+/* ---------- settings: my name ---------- */
+const myNameInput = document.getElementById('myNameInput');
+const myNameStatus = document.getElementById('myNameStatus');
+function refreshMyName(){
+  myNameInput.value = store.get('myName', '');
+  myNameStatus.textContent = store.get('myName', '') ? '' : 'Set a name so the family can see who added or ticked a task.';
+}
+refreshMyName();
+document.getElementById('saveMyNameBtn').addEventListener('click', () => {
+  store.set('myName', myNameInput.value.trim().slice(0, 24));
+  refreshMyName();
+  toast(store.get('myName', '') ? 'Name saved ✓' : 'Name cleared');
 });
 
 /* ---------- settings: household members ---------- */
@@ -1275,7 +1332,9 @@ const lastPush = {};   // id → serialized core, to detect what changed locally
 
 function todoCore(td){
   return {text: td.text, priority: td.priority, tags: td.tags || [],
-          done: !!td.done, date: td.date, ideaId: td.ideaId || null};
+          done: !!td.done, date: td.date, ideaId: td.ideaId || null,
+          createdBy: td.createdBy || null, createdAt: td.createdAt || null,
+          doneBy: td.doneBy || null, doneAt: td.doneAt || null};
 }
 function syncMsg(text){
   const el = document.getElementById('syncMsg');
