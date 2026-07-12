@@ -237,7 +237,7 @@
          using your own key.</p>
       <button class="btn ghost" id="wipeBtn">Delete all data</button>
     </div>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v16<br><span id="envInfo"></span></p>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v17<br><span id="envInfo"></span></p>
   </section>
 </main>
 
@@ -596,15 +596,18 @@ function localSummarize(text){
   // Only clauses that express an intended ACTION become tasks — observations,
   // feelings, and context stay in the idea but produce no todo. Zero tasks is
   // a valid outcome.
-  const ACTION_PHRASES = /\b(needs? to|have to|has to|must|should|remember to|don't forget|going to|gonna|want to|look into|follow up|set up|pick up|drop off|go to|sign up|book in|sort out|work on)\b/i;
-  const ACTION_VERBS = /\b(call|ring|phone|text|message|email|buy|order|book|send|writ|finish|fix|repair|check|schedul|organis|organiz|plan|research|pay|clean|prepar|review|updat|creat|mak|build|contact|ask|cancel|renew|submit|tak|bring|grab|mov|sell|post|visit|regist|apply|install|download|print|wash|redesign|design|start|try|collect|return|deliver|water|feed|walk|arrang)(e|es|s|ed|ing)?\b/i;
-  const picked = sentences.filter(s => ACTION_PHRASES.test(s) || ACTION_VERBS.test(s));
+  const ACTION_PHRASES = /\b(needs? to|have to|has to|must|should|remember to|don't forget|going to|gonna|want to|make sure|look into|follow up|set up|pick up|drop off|go to|sign up|book in|sort out|work on|put on)\b/i;
+  const ACTION_VERBS = /\b(call|ring|phone|text|message|email|buy|order|book|send|writ|finish|fix|repair|check|schedul|organis|organiz|plan|research|pay|clean|prepar|review|updat|creat|mak|build|contact|ask|cancel|renew|submit|tak|bring|grab|mov|sell|post|visit|regist|apply|install|download|print|wash|rins|brush|floss|redesign|design|start|try|collect|return|deliver|water|feed|walk|arrang)(e|es|s|ed|ing)?\b/i;
+  let picked = sentences.filter(s => ACTION_PHRASES.test(s) || ACTION_VERBS.test(s));
+  // split compound actions: "...put on my pajamas and brush my teeth and rinse..."
+  const AND_ACTION = /\s+and\s+(?=(?:also\s+|then\s+|maybe\s+)?(?:make sure|put on|pick up|drop off|go to|sign up|set up|call|ring|phone|text|message|email|buy|order|book|send|write|finish|fix|repair|check|schedule|organis\w*|organiz\w*|plan|research|pay|clean|prepare|review|update|create|make|build|contact|ask|cancel|renew|submit|take|bring|grab|move|sell|post|visit|register|apply|install|download|print|wash|rinse|brush|floss|start|try|collect|return|deliver|water|feed|walk|arrange)\b)/i;
+  picked = picked.flatMap(s => s.split(AND_ACTION));
   const tasks = picked.slice(0,6).map(t => {
     const priority = detectPriority(t);
     // strip spoken fillers and lead-ins so the task reads as an imperative
-    for (let pass = 0; pass < 3; pass++){
+    for (let pass = 0; pass < 4; pass++){
       t = t.replace(/^(um+|uh+|okay|ok|so|well|right|actually|basically|anyway|oh|and|also|then|plus)[,\s]+/i,'')
-           .replace(/^(i |we |you )?(really |also |just |probably |definitely )*(think i |want to|would like to|'d like to|was thinking (of|about)?|should also|need to|have to|must|should|remember to|don't forget to|don't forget|maybe someday|maybe|someday|it would be good to|i've got to|i got to|gotta)\s*/i,'')
+           .replace(/^(i |we |you )?(really |also |just |probably |definitely )*(think i |want to|would like to|'d like to|was thinking (of|about)?|should also|needs? to|have to|must|should|remember to|don't forget to|don't forget|make sure (that )?(i |we |you )?|maybe someday|maybe|someday|it would be good to|i've got to|i got to|gotta)\s*/i,'')
            .replace(/^to\s+/i,'').trim();
     }
     t = t.replace(/[.!?]+$/,'').trim();
@@ -639,7 +642,7 @@ const TAG_RULES = [
   ['car',      /\b(car|ute|van|tyres?|tires?|mechanic|oil change|rego|registration|petrol|fuel|windscreen|service the car|car service)\b/],
   ['travel',   /\b(flight|hotel|airbnb|trip|holiday|vacation|passport|visa|itinerary|luggage|airport)\b/],
   ['pets',     /\b(dog|cat|puppy|kitten|vet|pet)\b/],
-  ['health',   /\b(doctor|dentist|gp|gym|workout|medication|medicine|prescription|physio|exercise|pharmacy|chemist|optometrist|specialist|checkup|blood test|scan|appointment)\b/],
+  ['health',   /\b(doctor|dentist|gp|gym|workout|medication|medicine|prescription|physio|exercise|pharmacy|chemist|optometrist|specialist|checkup|blood test|scan|appointment|sleep|teeth|tooth|ulcer|pajamas|pyjamas)\b/],
   ['finance',  /\b(pay|payment|bill|invoice|tax|bank|budget|insurance|rent|mortgage|refund|accountant|quote|money|owed?|loan|super|pension|receipt)\b/],
   ['shopping', /\b(buy|order|shop|shopping|purchase|groceries|supermarket|milk|bread|get some|pick up some)\b/],
   ['work',     /\b(meeting|client|boss|report|deadline|project|presentation|colleague|office|interview|resume|cv|linkedin|slides|spreadsheet|team|manager)\b/],
@@ -718,20 +721,20 @@ saveIdeaBtn.addEventListener('click', async () => {
   saveIdeaBtn.disabled = true;
   saveIdeaBtn.innerHTML = '<span class="spin">◌</span> Summarizing…';
 
-  let result = null;
+  let result = null, engine = 'built-in';
   const gKey = store.get('geminiKey', '');
   const cKey = store.get('apiKey', '');
   if (gKey){
-    try { result = await geminiSummarize(raw, gKey); }
+    try { result = await geminiSummarize(raw, gKey); engine = 'gemini'; }
     catch(e){ toast('Gemini unavailable (' + e.message + ') — trying fallback.'); }
   }
   if (!result && cKey){
-    try { result = await claudeSummarize(raw, cKey); }
+    try { result = await claudeSummarize(raw, cKey); engine = 'claude'; }
     catch(e){ toast('Claude unavailable — used built-in summary.'); }
   }
   if (!result) result = localSummarize(raw);
 
-  const idea = {id: Date.now() + '', raw, summary: result.summary, priority: result.priority, ts: Date.now()};
+  const idea = {id: Date.now() + '', raw, summary: result.summary, priority: result.priority, engine, ts: Date.now()};
   ideas.unshift(idea); saveIdeas();
 
   const t = todayStr();
@@ -777,6 +780,7 @@ function renderIdeas(){
         <span class="chip"><span class="dot ${idea.priority}"></span> ${idea.priority}</span>
         <span class="chip">${d.toLocaleDateString(undefined,{day:'numeric',month:'short'})} ${d.toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'})}</span>
         ${linked.length ? `<span class="chip">✅ ${doneCount}/${linked.length}</span>` : ''}
+        ${idea.engine ? `<span class="chip">${idea.engine === 'built-in' ? '⚙' : '✨'} ${idea.engine}</span>` : ''}
         <button class="del" aria-label="Delete idea">🗑</button>
       </div>`;
     card.querySelector('.summary').textContent = idea.summary;
