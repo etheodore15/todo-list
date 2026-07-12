@@ -68,6 +68,39 @@ All ideas and tasks are stored only in your phone's browser storage. Nothing is
 uploaded anywhere unless you enable Claude summaries (then only the idea text is
 sent to the Anthropic API with your own key).
 
+
+## Family sync
+
+One person creates a free Firebase project; everyone else joins with an invite code.
+
+1. Go to [console.firebase.google.com](https://console.firebase.google.com) → **Add project** (any name, disable Analytics).
+2. Build → **Firestore Database** → Create database (production mode).
+3. In the **Rules** tab, paste and **Publish**:
+
+```
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /households/{hid} {
+      allow get, create, update: if true;
+      allow list, delete: if false;
+      match /items/{item} {
+        allow read, write: if true;
+      }
+    }
+  }
+}
+```
+
+Households are addressed by long random IDs that only your invite code contains —
+the rules forbid listing them, so knowing the invite is what grants access.
+
+4. Project settings (⚙) → Your apps → **Web app (</>)** → Register → copy the `firebaseConfig` snippet.
+5. In the app: Settings → **Family sync** → paste the snippet → **Create household** → **Share invite code** with your family. They paste it under "Join household" — no Firebase setup needed on their devices.
+
+Tasks sync in real time (and offline changes catch up automatically). Ideas and
+voice transcripts never sync — they stay on the device that captured them.
+
 ## Files
 
 - `index.html` — the whole app (UI + logic)
