@@ -85,6 +85,26 @@ C2e small. Caregiving reuses co-parenting's audit spine almost entirely.
 
 ---
 
+## C1d storage decision: receipt photos
+
+Investigated July 2026. The constraint that decides it: our setup promise is
+"free Firebase project, **no credit card**" (Spark plan), and since
+30 Oct 2024 Cloud Storage for Firebase requires the pay-as-you-go **Blaze**
+plan even to provision a bucket (Spark projects get 402/403 on bucket calls).
+Options considered:
+
+| Option | Verdict |
+|---|---|
+| **Firebase Storage buckets** | ❌ for now — needs Blaze (credit card), breaking the no-card invite model. Right answer *later*, once a hosted backend/productization exists |
+| **Compressed thumbnail in a Firestore doc** | ✅ **chosen** — client-side canvas resize to ≤1024px JPEG (~100–250 KB base64), stored in a `receipts` subcollection per space (own doc, so item sync stays light). Fits the 1 MiB doc limit with margin; Firestore's Spark tier (1 GiB storage, daily read/write quotas) holds thousands of receipts; offline caching and the invite model keep working unchanged |
+| **Photo stays on the capturing device, only amount/date sync** | Fallback when compression still exceeds the cap — the ledger entry syncs, the image shows "on Alex's phone" |
+| **Third-party storage (R2/S3/Supabase)** | ❌ — a second account/key to provision kills the 3-minute setup |
+
+Design for C1d: task carries `amount`; receipt = `{taskId, ts, who, amount,
+note, thumb}` doc; running per-space ledger with "owed" split; CSV export
+rides the existing history exporter. Full-resolution original optionally kept
+in local IndexedDB with an "export originals" backup action.
+
 ## Sequencing & strategy
 
 ```
