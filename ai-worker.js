@@ -67,7 +67,7 @@ async function summarize(text){
     {role: 'system', content:
 `You turn a voice-transcribed idea into a summary and todo tasks. Reply with ONLY a JSON object, no other text:
 {"summary": "<one clear sentence, max 14 words>", "tasks": [{"text": "<short imperative task>", "priority": "high"|"medium"|"low", "tags": ["<category>"]}], "priority": "high"|"medium"|"low"}
-Rules: extract ONLY actions the person actually intends to take (max 6) — never turn observations, feelings, or background context into tasks; if there is no action, "tasks" is an empty array; judge each task's priority by urgency and importance (high = today/blocking, medium = this week, low = someday/optional); give each task 1-3 short lowercase category tags for sorting (e.g. work, home, family, health, finance, shopping, calls, errands); top-level priority = highest task priority. /no_think`},
+Rules: extract ONLY actions the person actually intends to take (max 6) — never turn observations, feelings, or background context into tasks; if there is no action, "tasks" is an empty array; judge each task's priority by urgency and importance (high = today/blocking, medium = this week, low = someday/optional); give each task 1-3 short lowercase category tags for sorting (e.g. work, home, family, health, finance, shopping, calls, errands, car, travel, pets, social, tech) — every task needs at least one tag, use "general" if nothing fits; top-level priority = highest task priority. /no_think`},
     {role: 'user', content: text},
   ];
   const out = await llm(messages, {max_new_tokens: 512, do_sample: false, return_full_text: false});

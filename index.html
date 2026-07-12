@@ -229,7 +229,7 @@
          unless you enable Claude summaries.</p>
       <button class="btn ghost" id="wipeBtn">Delete all data</button>
     </div>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v6</p>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v7</p>
   </section>
 </main>
 
@@ -568,19 +568,24 @@ function detectPriority(text){
 }
 
 const TAG_RULES = [
-  ['calls',    /\b(call|ring|phone|dial)\b/],
-  ['shopping', /\b(buy|order|shop|purchase|groceries|supermarket)\b/],
-  ['finance',  /\b(pay|bill|invoice|tax|bank|budget|insurance|rent|mortgage|refund|accountant|quote)\b/],
-  ['health',   /\b(doctor|dentist|gp|gym|workout|medication|prescription|physio|exercise|vet)\b/],
-  ['home',     /\b(clean|fix|repair|garden|garage|lawn|laundry|dishes|house|kitchen|plumber|electrician|bins?)\b/],
-  ['work',     /\b(meeting|client|boss|report|deadline|project|presentation|colleague|office|invoice)\b/],
-  ['family',   /\b(mum|dad|mom|kids?|son|daughter|wife|husband|partner|birthday|present|gift|school)\b/],
-  ['errands',  /\b(pick up|drop off|post|collect|return|deliver|parcel|package)\b/],
-  ['tech',     /\b(website|app|computer|laptop|software|redesign|backup|password)\b/],
+  ['calls',    /\b(call|ring|phone|dial|get in touch|reach out)\b/],
+  ['car',      /\b(car|ute|van|tyres?|tires?|mechanic|oil change|rego|registration|petrol|fuel|windscreen|service the car|car service)\b/],
+  ['travel',   /\b(flight|hotel|airbnb|trip|holiday|vacation|passport|visa|itinerary|luggage|airport)\b/],
+  ['pets',     /\b(dog|cat|puppy|kitten|vet|pet)\b/],
+  ['health',   /\b(doctor|dentist|gp|gym|workout|medication|medicine|prescription|physio|exercise|pharmacy|chemist|optometrist|specialist|checkup|blood test|scan|appointment)\b/],
+  ['finance',  /\b(pay|payment|bill|invoice|tax|bank|budget|insurance|rent|mortgage|refund|accountant|quote|money|owed?|loan|super|pension|receipt)\b/],
+  ['shopping', /\b(buy|order|shop|shopping|purchase|groceries|supermarket|milk|bread|get some|pick up some)\b/],
+  ['work',     /\b(meeting|client|boss|report|deadline|project|presentation|colleague|office|interview|resume|cv|linkedin|slides|spreadsheet|team|manager)\b/],
+  ['family',   /\b(mum|dad|mom|kids?|son|daughter|wife|husband|partner|birthday|present|gift|school|christmas|anniversary|nanna?|grandma|grandpa|niece|nephew|brother|sister)\b/],
+  ['social',   /\b(friends?|catch up|dinner with|lunch with|party|bbq|barbecue|drinks|wedding)\b/],
+  ['errands',  /\b(pick up|drop off|post office|post|collect|return|deliver|parcel|package|dry clean|library|council|licence|license)\b/],
+  ['home',     /\b(clean|tidy|declutter|fix|repair|garden|plants?|mow|vacuum|paint|renovat\w*|furniture|shed|fence|gutter|roof|windows?|doors?|light|bulb|leak|garage|lawn|laundry|dishes|house|kitchen|plumber|electrician|bins?|water the)\b/],
+  ['tech',     /\b(website|app|computer|laptop|software|redesign|backup|password|printer|wifi|router|email account)\b/],
 ];
 function detectTags(text){
   const t = text.toLowerCase();
-  return TAG_RULES.filter(([, re]) => re.test(t)).map(([tag]) => tag).slice(0, 3);
+  const tags = TAG_RULES.filter(([, re]) => re.test(t)).map(([tag]) => tag).slice(0, 3);
+  return tags.length ? tags : ['general'];   // every task gets at least one tag
 }
 function cleanTags(arr, fallbackText){
   const tags = (Array.isArray(arr) ? arr : [])
@@ -632,7 +637,7 @@ async function claudeSummarize(text, apiKey){
 Rules:
 - Extract ONLY actions the person actually intends to take, as separate tasks (max 6). Never turn observations, feelings, or background context into tasks — if the idea contains no action, return an empty tasks array and just summarize it. Merge duplicates. Fix obvious speech-transcription errors from context, but keep names as spoken.
 - Judge each task's priority by urgency (time pressure) AND importance (consequences): high = needs action today or blocks other things; medium = this week; low = someday/optional.
-- Give each task 1-3 short lowercase category tags for sorting (e.g. work, home, family, health, finance, shopping, calls, errands). Reuse common tags rather than inventing niche ones.
+- Give each task 1-3 short lowercase category tags for sorting (e.g. work, home, family, health, finance, shopping, calls, errands, car, travel, pets, social, tech). Every task must have at least one tag — use "general" if nothing fits. Reuse common tags rather than inventing niche ones.
 - The top-level priority is the highest task priority.
 
 Idea: """${text}"""`}]
