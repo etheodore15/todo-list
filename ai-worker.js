@@ -11,12 +11,14 @@ const ASR_MODEL = 'onnx-community/whisper-base';
 let LLM_MODEL = 'onnx-community/Qwen3-0.6B-ONNX';
 let llmDtypeOverride = null; // test hook
 
-let asr = null, llm = null, device = null;
+let asr = null, llm = null, device = null, gpuHasF16 = false;
 
 async function pickDevice(){
   if (device) return device;
   try {
-    if (self.navigator.gpu && await self.navigator.gpu.requestAdapter()) {
+    const adapter = self.navigator.gpu && await self.navigator.gpu.requestAdapter();
+    if (adapter) {
+      gpuHasF16 = adapter.features.has('shader-f16');
       device = 'webgpu';
       return device;
     }
@@ -57,7 +59,8 @@ async function loadLLM(){
   }
   llm = await pipeline('text-generation', LLM_MODEL, {
     device: dev,
-    dtype: llmDtypeOverride || 'q4f16',
+    // q4f16 (570MB) needs GPU fp16 shader support; fall back to q4 otherwise
+    dtype: llmDtypeOverride || (gpuHasF16 ? 'q4f16' : 'q4'),
     progress_callback: progressCb('llm'),
   });
 }

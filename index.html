@@ -229,7 +229,7 @@
          unless you enable Claude summaries.</p>
       <button class="btn ghost" id="wipeBtn">Delete all data</button>
     </div>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v7</p>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v8</p>
   </section>
 </main>
 
@@ -914,16 +914,35 @@ function setupModelButton(kind, btnId, statusId, storeKey, loadMsg, enabledLabel
     }
     btn.disabled = true;
     status.textContent = loadMsg;
-    aiProgress[kind] = (pct) => { status.textContent = `Downloading… ${pct}% (one-time, stays on your phone)`; };
+    // keep the screen awake — phone browsers kill long downloads when backgrounded
+    let wakeLock = null;
+    try { if (navigator.wakeLock) wakeLock = await navigator.wakeLock.request('screen'); } catch(_){}
+    let phase = 'download';
+    aiProgress[kind] = (pct) => {
+      if (pct >= 100){
+        if (phase === 'download'){
+          phase = 'prepare';
+          status.textContent = 'Download complete ✓ — preparing the model… the first time can take a few minutes. Keep the app open.';
+        }
+      } else {
+        status.textContent = `Downloading… ${pct}% — keep the app open and the screen on.`;
+      }
+    };
+    const reassure = setInterval(() => {
+      if (phase === 'prepare') status.textContent = 'Still preparing the model… this is normal on first load. Keep the app open.';
+    }, 60000);
     try {
       if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
       const {device} = await aiCall('load-' + kind);
       store.set(storeKey, true);
       status.textContent = `✅ Ready — running on-device (${device === 'webgpu' ? 'GPU accelerated' : 'CPU mode'}).`;
+      toast(kind === 'asr' ? 'Offline voice recognition enabled ✓' : 'On-device summaries enabled ✓');
     } catch (err) {
       status.textContent = '❌ Could not load the model: ' + err.message +
-        (location.protocol === 'http:' ? '' : ' — check your connection and free storage, then try again.');
+        ' — tap the button to retry (already-downloaded parts resume from cache).';
     }
+    clearInterval(reassure);
+    if (wakeLock) try { wakeLock.release(); } catch(_){}
     aiProgress[kind] = null;
     btn.disabled = false;
     refresh();
@@ -974,6 +993,11 @@ document.getElementById('wipeBtn').addEventListener('click', () => {
 
 /* ---------- init ---------- */
 updateBadge();
+
+// Warm up enabled on-device models in the background so the first
+// capture of the session doesn't pay the model-load wait.
+if (store.get('localASR', false)) aiCall('load-asr').catch(() => {});
+if (store.get('localLLM', false)) aiCall('load-llm').catch(() => {});
 
 /* ---------- service worker ---------- */
 if ('serviceWorker' in navigator){
