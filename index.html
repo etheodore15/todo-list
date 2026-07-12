@@ -237,7 +237,7 @@
          using your own key.</p>
       <button class="btn ghost" id="wipeBtn">Delete all data</button>
     </div>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v17<br><span id="envInfo"></span></p>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v18<br><span id="envInfo"></span></p>
   </section>
 </main>
 
@@ -371,7 +371,44 @@ Rules:
 Idea: """${text}"""`;
 }
 
-async function geminiSummarize(text, key){
+async function apiErrMsg(res){
+  try {
+    const d = await res.json();
+    return d.error && d.error.message ? ': ' + String(d.error.message).slice(0, 140) : '';
+  } catch (_) { return ''; }
+}
+
+async function geminiListModels(key){
+  const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models?pageSize=100', {
+    headers: {'x-goog-api-key': key}
+  });
+  if (!res.ok) throw new Error('API ' + res.status + (await apiErrMsg(res)));
+  return (await res.json()).models || [];
+}
+
+function chooseGeminiModel(models){
+  // pick the newest general-purpose flash model this key can actually use
+  const cands = models
+    .filter(m => (m.supportedGenerationMethods || []).includes('generateContent'))
+    .map(m => String(m.name || '').replace(/^models\//, ''))
+    .filter(n => /^gemini-\d+(\.\d+)?-flash/.test(n) && !/preview|exp|image|tts|live|audio|thinking|8b/.test(n));
+  cands.sort((a, b) => {
+    const v = n => parseFloat((n.match(/^gemini-(\d+(?:\.\d+)?)/) || [0, 0])[1]);
+    return v(b) - v(a) || a.length - b.length;   // newest version, then plainest name
+  });
+  return cands[0] || 'gemini-2.5-flash';
+}
+
+async function geminiModel(key){
+  let m = store.get('geminiModel', '');
+  if (!m){
+    m = chooseGeminiModel(await geminiListModels(key));
+    store.set('geminiModel', m);
+  }
+  return m;
+}
+
+async function geminiSummarize(text, key, isRetry){
   const schema = {
     type: 'OBJECT',
     properties: {
@@ -389,7 +426,8 @@ async function geminiSummarize(text, key){
     },
     required: ['summary','tasks','priority']
   };
-  const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent', {
+  const model = await geminiModel(key);
+  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
     method: 'POST',
     headers: {'content-type': 'application/json', 'x-goog-api-key': key},
     body: JSON.stringify({
@@ -397,7 +435,11 @@ async function geminiSummarize(text, key){
       generationConfig: {responseMimeType: 'application/json', responseSchema: schema}
     })
   });
-  if (!res.ok) throw new Error('API ' + res.status);
+  if (res.status === 404 && !isRetry){
+    store.set('geminiModel', '');            // model retired — rediscover and retry once
+    return geminiSummarize(text, key, true);
+  }
+  if (!res.ok) throw new Error('API ' + res.status + (await apiErrMsg(res)));
   const data = await res.json();
   const parts = data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts || [];
   const raw = parts.map(p => p.text || '').join('');
@@ -1038,14 +1080,32 @@ document.getElementById('modelsWipeBtn').addEventListener('click', async () => {
 const gemInput = document.getElementById('geminiKeyInput');
 const gemStatus = document.getElementById('geminiKeyStatus');
 function refreshGemStatus(){
-  gemStatus.textContent = store.get('geminiKey','') ? '✅ Gemini summaries enabled.' : '';
+  const k = store.get('geminiKey', '');
+  const m = store.get('geminiModel', '');
+  gemStatus.textContent = k ? `✅ Gemini summaries enabled${m ? ' (' + m + ')' : ''}.` : '';
 }
 refreshGemStatus();
-document.getElementById('saveGeminiKeyBtn').addEventListener('click', () => {
-  store.set('geminiKey', gemInput.value.trim());
+document.getElementById('saveGeminiKeyBtn').addEventListener('click', async () => {
+  const val = gemInput.value.trim();
+  store.set('geminiKey', val);
+  store.set('geminiModel', '');
   gemInput.value = '';
-  refreshGemStatus();
-  toast(store.get('geminiKey','') ? 'Gemini summaries enabled ✓' : 'Gemini key cleared');
+  if (!val){ refreshGemStatus(); toast('Gemini key cleared'); return; }
+  gemStatus.textContent = 'Testing key…';
+  try {
+    const model = await geminiModel(val);
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+      method: 'POST',
+      headers: {'content-type': 'application/json', 'x-goog-api-key': val},
+      body: JSON.stringify({contents: [{role: 'user', parts: [{text: 'Reply with exactly: OK'}]}]})
+    });
+    if (!res.ok) throw new Error('API ' + res.status + (await apiErrMsg(res)));
+    gemStatus.textContent = `✅ Key works — using ${model}.`;
+    toast('Gemini summaries enabled ✓');
+  } catch (err) {
+    gemStatus.textContent = '❌ Key test failed: ' + err.message +
+      ' — summaries fall back to built-in until this is fixed.';
+  }
 });
 
 /* ---------- settings ---------- */
