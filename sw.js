@@ -1,10 +1,11 @@
-const CACHE = 'idea-todo-v22';
+const CACHE = 'idea-todo-v23';
 const LIB_CACHE = 'idea-todo-libs-v1';
 const ASSETS = [
   './',
   './index.html',
   './manifest.webmanifest',
   './ai-worker.js',
+  './digest.js',
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/icon-maskable-512.png'
@@ -51,4 +52,60 @@ self.addEventListener('fetch', e => {
       })
       .catch(() => caches.match(e.request).then(m => m || caches.match('./index.html')))
   );
+});
+
+// ---------- daily digest (Periodic Background Sync) ----------
+importScripts('./digest.js');
+
+function idbOp(mode, fn){
+  return new Promise((resolve) => {
+    const req = indexedDB.open('itodo-sw', 1);
+    req.onupgradeneeded = () => req.result.createObjectStore('kv');
+    req.onerror = () => resolve(null);
+    req.onsuccess = () => {
+      const tx = req.result.transaction('kv', mode);
+      const r = fn(tx.objectStore('kv'));
+      r.onsuccess = () => resolve(r.result);
+      r.onerror = () => resolve(null);
+    };
+  });
+}
+const idbGet = (k) => idbOp('readonly', (st) => st.get(k));
+const idbSet = (k, v) => idbOp('readwrite', (st) => st.put(v, k));
+
+self.addEventListener('message', (e) => {
+  if (e.data && e.data.type === 'config') idbSet('cfg', e.data.cfg);
+});
+
+self.addEventListener('periodicsync', (e) => {
+  if (e.tag === 'daily-digest') e.waitUntil(runDigest());
+});
+
+async function runDigest(){
+  try {
+    const cfg = await idbGet('cfg');
+    if (!cfg || !cfg.hid || !cfg.projectId) return;
+    const since = (await idbGet('digestAt')) || (Date.now() - 86400000);
+    const url = 'https://firestore.googleapis.com/v1/projects/' + cfg.projectId +
+      '/databases/(default)/documents/households/' + cfg.hid + '/items?pageSize=300&key=' + cfg.apiKey;
+    const res = await fetch(url);
+    if (!res.ok) return;
+    const data = await res.json();
+    const items = (data.documents || []).map(parseFsDoc);
+    const today = new Date().toISOString().slice(0, 10);
+    const d = composeDigest(items, cfg.me, since, today);
+    await idbSet('digestAt', Date.now());
+    if (d.openToday || d.news.length || d.ticks.length){
+      await self.registration.showNotification(d.title,
+        {body: d.body, icon: 'icons/icon-192.png', badge: 'icons/icon-192.png', tag: 'daily-digest'});
+    }
+  } catch (_) {}
+}
+
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  e.waitUntil(clients.matchAll({type: 'window', includeUncontrolled: true}).then(ws => {
+    for (const w of ws){ if ('focus' in w) return w.focus(); }
+    return clients.openWindow('./');
+  }));
 });

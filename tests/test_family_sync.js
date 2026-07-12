@@ -122,6 +122,13 @@ export function onSnapshot(col, cb, errCb){
   const textsA = await A.locator('.todo .ttext').allTextContents();
   check('A: task added on B appears', textsA.some(t => /call the plumber/.test(t)));
 
+  // family activity banner on A reports Lulu's addition
+  const banner = await A.locator('#awayBanner').textContent();
+  console.log('banner:', JSON.stringify(banner));
+  check('A: family activity banner shows Lulu added', /Lulu added/.test(banner) && /plumber/.test(banner));
+  await A.locator('#awayBanner .close').click();
+  check('A: banner dismisses', !(await A.locator('#awayBanner').isVisible()));
+
   // B ticks A's task → done state syncs to A
   await B.locator('.todo', { hasText: 'buy milk' }).locator('.chk').click();
   await A.waitForTimeout(1200);
