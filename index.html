@@ -104,6 +104,8 @@
     background:var(--card); border:1px solid #2a3245; color:var(--muted); cursor:pointer;}
   .fchip.active{background:var(--accent); border-color:var(--accent); color:#fff;}
   .empty{text-align:center; color:var(--muted); padding:48px 20px; font-size:.9rem; line-height:1.6;}
+  .browser-warn{background:#3a2f14; border:1px solid #8a6d1f; color:#ffd97a; border-radius:12px;
+    padding:12px 14px; font-size:.83rem; line-height:1.5; margin-bottom:6px;}
 
   /* Todo */
   .prio-section{margin-bottom:18px;}
@@ -229,7 +231,7 @@
          unless you enable Claude summaries.</p>
       <button class="btn ghost" id="wipeBtn">Delete all data</button>
     </div>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v9</p>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v10</p>
   </section>
 </main>
 
@@ -995,6 +997,16 @@ document.getElementById('wipeBtn').addEventListener('click', () => {
 
 /* ---------- init ---------- */
 updateBadge();
+
+// Firefox on Android has no Web Speech API and no WebGPU — warn instead of
+// letting voice input and on-device AI fail confusingly.
+if (/firefox/i.test(navigator.userAgent)){
+  const warn = document.createElement('div');
+  warn.className = 'browser-warn';
+  warn.innerHTML = '⚠️ You\'re viewing this in <b>Firefox</b>, which doesn\'t support voice input or on-device AI. ' +
+    'For the full app: open this page in <b>Chrome</b>, then menu (⋮) → <b>Add to Home screen</b> → <b>Install</b>.';
+  document.getElementById('view-capture').prepend(warn);
+}
 
 // Warm up enabled on-device models in the background so the first
 // capture of the session doesn't pay the model-load wait.
