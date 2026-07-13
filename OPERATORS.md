@@ -52,9 +52,15 @@ instructions.
   is re-attributed). Google sign-in (planned) removes this.
 - Gemini features still use per-user keys until **P2 (AI proxy)** ships.
 
-## P2 preview (AI proxy) — not yet built
+## P2 — AI proxy (built, v35)
 
-A single Cloud Function holding *your* Gemini key: verifies the caller's
-Firebase Auth token, applies a per-user daily quota (the free/paid dial),
-and forwards the four AI calls. Kills the "paste a Gemini key" step for
-everyone. Ships with its own runbook when built.
+Removes the last configuration step: with the proxy deployed, every user gets
+smart AI (summaries, break-downs, tone checks, doctor briefings) with **no key
+of their own**, behind a per-user daily quota you control.
+
+Full deploy runbook: **`functions/README.md`**. In short: `firebase deploy
+--only functions:ai` with your Gemini key set as a secret, then paste the
+function URL into `managed-config.js` as `aiProxy`. Until you do, AI falls back
+to the built-in heuristic (or a user's own pasted key, which always works and
+bypasses the quota). This also resolves the digest limitation below for AI —
+the digest itself is fixed separately in v36.
