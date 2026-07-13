@@ -340,6 +340,16 @@
   .med-item .mi-name{font-weight:600;}
   .med-item .mi-when{color:var(--muted); font-size:.8rem; margin-top:2px;}
   .med-empty{color:var(--muted); font-size:.85rem; text-align:center; padding:14px 0;}
+  /* v46: missed-dose alert on Today */
+  .missed-banner{border:1px solid rgba(216,58,78,.5); background:rgba(216,58,78,.12); border-radius:12px;
+    padding:11px 13px; margin-bottom:12px;}
+  .missed-head{display:flex; justify-content:space-between; align-items:center; gap:8px;}
+  .missed-head b{color:var(--danger); font-size:.92rem;}
+  .missed-x{background:none; border:none; color:var(--muted); font-size:1rem; cursor:pointer; padding:2px 6px;}
+  .missed-list{margin:6px 0 2px; padding-left:2px; font-size:.85rem; color:var(--text);}
+  .missed-list .mrow{padding:2px 0;}
+  .missed-cta{background:none; border:none; color:var(--danger); font-weight:600; cursor:pointer;
+    padding:4px 0 0; font-size:.82rem; text-align:left;}
 
 </style>
 </head>
@@ -376,6 +386,7 @@
     <div class="progress"><div id="progressBar"></div></div>
     <div id="awayBanner" style="display:none;"></div>
     <div id="spaceFilter" style="display:flex; gap:8px; overflow-x:auto; margin-bottom:10px; scrollbar-width:none;"></div>
+    <div id="missedBanner" style="display:none;"></div>
     <div id="profileCards" style="display:none;"></div>
     <div id="custodyBanner" style="display:none;"></div>
     <div id="spaceBar" style="display:none;"></div>
@@ -522,7 +533,7 @@
       <input type="file" id="importFile" accept=".json,application/json" style="display:none">
       <button class="btn ghost" id="wipeBtn">Delete all data</button>
     </div>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v45<br><span id="envInfo"></span></p>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v46<br><span id="envInfo"></span></p>
   </section>
 </main>
 
@@ -1754,7 +1765,10 @@ function detectPriority(text){
   add(/\b(today|tonight|this morning|this afternoon|this evening|end of (the )?day|before .{0,24}(close[sd]?|tonight|today|leave))\b/, 3);
   add(/\b(deadline|overdue|due (today|tomorrow|this week|by|on)|expir(es?|ing)|running out|last day|final notice)\b/, 2);
   add(/\b(important|essential|crucial|vital|key|big deal|really matters?)\b/, 2);
-  add(/\b(must|has to|have to)\b/, 1);
+  // medications & health-critical routines are must-dos — a missed dose has real
+  // consequences, so they should rank high on their own
+  add(/\b(medication|medicine|meds|dose|dosage|insulin|inhaler|epipen|prescription|blood pressure|blood sugar|blood thinner|chemo|dialysis)\b/, 3);
+  add(/\b(must|has to|have to|need(s)? to|got to|gotta)\b/, 2);
   add(/\b(tomorrow|this week|by (mon|tues|wednes|thurs|fri|satur|sun)day|in the next (few|couple of) days|soon|quickly)\b/, 1);
   add(/\b(blocked|blocking|waiting on me|before i can|or else|otherwise)\b/, 1);
   add(/\b(someday|eventually|maybe|might|one day|at some point|whenever|no rush|not urgent|low priority|nice to have|would be nice|if i (get|have) time|down the track|later on|sometime)\b/, -3);
@@ -2247,6 +2261,7 @@ function renderAdhdStrip(){
 function renderTodos(){
   const el = document.getElementById('todoList');
   renderSpaceFilter();
+  renderMissedBanner();
   renderProfileCards();
   renderCustodyBanner();
   renderSpaceBar();
@@ -3746,6 +3761,64 @@ function custodyLabel(hid, dateStr){
   return null;
 }
 
+// v46: missed medications/routines were only visible in the History log. Surface
+// them on Today so the next carer sees a missed dose immediately. Dismissible
+// per space (acknowledged up to "now"); never resurfaces anything > 3 days old.
+function renderMissedBanner(){
+  const host = document.getElementById('missedBanner');
+  if (!host) return;
+  const cares = spacesList().filter(s => s.type === 'care')
+    .filter(s => activeSpace === 'all' || activeSpace === s.hid);
+  if (!cares.length){ host.style.display = 'none'; host.innerHTML = ''; return; }
+  const ack = store.get('missedAck', {});
+  const cutoff = Date.now() - 3 * 86400000;
+  const evs = store.get('events', []).filter(e => e.kind === 'missed'
+      && cares.some(s => s.hid === e.space)
+      && e.ts >= Math.max(cutoff, ack[e.space] || 0))
+    .sort((a, b) => b.ts - a.ts);
+  if (!evs.length){ host.style.display = 'none'; host.innerHTML = ''; return; }
+  host.innerHTML = '';
+  const wrap = document.createElement('div');
+  wrap.className = 'missed-banner';
+  const head = document.createElement('div');
+  head.className = 'missed-head';
+  const b = document.createElement('b');
+  b.textContent = `⚠️ ${evs.length} missed ${evs.length === 1 ? 'dose / routine' : 'doses / routines'}`;
+  head.appendChild(b);
+  const x = document.createElement('button');
+  x.className = 'missed-x'; x.setAttribute('aria-label', 'Dismiss missed alerts'); x.textContent = '✕';
+  x.addEventListener('click', () => {
+    const m = store.get('missedAck', {});
+    cares.forEach(s => { m[s.hid] = Date.now(); });
+    store.set('missedAck', m);
+    renderMissedBanner();
+  });
+  head.appendChild(x);
+  wrap.appendChild(head);
+  const list = document.createElement('div');
+  list.className = 'missed-list';
+  evs.slice(0, 5).forEach(e => {
+    const row = document.createElement('div');
+    row.className = 'mrow';
+    row.textContent = '• ' + e.text + (e.detail ? ' — ' + e.detail : '');
+    list.appendChild(row);
+  });
+  if (evs.length > 5){
+    const more = document.createElement('div');
+    more.className = 'mrow'; more.style.color = 'var(--muted)';
+    more.textContent = `+ ${evs.length - 5} more`;
+    list.appendChild(more);
+  }
+  wrap.appendChild(list);
+  const cta = document.createElement('button');
+  cta.className = 'missed-cta';
+  cta.textContent = 'See in history →';
+  cta.addEventListener('click', () => openHistory(cares[0]));
+  wrap.appendChild(cta);
+  host.appendChild(wrap);
+  host.style.display = '';
+}
+
 function renderCustodyBanner(){
   const host = document.getElementById('custodyBanner');
   if (!host) return;
@@ -4030,7 +4103,7 @@ document.getElementById('medSave').addEventListener('click', () => {
   if (td){
     Object.assign(td, {text, time, recur, med: {name, dose}, date: td.done ? td.date : date});
   } else {
-    td = {id: uid(), text, priority: 'medium', tags: ['meds'], done: false, date, recur, time,
+    td = {id: uid(), text, priority: 'high', tags: ['meds'], done: false, date, recur, time,
       energy: 'low', minutes: ENERGY_MIN.low, space: sp.hid, med: {name, dose},
       ideaId: null, createdBy: myName() || null, createdAt: Date.now()};
     todos.push(td);

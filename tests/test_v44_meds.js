@@ -77,7 +77,7 @@ export function onSnapshot(col, cb){ cb({docChanges: () => []}); return () => {}
   });
   check('v44: med task is in the care space', med && med.space === 'hh-care');
   check('v44: med task is daily + timed', med && med.recurType === 'daily' && med.time === '08:00');
-  check('v44: med task tagged meds + valid priority (so it renders)', med && med.tag && med.prio === 'medium');
+  check('v44: med task tagged meds + high priority (must-do, renders in Do first)', med && med.tag && med.prio === 'high');
   check('v44: dose captured', med && med.dose === '1 tablet with food');
 
   // ---------- it shows on Today ----------
