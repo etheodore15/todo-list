@@ -327,6 +327,19 @@
   .setup-step b{display:block; font-size:.95rem;}
   .setup-step span{display:block; color:var(--muted); font-size:.8rem; margin-top:2px;}
   .setup-step:hover{border-color:var(--accent);}
+  /* v44: structured medication / routine capture */
+  .med-lab{display:block; font-size:.78rem; color:var(--muted); margin:8px 0 3px;}
+  .med-inp{width:100%; background:var(--bg); border:1px solid #2a3245; border-radius:9px;
+    color:var(--text); padding:10px 11px; font-size:.95rem;}
+  .med-rep, .med-day{background:var(--bg); border:1px solid #2a3245; border-radius:8px; color:var(--text);
+    padding:7px 12px; font-size:.85rem; cursor:pointer;}
+  .med-rep.active, .med-day.active{background:var(--accent); border-color:var(--accent); color:#0b0f19; font-weight:700;}
+  .med-item{display:flex; align-items:center; gap:10px; background:var(--bg); border:1px solid #2a3245;
+    border-radius:11px; padding:11px 13px; margin-bottom:8px; cursor:pointer;}
+  .med-item .mi-body{flex:1; min-width:0;}
+  .med-item .mi-name{font-weight:600;}
+  .med-item .mi-when{color:var(--muted); font-size:.8rem; margin-top:2px;}
+  .med-empty{color:var(--muted); font-size:.85rem; text-align:center; padding:14px 0;}
 
 </style>
 </head>
@@ -508,7 +521,7 @@
       <input type="file" id="importFile" accept=".json,application/json" style="display:none">
       <button class="btn ghost" id="wipeBtn">Delete all data</button>
     </div>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v43<br><span id="envInfo"></span></p>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v44<br><span id="envInfo"></span></p>
   </section>
 </main>
 
@@ -561,9 +574,41 @@
   <div class="sheet">
     <h3>💙 Care recipient profile</h3>
     <p class="side-note">Shared with everyone in this care space and included in the doctor-visit briefing.</p>
-    <div id="profileFields" style="max-height:52vh; overflow-y:auto;"></div>
-    <button class="btn primary" id="profileSave" style="margin-top:12px;">Save profile</button>
+    <div id="profileFields" style="max-height:44vh; overflow-y:auto;"></div>
+    <button class="btn ghost" id="profileMedsBtn" style="margin-top:10px; width:100%;">💊 Medications &amp; routines →</button>
+    <button class="btn primary" id="profileSave" style="margin-top:8px;">Save profile</button>
     <button class="btn ghost" id="profileCancel">Cancel</button>
+  </div>
+</div>
+
+<div id="medListSheet" class="sheet-overlay" role="dialog" aria-modal="true" aria-label="Medications and routines" style="display:none;">
+  <div class="sheet">
+    <h3>💊 Medications &amp; routines</h3>
+    <p class="side-note">Timed, repeating tasks for the person you care for. Each tick is a record; a missed one is flagged for the next carer.</p>
+    <div id="medList" style="max-height:46vh; overflow-y:auto; margin:6px 0 8px;"></div>
+    <button class="btn primary" id="medAddBtn" style="width:100%;">➕ Add a medication or routine</button>
+    <button class="btn ghost" id="medListClose">Done</button>
+  </div>
+</div>
+
+<div id="medSheet" class="sheet-overlay" role="dialog" aria-modal="true" aria-label="Add a medication or routine" style="display:none;">
+  <div class="sheet">
+    <h3 id="medFormTitle">💊 Add a medication or routine</h3>
+    <label class="med-lab" for="medName">Medicine or routine</label>
+    <input id="medName" class="med-inp" placeholder="e.g. Metformin 500mg, or “Morning wash”" autocomplete="off">
+    <label class="med-lab" for="medDose">Dose / details <span style="color:var(--muted)">(optional)</span></label>
+    <input id="medDose" class="med-inp" placeholder="e.g. 1 tablet with food" autocomplete="off">
+    <label class="med-lab" for="medTime">Time of day</label>
+    <input id="medTime" class="med-inp" type="time">
+    <label class="med-lab">Repeats</label>
+    <div id="medRepeat" style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:4px;">
+      <button type="button" class="med-rep active" data-rep="daily">Every day</button>
+      <button type="button" class="med-rep" data-rep="weekly">Chosen days</button>
+    </div>
+    <div id="medDays" style="display:none; gap:6px; flex-wrap:wrap; margin:4px 0 2px;"></div>
+    <button class="btn primary" id="medSave" style="margin-top:12px;">Save</button>
+    <button class="btn ghost" id="medDelete" style="display:none;">Delete this one</button>
+    <button class="btn ghost" id="medCancel">Cancel</button>
   </div>
 </div>
 
@@ -2045,6 +2090,7 @@ const SPACE_ACTIONS = {
   ],
   care: [
     ['💙 Profile', sp => openProfile(sp)],
+    ['💊 Meds', sp => openMeds(sp)],
     ['📝 Care note', () => { showView('capture'); toast('Speak or type an observation, then “Share to …” it to the team from Ideas.'); }],
     ['📜 History & briefing', sp => openHistory(sp)],
     ['📤 Invite', sp => shareSpaceInvite(sp)]
@@ -3090,7 +3136,8 @@ function todoCore(td){
           subtasks: (td.subtasks || []).map(s => ({text: s.text, done: !!s.done})),
           energy: td.energy || null, minutes: td.minutes || null,
           someday: !!td.someday, carried: td.carried || 0, amount: td.amount || null,
-          expenseBy: td.expenseBy || null, expenseAt: td.expenseAt || null};
+          expenseBy: td.expenseBy || null, expenseAt: td.expenseAt || null,
+          med: td.med || null};
 }
 function syncMsg(text){
   const el = document.getElementById('syncMsg');
@@ -3761,6 +3808,147 @@ document.getElementById('profileCancel').addEventListener('click', () => {
   document.getElementById('profileSheet').style.display = 'none';
 });
 
+/* ---------- medications & routines (v44) ----------
+   The care profile captures WHO the person is; this captures WHAT they need done
+   on a schedule. A medication/routine is a repeating, timed task in the care
+   space (so it flows into the existing tick-is-a-record + missed-dose machinery
+   and the doctor briefing) — but entered through a structured form instead of a
+   free-text "every day" prompt no caregiver could be expected to discover. */
+function medTasks(hid){
+  return todos.filter(t => t.space === hid && (t.med || (t.tags || []).includes('meds')));
+}
+function medWhen(td){
+  const rep = td.recur ? recurLabel(td.recur).replace('↻ ', '') : 'once';
+  return (td.time ? fmtTime(td.time) + ' · ' : '') + rep;
+}
+function openMeds(sp){
+  const host = document.getElementById('medList');
+  host.innerHTML = '';
+  const meds = medTasks(sp.hid).sort((a, b) => (a.time || '99') < (b.time || '99') ? -1 : 1);
+  if (!meds.length){
+    host.innerHTML = '<div class="med-empty">No medications or routines yet.<br>Add the first one below.</div>';
+  }
+  meds.forEach(td => {
+    const row = document.createElement('div');
+    row.className = 'med-item';
+    const body = document.createElement('div');
+    body.className = 'mi-body';
+    const nm = document.createElement('div'); nm.className = 'mi-name';
+    nm.textContent = (td.med && td.med.name) || td.text;
+    const wh = document.createElement('div'); wh.className = 'mi-when';
+    wh.textContent = medWhen(td) + (td.med && td.med.dose ? ' · ' + td.med.dose : '');
+    body.appendChild(nm); body.appendChild(wh);
+    row.appendChild(body);
+    const ed = document.createElement('span'); ed.textContent = '✏️'; ed.setAttribute('aria-hidden', 'true');
+    row.appendChild(ed);
+    row.addEventListener('click', () => openMedForm(sp, td));
+    host.appendChild(row);
+  });
+  document.getElementById('medListSheet').dataset.hid = sp.hid;
+  document.getElementById('medListSheet').style.display = 'flex';
+}
+document.getElementById('medListClose').addEventListener('click', () => {
+  document.getElementById('medListSheet').style.display = 'none';
+});
+document.getElementById('medAddBtn').addEventListener('click', () => {
+  const hid = document.getElementById('medListSheet').dataset.hid;
+  const sp = spacesList().find(s => s.hid === hid);
+  if (sp) openMedForm(sp, null);
+});
+
+function renderMedDays(sel){
+  const host = document.getElementById('medDays');
+  host.innerHTML = '';
+  WEEKDAYS.forEach((name, i) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'med-day' + (sel.includes(i) ? ' active' : '');
+    b.dataset.dow = i;
+    b.textContent = name.slice(0, 3).replace(/^./, c => c.toUpperCase());
+    b.addEventListener('click', () => b.classList.toggle('active'));
+    host.appendChild(b);
+  });
+}
+function setMedRepeat(rep){
+  document.querySelectorAll('#medRepeat .med-rep').forEach(b => b.classList.toggle('active', b.dataset.rep === rep));
+  document.getElementById('medDays').style.display = rep === 'weekly' ? 'flex' : 'none';
+}
+document.querySelectorAll('#medRepeat .med-rep').forEach(b =>
+  b.addEventListener('click', () => setMedRepeat(b.dataset.rep)));
+
+function openMedForm(sp, td){
+  const sheet = document.getElementById('medSheet');
+  sheet.dataset.hid = sp.hid;
+  sheet.dataset.id = td ? td.id : '';
+  document.getElementById('medFormTitle').textContent = td ? '💊 Edit' : '💊 Add a medication or routine';
+  document.getElementById('medName').value = (td && td.med && td.med.name) || (td && td.text) || '';
+  document.getElementById('medDose').value = (td && td.med && td.med.dose) || '';
+  document.getElementById('medTime').value = (td && td.time) || '';
+  const weekly = td && td.recur && td.recur.type === 'weekly';
+  renderMedDays(weekly ? td.recur.dow : []);
+  setMedRepeat(weekly ? 'weekly' : 'daily');
+  document.getElementById('medDelete').style.display = td ? '' : 'none';
+  sheet.style.display = 'flex';
+  setTimeout(() => document.getElementById('medName').focus(), 60);
+}
+document.getElementById('medCancel').addEventListener('click', () => {
+  document.getElementById('medSheet').style.display = 'none';
+});
+document.getElementById('medSave').addEventListener('click', () => {
+  const sheet = document.getElementById('medSheet');
+  const hid = sheet.dataset.hid;
+  const sp = spacesList().find(s => s.hid === hid);
+  if (!sp) return;
+  const name = document.getElementById('medName').value.trim();
+  if (!name){ toast('Give the medication or routine a name.'); return; }
+  const dose = document.getElementById('medDose').value.trim();
+  const time = document.getElementById('medTime').value || null;
+  const rep = document.querySelector('#medRepeat .med-rep.active').dataset.rep;
+  let recur;
+  if (rep === 'weekly'){
+    const dow = [...document.querySelectorAll('#medDays .med-day.active')].map(b => +b.dataset.dow);
+    if (!dow.length){ toast('Pick at least one day, or choose “Every day”.'); return; }
+    recur = {type: 'weekly', dow: dow.sort()};
+  } else recur = {type: 'daily'};
+  const text = name + (dose ? ' — ' + dose : '');
+  const date = nextOccurrence(recur, todayStr());
+  const editId = sheet.dataset.id;
+  let td = editId ? todos.find(t => t.id === editId) : null;
+  if (td){
+    Object.assign(td, {text, time, recur, med: {name, dose}, date: td.done ? td.date : date});
+  } else {
+    td = {id: uid(), text, priority: 'medium', tags: ['meds'], done: false, date, recur, time,
+      energy: 'low', minutes: ENERGY_MIN.low, space: sp.hid, med: {name, dose},
+      ideaId: null, createdBy: myName() || null, createdAt: Date.now()};
+    todos.push(td);
+    logEvent('created', td);
+  }
+  saveTodos();
+  sheet.style.display = 'none';
+  openMeds(sp);          // back to the list, now updated
+  renderTodos();
+  track('feature_used', {feature: 'meds'});
+  toast(editId ? 'Updated ✓' : 'Added — it’ll appear on Today at its time ✓');
+});
+document.getElementById('medDelete').addEventListener('click', () => {
+  const sheet = document.getElementById('medSheet');
+  const id = sheet.dataset.id;
+  const sp = spacesList().find(s => s.hid === sheet.dataset.hid);
+  if (!id) return;
+  if (!confirm('Delete this medication/routine? Past records in History are kept.')) return;
+  todos = todos.filter(t => t.id !== id);
+  saveTodos();
+  sheet.style.display = 'none';
+  if (sp) openMeds(sp);
+  renderTodos();
+  toast('Deleted');
+});
+document.getElementById('profileMedsBtn').addEventListener('click', () => {
+  const hid = document.getElementById('profileSheet').dataset.hid;
+  const sp = spacesList().find(s => s.hid === hid);
+  if (sp) openMeds(sp);
+});
+
 /* ---------- ledger view (C1d) ---------- */
 let ledgerRcs = [], ledgerSpace = null;
 
@@ -3993,7 +4181,7 @@ function guideSpaceSetup(sp){
   if (sp.type === 'care'){
     steps.push(['💙 Fill the care profile', 'One shared picture of the person.', () => openProfile(sp)]);
     steps.push(['💊 Add a medication or routine', 'A timed, repeating task — every tick is a record.',
-      () => { activeSpace = sp.hid; showView('today'); renderTodos(); const q = document.getElementById('quickAdd'); if (q){ q.value = ''; q.focus(); } toast('Add e.g. “Morning meds 8am”, then tap 🔁 on it to repeat daily.'); }]);
+      () => openMeds(sp)]);
   }
   if (sp.type === 'family') steps.push(['👥 Add people to delegate to',
     'Assign tasks to who they’re for.', () => editSpaceMembers(sp)]);
@@ -4155,6 +4343,8 @@ document.addEventListener('keydown', (e) => {
     ['toneSheet', () => closeToneSheet(null)],
     ['expSheet', () => { document.getElementById('expSheet').style.display = 'none'; expTask = null; }],
     ['custodySheet', () => { document.getElementById('custodySheet').style.display = 'none'; }],
+    ['medSheet', () => { document.getElementById('medSheet').style.display = 'none'; }],
+    ['medListSheet', () => { document.getElementById('medListSheet').style.display = 'none'; }],
     ['profileSheet', () => { document.getElementById('profileSheet').style.display = 'none'; }],
     ['histOverlay', () => { document.getElementById('histOverlay').style.display = 'none'; }],
     ['ledgerOverlay', () => { document.getElementById('ledgerOverlay').style.display = 'none'; }],
