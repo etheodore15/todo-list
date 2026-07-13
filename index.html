@@ -331,7 +331,7 @@
         <button class="btn primary" id="joinBtn">Join space</button>
         <details style="margin-top:12px;">
           <summary style="color:var(--accent); cursor:pointer;">First device? Create a space (one-time, ~3 min)</summary>
-          <p style="margin-top:8px;">
+          <p style="margin-top:8px;" id="selfHostHowto">
             1. Go to <b>console.firebase.google.com</b> → Add project (any name, Analytics off).<br>
             2. Build → <b>Firestore Database</b> → Create database (production mode).<br>
             3. In the <b>Rules</b> tab, paste the rules from
@@ -350,6 +350,7 @@
             <option value="care">💙 Care team</option>
           </select>
           <button class="btn primary" id="createHhBtn" style="margin-top:8px;">Create space</button>
+          <button class="btn primary" id="createManagedBtn" style="margin-top:8px; display:none;">Create space</button>
         </details>
       </div>
       <p id="syncMsg"></p>
@@ -401,7 +402,7 @@
       <input type="file" id="importFile" accept=".json,application/json" style="display:none">
       <button class="btn ghost" id="wipeBtn">Delete all data</button>
     </div>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v30<br><span id="envInfo"></span></p>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v31<br><span id="envInfo"></span></p>
   </section>
 </main>
 
@@ -461,6 +462,7 @@
 
 <div class="toast" id="toast"></div>
 
+<script src="managed-config.js"></script>
 <script>
 'use strict';
 
@@ -2544,12 +2546,45 @@ async function loadFbModules(){
   fbInitApp = appMod.initializeApp;
 }
 
+/* ---------- managed mode (P1: zero-config hosted service) ----------
+   With window.MANAGED set (operator's shared Firebase project), spaces are
+   one tap: anonymous sign-in happens silently, all managed spaces share one
+   database, and access control comes from firestore.rules membership — so
+   invite codes carry no keys at all. Self-hosted spaces keep working
+   unchanged alongside. */
+let managedApp = null, managedDb = null, managedUid = null;
+
+async function ensureManaged(){
+  if (!window.MANAGED) throw new Error('this build has no hosted service configured');
+  await loadFbModules();
+  if (!managedApp){
+    managedApp = fbInitApp(window.MANAGED, 'managed');
+    managedDb = fbFs.initializeFirestore(managedApp, {localCache: fbFs.persistentLocalCache()});
+  }
+  if (managedUid) return;
+  const auth = await import('./vendor/firebase-auth.js');
+  const a = auth.getAuth(managedApp);
+  managedUid = await new Promise((resolve, reject) => {
+    let settled = false;
+    const unsub = auth.onAuthStateChanged(a, u => {
+      if (u && !settled){ settled = true; unsub(); resolve(u.uid); }
+    }, err => { if (!settled){ settled = true; reject(err); } });
+    if (a.currentUser){ settled = true; unsub(); resolve(a.currentUser.uid); return; }
+    auth.signInAnonymously(a).catch(err => { if (!settled){ settled = true; reject(err); } });
+  });
+}
+
 async function startSpaceSync(sp){
   if (spaceRt[sp.hid]) return;
   await loadFbModules();
   const rt = spaceRt[sp.hid] = {db: null, unsub: null, lastPush: {}};
-  const app = fbInitApp(sp.cfg, 'space-' + sp.hid);
-  rt.db = fbFs.initializeFirestore(app, {localCache: fbFs.persistentLocalCache()});
+  if (sp.managed){
+    await ensureManaged();
+    rt.db = managedDb;
+  } else {
+    const app = fbInitApp(sp.cfg, 'space-' + sp.hid);
+    rt.db = fbFs.initializeFirestore(app, {localCache: fbFs.persistentLocalCache()});
+  }
   // seed lastPush so everything local for this space pushes once
   todos.forEach(td => { if ((td.space || null) === sp.hid) rt.lastPush[td.id] = null; });
   syncPush();
@@ -2635,16 +2670,24 @@ function parseFbConfig(text){
   return {apiKey, projectId};
 }
 function inviteEncode(cfg, hid, name, type){
-  return 'ITODO1-' + btoa(JSON.stringify({k: cfg.apiKey, p: cfg.projectId, h: hid,
-    n: name || spaceName(hid) || undefined, t: type || (spacesList().find(s => s.hid === hid) || {}).type || undefined}))
-    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const sp = spacesList().find(s => s.hid === hid);
+  const b64 = (o) => btoa(JSON.stringify(o)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  if (sp && sp.managed)   // hosted service: no keys in the code at all
+    return 'ITODO2-' + b64({h: hid, n: name || sp.name, t: type || sp.type});
+  return 'ITODO1-' + b64({k: cfg.apiKey, p: cfg.projectId, h: hid,
+    n: name || (sp && sp.name) || undefined, t: type || (sp && sp.type) || undefined});
 }
 function inviteDecode(code){
-  const m = String(code).trim().match(/ITODO1-([A-Za-z0-9_-]+)/);
+  const m = String(code).trim().match(/ITODO(1|2)-([A-Za-z0-9_-]+)/);
   if (!m) throw new Error('that does not look like an invite code');
-  const j = JSON.parse(atob(m[1].replace(/-/g, '+').replace(/_/g, '/')));
+  const j = JSON.parse(atob(m[2].replace(/-/g, '+').replace(/_/g, '/')));
+  if (m[1] === '2'){
+    if (!window.MANAGED) throw new Error('this invite is for the hosted service — update the app first');
+    if (!j.h) throw new Error('invite code is incomplete');
+    return {managed: true, cfg: null, hid: j.h, name: j.n || 'Family', type: SPACE_ICON[j.t] ? j.t : 'family'};
+  }
   if (!j.k || !j.p || !j.h) throw new Error('invite code is incomplete');
-  return {cfg: {apiKey: j.k, projectId: j.p}, hid: j.h,
+  return {managed: false, cfg: {apiKey: j.k, projectId: j.p}, hid: j.h,
           name: j.n || 'Family', type: SPACE_ICON[j.t] ? j.t : 'family'};
 }
 
@@ -2966,13 +3009,46 @@ document.getElementById('createHhBtn').addEventListener('click', async () => {
 
 document.getElementById('joinBtn').addEventListener('click', async () => {
   try {
-    const {cfg, hid, name, type} = inviteDecode(document.getElementById('inviteInput').value);
+    const inv = inviteDecode(document.getElementById('inviteInput').value);
     document.getElementById('inviteInput').value = '';
-    if (await addSpace({hid, name, type, cfg})) toast(`Joined "${name}" ✓`);
+    if (inv.managed){
+      await ensureManaged();
+      // become a member BEFORE the listener starts, or the rules reject reads
+      await fbFs.setDoc(fbFs.doc(managedDb, 'households', inv.hid),
+        {members: {[managedUid]: myName() || 'member'}}, {merge: true});
+    }
+    if (await addSpace({hid: inv.hid, name: inv.name, type: inv.type, cfg: inv.cfg, managed: !!inv.managed}))
+      toast(`Joined "${inv.name}" ✓`);
   } catch (err) {
     syncMsg('❌ ' + err.message);
   }
 });
+
+document.getElementById('createManagedBtn').addEventListener('click', async () => {
+  try {
+    const name = (document.getElementById('spaceNameInput').value.trim() || 'Family').slice(0, 24);
+    const type = document.getElementById('spaceTypeSel').value || 'family';
+    await ensureManaged();
+    const hid = 'hh-' + uid() + Math.random().toString(36).slice(2, 10);
+    await fbFs.setDoc(fbFs.doc(managedDb, 'households', hid),
+      {created: Date.now(), name, type, members: {[managedUid]: myName() || 'member'}});
+    if (!await addSpace({hid, name, type, cfg: null, managed: true})) return;
+    document.getElementById('spaceNameInput').value = '';
+    toast(`Space "${name}" created ✓ — now share the invite code`);
+  } catch (err) {
+    syncMsg('❌ ' + err.message);
+  }
+});
+
+// managed builds: creating a space is one tap — hide the self-hosted Firebase
+// walkthrough (self-hosted invites still join fine)
+if (window.MANAGED){
+  document.getElementById('selfHostHowto').style.display = 'none';
+  document.getElementById('fbConfigInput').style.display = 'none';
+  document.getElementById('createHhBtn').style.display = 'none';
+  document.getElementById('createManagedBtn').style.display = '';
+  document.querySelector('#syncSetup details summary').textContent = '➕ Create a new space';
+}
 
 document.getElementById('addSpaceBtn').addEventListener('click', () => {
   const el = document.getElementById('syncSetup');
