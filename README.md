@@ -8,9 +8,13 @@ No app store, no build tools, no account — it runs entirely on your phone.
 
 ## Install on your Android phone
 
-1. Enable **GitHub Pages** for this repository
-   (repo → Settings → Pages → deploy from the `main` branch, root folder).
-   Note: on GitHub's free plan, Pages only works on **public** repositories.
+1. Host the app. Two options (either works; you can run both in parallel):
+   - **GitHub Pages** — repo → Settings → Pages → deploy from `main`, root
+     folder. Free-plan Pages needs a **public** repo.
+   - **Firebase Hosting** — `./deploy-backend.sh hosting` puts the app in the
+     same Firebase project as your data + functions, at `<project>.web.app`,
+     with free SSL and a custom-domain option. See `OPERATORS.md` → *Hosting
+     the app on Firebase*.
 2. On your phone, open **Chrome** and go to:
 
    ```

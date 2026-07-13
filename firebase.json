@@ -1,4 +1,31 @@
 {
+  "hosting": {
+    "public": ".",
+    "ignore": [
+      "firebase.json",
+      ".firebaserc",
+      "**/.*",
+      "functions/**",
+      "tests/**",
+      "testmodels/**",
+      "**/node_modules/**",
+      "*.md",
+      "firestore.rules",
+      "firestore.indexes.json",
+      "deploy-backend.sh",
+      "package*.json"
+    ],
+    "headers": [
+      {
+        "source": "/vendor/**",
+        "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }]
+      },
+      {
+        "source": "**/@(sw.js|index.html|dashboard.html|managed-config.js|digest.js|ai-worker.js|manifest.webmanifest)",
+        "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
+      }
+    ]
+  },
   "firestore": {
     "rules": "firestore.rules",
     "indexes": "firestore.indexes.json"

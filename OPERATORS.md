@@ -67,6 +67,34 @@ type — plus a hub linking these build/flow docs. Access:
 
 No task content is ever stored or shown — only the anonymized counters.
 
+## Hosting the app on Firebase (optional — one place for everything)
+
+The app runs on GitHub Pages today. To put the whole system in one Firebase
+project (app + data + functions + auth + dashboard), publish it to **Firebase
+Hosting** — GitHub Pages keeps working in parallel, so there's no cut-over risk.
+
+1. **Deploy:** `./deploy-backend.sh hosting` (or `everything` for backend + app
+   together). Your app is now live at `https://<project-id>.web.app` and
+   `…firebaseapp.com`, with free SSL. `firebase.json` already lists what to
+   serve, ignores the repo's non-app files, and sets cache headers (immutable
+   for `/vendor/`, no-cache for `sw.js`/`index.html` so updates land).
+2. **Authorize the new domain** (required or Google sign-in on the dashboard,
+   and OAuth popups, will be blocked): Firebase console → Authentication →
+   Settings → **Authorized domains** → add `<project-id>.web.app` (and your
+   custom domain below).
+3. **Custom domain (recommended for portability):** Hosting → Add custom domain
+   → e.g. `app.yourname.com` → follow the DNS steps. This domain becomes the
+   app's permanent address — you can later move hosts (Firebase ↔ GitHub ↔
+   anything) without changing it, and it's what the eventual Play Store wrapper
+   points at.
+4. **Point invite links at the new address:** set `appUrl` in
+   `managed-config.js` (e.g. `'https://app.yourname.com/'`) and push. Every
+   share-invite link then uses it — no code change.
+
+**Transportability in one line:** the app is a folder of static files. Any host
+that serves static files works; the domain (step 3) is the stable address, the
+host behind it is swappable.
+
 ## Deploying the backend (Infrastructure-as-Code)
 
 The whole backend lives in the repo and deploys with one command — no
