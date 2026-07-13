@@ -171,6 +171,52 @@ export function onSnapshot(col, cb, errCb){
   check('C1d: amount persists on the task after reload',
     (await A.locator('.amount-chip').allTextContents()).some(t => /\$60\.00/.test(t)));
 
+  // ---------- v42 fix: personal-task expense doesn't silently vanish ----------
+  await A.click('nav.tabs button[data-view="today"]');
+  // a personal task (no space) with an expense
+  await A.evaluate(() => {
+    todos.push({id:'t-personal', text:'my own book', priority:'low', tags:['general'], done:false,
+      date: todayStr(), space:null, createdBy:'alex', createdAt:Date.now()});
+    saveTodos(); renderTodos();
+  });
+  const bookRow = A.locator('.todo', { hasText: 'my own book' });
+  await bookRow.locator('.ttext').click();
+  await bookRow.locator('.tact', { hasText: 'Expense' }).click();
+  await A.fill('#expAmount', '15');
+  await A.click('#expSave');
+  await A.waitForTimeout(300);
+  check('v42: personal-task expense warns it is not in a ledger',
+    /not in a shared ledger|personal/i.test(await A.locator('#toast').textContent()));
+  const rcAfterPersonal = await fetch('http://localhost:8907/dump?prefix=' + encodeURIComponent('households/hh-cop/receipts')).then(r => r.json());
+  check('v42: no stray receipt created for a personal task',
+    !Object.values(rcAfterPersonal).some(r => r.taskId === 't-personal'));
+
+  // ---------- v42 fix: moving the task into the space carries the expense in ----------
+  await A.locator('.todo', { hasText: 'my own book' }).locator('.scope-chip').click();
+  await A.waitForTimeout(200);
+  await A.locator('#scopeSpaces button, #scopeFamily').first().click();  // move into the (only) space / family
+  await A.waitForTimeout(700);
+  const rcAfterMove = await fetch('http://localhost:8907/dump?prefix=' + encodeURIComponent('households/hh-cop/receipts')).then(r => r.json());
+  check('v42: moving a task with an amount into a space creates its receipt',
+    Object.values(rcAfterMove).some(r => r.taskId === 't-personal' && r.amount === 15 && r.who === 'alex'));
+  check('v42: receipt uses a deterministic per-task id (idempotent)',
+    'rc-t-personal' in rcAfterMove);
+
+  // ---------- v42 fix: ledger dedupes by task (no double-count) ----------
+  const dedup = await A.evaluate(() => {
+    // two receipts for the same task (a stale random-id one + the deterministic one)
+    ledgerRcs = [
+      {id:'old-random', taskId:'x1', ts:1, who:'alex', amount:20, note:'a', space:'hh-cop'},
+      {id:'rc-x1', taskId:'x1', ts:2, who:'alex', amount:20, note:'a', space:'hh-cop'}
+    ];
+    const byTask = {};
+    ledgerRcs.forEach(r => { const k = r.taskId||r.id; if (!byTask[k] || r.ts>byTask[k].ts) byTask[k]=r; });
+    const deduped = Object.values(byTask);
+    return {count: deduped.length, total: deduped.reduce((a,r)=>a+r.amount,0)};
+  });
+  check('v42: duplicate receipts for one task collapse to a single ledger line',
+    dedup.count === 1 && dedup.total === 20);
+
   console.log(errors.length ? 'ERRORS:\n' + errors.join('\n') : 'NO JS ERRORS');
   console.log(`${pass} passed, ${fail} failed`);
   await browser.close();

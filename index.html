@@ -487,7 +487,7 @@
       <input type="file" id="importFile" accept=".json,application/json" style="display:none">
       <button class="btn ghost" id="wipeBtn">Delete all data</button>
     </div>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v41<br><span id="envInfo"></span></p>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v42<br><span id="envInfo"></span></p>
   </section>
 </main>
 
@@ -1343,20 +1343,33 @@ document.getElementById('expPhoto').addEventListener('change', async (e) => {
 document.getElementById('expCancel').addEventListener('click', () => {
   document.getElementById('expSheet').style.display = 'none'; expTask = null;
 });
+// Push (or re-push) the receipt for a task that carries an amount and lives in
+// a space. Deterministic id per task → idempotent, so moving a task between
+// spaces or re-logging never duplicates it in the ledger.
+function syncReceipt(td, thumb){
+  if (!td.space || !td.amount) return;
+  pushReceipt({id: 'rc-' + td.id, taskId: td.id, ts: td.expenseAt || Date.now(),
+    who: td.expenseBy || myName() || null, amount: td.amount,
+    note: td.text, space: td.space, thumb: thumb || null});
+}
 document.getElementById('expSave').addEventListener('click', () => {
   if (!expTask) return;
   const amount = Math.round(parseFloat(document.getElementById('expAmount').value) * 100) / 100;
   if (!(amount >= 0.01)){ toast('Enter an amount first.'); return; }
   expTask.amount = amount;
-  if (expTask.space){
-    pushReceipt({id: uid(), taskId: expTask.id, ts: Date.now(), who: myName() || null,
-      amount, note: expTask.text, space: expTask.space, thumb: expThumb || null});
-  }
+  expTask.expenseBy = myName() || null;
+  expTask.expenseAt = Date.now();
+  const inSpace = !!expTask.space;
+  if (inSpace) syncReceipt(expTask, expThumb);
   logEvent('expense', expTask, '$' + amount.toFixed(2));
   track('feature_used', {feature: 'expense'});
   saveTodos(); renderTodos();
   document.getElementById('expSheet').style.display = 'none'; expTask = null;
-  toast('Expense logged: $' + amount.toFixed(2) + ' 💵');
+  // be honest: a personal-task expense is NOT in any shared ledger
+  toast(inSpace ? 'Expense logged to the ledger: $' + amount.toFixed(2) + ' 💵'
+    : (spacesList().length
+        ? 'Saved $' + amount.toFixed(2) + ' on this task — it\'s personal, so it\'s not in a shared ledger. Tap the task\'s scope chip to move it to a space.'
+        : 'Saved $' + amount.toFixed(2) + '. Join a space to track expenses in a shared ledger.'));
 });
 
 /* ---------- break it down (B1) ---------- */
@@ -2779,8 +2792,9 @@ function openScopeSheet(td){
         const from = td.space;
         td.space = sp.hid; td.scope = null;
         if (from !== sp.hid) logEvent('moved', td, 'to "' + sp.name + '"');
+        if (td.amount) syncReceipt(td);   // bring any expense into the new space's ledger
         saveTodos(); renderTodos(); updateBadge();
-        toast(`In "${sp.name}" now ✓`);
+        toast(`In "${sp.name}" now ✓` + (td.amount ? ' — its $' + td.amount.toFixed(2) + ' expense is in the ledger' : ''));
         closeScopeSheet();
       });
       spWrap.appendChild(b);
@@ -2814,6 +2828,7 @@ function applyScope(scope, assignees){
   scopeTask.assignees = assignees || [];
   if (scope === 'private') scopeTask.space = null;
   else if (scopeTask.space == null) scopeTask.space = store.get('defaultSpace', null);
+  if (scopeTask.amount && scopeTask.space) syncReceipt(scopeTask);   // expense follows into the ledger
   saveTodos(); renderTodos(); updateBadge();
   toast(scope === 'private' ? 'Task is now private to this device 🔒'
       : (assignees && assignees.length ? 'Assigned to ' + assignees.join(', ') + ' ✓'
@@ -2939,7 +2954,8 @@ function todoCore(td){
           assignees: td.assignees || [], recur: td.recur || null, time: td.time || null,
           subtasks: (td.subtasks || []).map(s => ({text: s.text, done: !!s.done})),
           energy: td.energy || null, minutes: td.minutes || null,
-          someday: !!td.someday, carried: td.carried || 0, amount: td.amount || null};
+          someday: !!td.someday, carried: td.carried || 0, amount: td.amount || null,
+          expenseBy: td.expenseBy || null, expenseAt: td.expenseAt || null};
 }
 function syncMsg(text){
   const el = document.getElementById('syncMsg');
@@ -3624,7 +3640,20 @@ async function openLedger(sp){
   store.get('pendingRc', []).filter(r => r.space === sp.hid).forEach(r => {
     if (!ledgerRcs.some(x => x.id === r.id)) ledgerRcs.push(r);
   });
-  ledgerRcs.sort((a, b) => b.ts - a.ts);
+  // also surface any local task in this space that carries an amount but whose
+  // receipt hasn't synced back yet (e.g. logged offline) — so it never "vanishes"
+  todos.filter(t => t.space === sp.hid && t.amount && t.scope !== 'private').forEach(t => {
+    if (!ledgerRcs.some(x => x.taskId === t.id))
+      ledgerRcs.push({id: 'rc-' + t.id, taskId: t.id, ts: t.expenseAt || t.createdAt || Date.now(),
+        who: t.expenseBy || t.createdBy || null, amount: t.amount, note: t.text, space: sp.hid, thumb: null});
+  });
+  // one expense per task — dedupe by taskId, keeping the newest
+  const byTask = {};
+  ledgerRcs.forEach(r => {
+    const k = r.taskId || r.id;
+    if (!byTask[k] || (r.ts || 0) > (byTask[k].ts || 0)) byTask[k] = r;
+  });
+  ledgerRcs = Object.values(byTask).sort((a, b) => b.ts - a.ts);
   renderLedger();
 }
 
