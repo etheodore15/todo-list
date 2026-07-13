@@ -360,6 +360,7 @@
     <textarea id="liveText" aria-label="Your idea — speak or type" placeholder="Your transcribed idea appears here… you can also just type."></textarea>
     <div class="cap-actions">
       <button class="btn ghost" id="clearBtn">Clear</button>
+      <button class="btn primary" id="saveNoteBtn" style="display:none;">📝 Save note</button>
       <button class="btn primary" id="saveIdeaBtn">Summarize &amp; Add</button>
     </div>
   </section>
@@ -521,7 +522,7 @@
       <input type="file" id="importFile" accept=".json,application/json" style="display:none">
       <button class="btn ghost" id="wipeBtn">Delete all data</button>
     </div>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v44<br><span id="envInfo"></span></p>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v45<br><span id="envInfo"></span></p>
   </section>
 </main>
 
@@ -683,6 +684,16 @@
   <p class="side-note" style="margin:8px 2px;">Append-only record — entries can't be edited or removed,
     and deleting a task leaves a delete entry. Everyone in the space sees the same history.</p>
   <div id="histList"></div>
+</div>
+
+<div id="briefOverlay" class="sheet-overlay" role="dialog" aria-modal="true" aria-label="Doctor visit brief" style="display:none;">
+  <div class="sheet" style="max-width:640px; max-height:88vh; display:flex; flex-direction:column;">
+    <div id="briefBody" style="overflow-y:auto; background:#fff; color:#111; border-radius:10px; padding:16px 18px; margin-bottom:10px;"></div>
+    <div style="display:flex; gap:8px;">
+      <button class="btn primary" id="briefPrint" style="flex:1;">🖨 Print / Save PDF</button>
+      <button class="btn ghost" id="briefClose">Close</button>
+    </div>
+  </div>
 </div>
 
 <div id="focusOverlay" role="dialog" aria-modal="true" aria-label="Just one thing" style="display:none;">
@@ -1071,6 +1082,7 @@ function showView(name){
   });
   if (name === 'ideas') renderIdeas();
   if (name === 'today') renderTodos();
+  if (name === 'capture' && typeof refreshCaptureMode === 'function') refreshCaptureMode();
 }
 
 /* ---------- header date ---------- */
@@ -1193,12 +1205,25 @@ async function managedIdToken(){
   return a.currentUser.getIdToken();
 }
 
+// fetch with a hard timeout, so a stalled request surfaces an error instead of
+// hanging a button forever (mobile networks drop connections silently).
+async function fetchT(url, opts, ms){
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), ms || 45000);
+  try {
+    return await fetch(url, {...opts, signal: ctl.signal});
+  } catch (e){
+    if (e.name === 'AbortError') throw new Error('timed out — check your connection and try again');
+    throw e;
+  } finally { clearTimeout(timer); }
+}
+
 // Low-level: run one generateContent body and return the parsed response.
 // Routes through the proxy or the user's key transparently.
 async function geminiGenerate(body, isRetry){
   if (aiViaProxy()){
     const token = await managedIdToken();
-    const res = await fetch(aiProxyUrl(), {
+    const res = await fetchT(aiProxyUrl(), {
       method: 'POST',
       headers: {'content-type': 'application/json', 'authorization': 'Bearer ' + token},
       body: JSON.stringify(body)
@@ -1210,7 +1235,7 @@ async function geminiGenerate(body, isRetry){
   }
   const key = userGeminiKey();
   const model = await geminiModel(key);
-  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+  const res = await fetchT(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
     method: 'POST',
     headers: {'content-type': 'application/json', 'x-goog-api-key': key},
     body: JSON.stringify(body)
@@ -1908,6 +1933,52 @@ saveIdeaBtn.addEventListener('click', async () => {
   showView('today');
 });
 
+/* ---------- capture as a care journal note (v45) ----------
+   A caregiver capturing an observation ("Mum ate well, seemed confused after
+   lunch") wants to SAVE it, not have it force-extracted into a task. When a care
+   space is in context, the capture screen offers "Save note" — which stores the
+   transcript straight into that space's journal (feeding the shift handoff + the
+   doctor briefing) and keeps a private copy in Ideas. */
+function noteSpace(){
+  const a = activeSpaceObj();
+  if (a && a.type === 'care') return a;
+  const cares = spacesList().filter(s => s.type === 'care');
+  return cares.length === 1 ? cares[0] : null;
+}
+function refreshCaptureMode(){
+  const sp = noteSpace();
+  const noteBtn = document.getElementById('saveNoteBtn');
+  const ideaBtn = document.getElementById('saveIdeaBtn');
+  const lt = document.getElementById('liveText');
+  if (sp){
+    noteBtn.style.display = '';
+    noteBtn.textContent = `📝 Save to ${sp.name} journal`;
+    ideaBtn.classList.remove('primary'); ideaBtn.classList.add('ghost');
+    ideaBtn.textContent = '…or pull out tasks';
+    lt.setAttribute('placeholder', 'Speak or type an observation about the person you care for…');
+  } else {
+    noteBtn.style.display = 'none';
+    ideaBtn.classList.add('primary'); ideaBtn.classList.remove('ghost');
+    ideaBtn.textContent = 'Summarize & Add';
+    lt.setAttribute('placeholder', 'Your transcribed idea appears here… you can also just type.');
+  }
+}
+document.getElementById('saveNoteBtn').addEventListener('click', () => {
+  const raw = liveText.value.trim();
+  if (!raw){ toast('Nothing to save — speak or type a note first.'); return; }
+  if (recording) stopRec();
+  const sp = noteSpace();
+  if (!sp) return;
+  // keep a private copy in Ideas too, marked already-shared to this space
+  const idea = {id: uid(), raw, summary: raw.length > 120 ? raw.slice(0, 117) + '…' : raw,
+    priority: 'low', engine: 'note', ts: Date.now(), sharedTo: [sp.hid]};
+  ideas.unshift(idea); saveIdeas();
+  logEvent('note', {id: 'note-' + idea.id, text: raw.slice(0, 600), space: sp.hid});
+  track('feature_used', {feature: 'care_note'});
+  liveText.value = ''; baseText = '';
+  toast(`Saved to the ${sp.name} journal 📝`);
+});
+
 /* ---------- render ideas ---------- */
 function renderIdeas(){
   const el = document.getElementById('ideasList');
@@ -2091,7 +2162,7 @@ const SPACE_ACTIONS = {
   care: [
     ['💙 Profile', sp => openProfile(sp)],
     ['💊 Meds', sp => openMeds(sp)],
-    ['📝 Care note', () => { showView('capture'); toast('Speak or type an observation, then “Share to …” it to the team from Ideas.'); }],
+    ['📝 Care note', () => { showView('capture'); toast('Speak or type an observation, then tap “Save to journal”.'); }],
     ['📜 History & briefing', sp => openHistory(sp)],
     ['📤 Invite', sp => shareSpaceInvite(sp)]
   ],
@@ -3508,6 +3579,41 @@ ${inp.open.join('\n') || '(none)'}`}]}],
   return JSON.parse(geminiText(data));
 }
 
+// No-AI fallback: compose the one-pager directly from the records. Always works,
+// instantly — so the briefing never depends on (or hangs on) an AI call.
+function localBriefing(sp){
+  const inp = briefingInput(sp);
+  const who = (getProfile(sp.hid) || {}).name || sp.name;
+  const overview = `Coordination summary for ${who} over the last 4 weeks: ` +
+    `${inp.notes.length} journal note${inp.notes.length === 1 ? '' : 's'}, ` +
+    `${inp.ticked.length} routine/medication task${inp.ticked.length === 1 ? '' : 's'} completed` +
+    (inp.missed.length ? `, ${inp.missed.length} missed` : '') +
+    `, and ${inp.open.length} task${inp.open.length === 1 ? '' : 's'} currently open. ` +
+    `Family coordination summary — not medical advice.`;
+  return {
+    overview,
+    observations: inp.notes,
+    routines: [...inp.ticked, ...inp.missed.map(x => '⚠️ MISSED — ' + x)],
+    concerns: inp.missed.length
+      ? [`${inp.missed.length} routine/medication task(s) were recorded as missed in this period.`] : [],
+    questions: []
+  };
+}
+
+// The brief as an in-app fragment (no full <html> wrapper) for the overlay.
+function briefingInner(sp, b){
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+  const sec = (title, arr) => (arr && arr.length)
+    ? `<h2 style="font-size:14px;margin:16px 0 6px;">${title}</h2><ul style="margin:0;padding-left:20px;">${arr.map(x => '<li style="font-size:13px;line-height:1.55;">' + esc(x) + '</li>').join('')}</ul>` : '';
+  return `<h1 style="font-size:18px;margin:0 0 2px;">${esc(sp.name)} — visit brief</h1>` +
+    `<p style="color:#555;font-size:11px;margin:0 0 8px;">Covers the last 4 weeks of shared care records · prepared ${new Date().toLocaleDateString()}. Family coordination summary, not medical advice.</p>` +
+    `<p style="font-size:13px;line-height:1.55;">${esc(b.overview)}</p>` +
+    sec('Observations', b.observations) +
+    sec('Routines &amp; medications (as recorded)', b.routines) +
+    sec('Concerns to raise', b.concerns) +
+    sec('Questions for the doctor', b.questions);
+}
+
 function briefingHtml(sp, b){
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
   const sec = (title, arr) => (arr && arr.length)
@@ -3528,24 +3634,31 @@ ${sec('Questions for the doctor', b.questions)}
 </body></html>`;
 }
 
+let curBrief = null;
 document.getElementById('histBriefBtn').addEventListener('click', async () => {
   if (!histSpace) return;
-  if (!aiEnabled()){ toast('Turn on smart AI in Settings to generate briefings.'); return; }
   const btn = document.getElementById('histBriefBtn');
   btn.disabled = true; btn.textContent = '🩺 Preparing…';
-  try {
-    const b = await geminiBriefing(histSpace);
-    track('feature_used', {feature: 'briefing'});
-    const w = window.open('', '_blank');
-    if (!w){ toast('Pop-ups are blocked — allow them to print.'); }
-    else {
-      w.document.write(briefingHtml(histSpace, b));
-      w.document.close(); w.focus(); w.print();
-    }
-  } catch (err) {
-    toast('Could not generate the brief: ' + err.message);
+  let b = null;
+  if (aiEnabled()){
+    try { b = await geminiBriefing(histSpace); track('feature_used', {feature: 'briefing'}); }
+    catch (err) { toast('Smart brief unavailable (' + err.message + ') — showing a plain summary.'); }
   }
+  if (!b) b = localBriefing(histSpace);   // no AI, or AI failed/timed out → always works
+  curBrief = {sp: histSpace, b};
+  document.getElementById('briefBody').innerHTML = briefingInner(histSpace, b);
+  document.getElementById('briefOverlay').style.display = 'flex';
   btn.disabled = false; btn.textContent = '🩺 Doctor briefing';
+});
+document.getElementById('briefClose').addEventListener('click', () => {
+  document.getElementById('briefOverlay').style.display = 'none';
+});
+document.getElementById('briefPrint').addEventListener('click', () => {
+  if (!curBrief) return;
+  const w = window.open('', '_blank');   // direct from a click → not pop-up-blocked
+  if (!w){ toast('Pop-ups are blocked — allow them to print or save a PDF.'); return; }
+  w.document.write(briefingHtml(curBrief.sp, curBrief.b));
+  w.document.close(); w.focus(); w.print();
 });
 
 document.getElementById('histClose').addEventListener('click', () => {
@@ -4346,6 +4459,7 @@ document.addEventListener('keydown', (e) => {
     ['medSheet', () => { document.getElementById('medSheet').style.display = 'none'; }],
     ['medListSheet', () => { document.getElementById('medListSheet').style.display = 'none'; }],
     ['profileSheet', () => { document.getElementById('profileSheet').style.display = 'none'; }],
+    ['briefOverlay', () => { document.getElementById('briefOverlay').style.display = 'none'; }],
     ['histOverlay', () => { document.getElementById('histOverlay').style.display = 'none'; }],
     ['ledgerOverlay', () => { document.getElementById('ledgerOverlay').style.display = 'none'; }],
     ['focusOverlay', () => closeFocus()]
