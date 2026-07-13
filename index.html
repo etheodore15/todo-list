@@ -327,6 +327,11 @@
   .setup-step b{display:block; font-size:.95rem;}
   .setup-step span{display:block; color:var(--muted); font-size:.8rem; margin-top:2px;}
   .setup-step:hover{border-color:var(--accent);}
+  .setup-step.done{opacity:.6; border-color:var(--ok);}
+  .setup-step.done b{color:var(--ok);}
+  /* setup sheet sits BELOW the sheets its steps open, so custody/profile/meds
+     stack on top and reveal the checklist again when closed */
+  #setupSheet{z-index:58;}
   /* v44: structured medication / routine capture */
   .med-lab{display:block; font-size:.78rem; color:var(--muted); margin:8px 0 3px;}
   .med-inp{width:100%; background:var(--bg); border:1px solid #2a3245; border-radius:9px;
@@ -533,7 +538,7 @@
       <input type="file" id="importFile" accept=".json,application/json" style="display:none">
       <button class="btn ghost" id="wipeBtn">Delete all data</button>
     </div>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v46<br><span id="envInfo"></span></p>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v47<br><span id="envInfo"></span></p>
   </section>
 </main>
 
@@ -879,7 +884,14 @@ function visibleToMe(td){
   if (!a.length) return true;
   const me = myName().toLowerCase();
   if (!me) return true;
-  return a.includes(me) || (td.createdBy || '').toLowerCase() === me;
+  if (a.includes(me) || (td.createdBy || '').toLowerCase() === me) return true;
+  // Fail open: if this space HAS a member roster and my name isn't in it,
+  // delegation can't have correctly targeted me (e.g. I saved "Lu" but was added
+  // as "Lulu") — so SHOW the task rather than silently hiding it forever. Only
+  // when a roster exists; an empty/unsynced roster keeps precise targeting.
+  const roster = (spaceMembers(td.space) || []).map(n => (n || '').toLowerCase()).filter(Boolean);
+  if (td.space && roster.length && !roster.includes(me)) return true;
+  return false;
 }
 function canReassign(td){
   if (td.scope === 'private') return true;
@@ -1042,7 +1054,9 @@ function rollover(){
         td.date = nextOccurrence(td.recur, t);
         (td.subtasks || []).forEach(s => { s.done = false; });
       } else if (spaceTypeOf(td.space) === 'care'){
-        logEvent('missed', td, 'scheduled ' + td.date + (td.time ? ' ' + fmtTime(td.time) : ''));
+        // who: null — a missed dose isn't attributable to the device that ran
+        // the rollover; it just wasn't ticked (see logEvent)
+        logEvent('missed', td, 'scheduled ' + td.date + (td.time ? ' ' + fmtTime(td.time) : ''), null);
         td.date = nextOccurrence(td.recur, t);
       } else td.date = t;
       changed = true;
@@ -1732,6 +1746,11 @@ function localSummarize(text){
   const ACTION_PHRASES = /\b(needs? to|have to|has to|must|should|remember to|don't forget|going to|gonna|want to|make sure|look into|follow up|set up|pick up|drop off|go to|sign up|book in|sort out|work on|put on)\b/i;
   const ACTION_VERBS = /\b(call|ring|phone|text|message|email|buy|order|book|send|writ|finish|fix|repair|check|schedul|organis|organiz|plan|research|pay|clean|prepar|review|updat|creat|mak|build|contact|ask|cancel|renew|submit|tak|bring|grab|mov|sell|post|visit|regist|apply|install|download|print|wash|rins|brush|floss|remind|redesign|design|start|try|collect|return|deliver|water|feed|walk|arrang)(e|es|s|ed|ing)?\b/i;
   let picked = sentences.filter(s => ACTION_PHRASES.test(s) || ACTION_VERBS.test(s));
+  // Drop clauses narrating something ALREADY DONE ("I already emailed the
+  // accountant", "cleaned the kitchen yesterday") so past-tense speech doesn't
+  // create open to-dos. Explicit future intent (ACTION_PHRASES) overrides.
+  const DONE_MARKER = /\b(already|just (did|finished|got|sorted|emailed|called|sent|paid|booked|cleaned|texted|messaged)|finished|did that|yesterday|last (night|week|month)|earlier|this morning|have (done|finished|sorted|cleaned|paid|sent|booked|called|emailed|texted)|(i|we|i've|we've)['’]?ve? (done|finished|sorted|cleaned|paid|sent|booked|called|emailed|texted))\b/i;
+  picked = picked.filter(s => ACTION_PHRASES.test(s) || !DONE_MARKER.test(s));
   // split compound actions: "...put on my pajamas and brush my teeth and rinse..."
   const AND_ACTION = /\s+and\s+(?=(?:also\s+|then\s+|maybe\s+)?(?:make sure|put on|pick up|drop off|go to|sign up|set up|call|ring|phone|text|message|email|buy|order|book|send|write|finish|fix|repair|check|schedule|organis\w*|organiz\w*|plan|research|pay|clean|prepare|review|update|create|make|build|contact|ask|cancel|renew|submit|take|bring|grab|move|sell|post|visit|register|apply|install|download|print|wash|rinse|brush|floss|start|try|collect|return|deliver|water|feed|walk|arrange)\b)/i;
   picked = picked.flatMap(s => s.split(AND_ACTION));
@@ -3168,8 +3187,12 @@ function syncLegacyMirror(){
    space, pushed to that space's append-only `events` subcollection so every
    member sees the same history. Deletes leave tombstone events even though
    the task list tidies. */
-function logEvent(kind, td, detail){
-  const ev = {id: uid(), ts: Date.now(), who: myName() || null, kind,
+function logEvent(kind, td, detail, whoOverride){
+  // whoOverride lets system-generated events (e.g. a nightly rollover marking a
+  // dose missed) record who: null instead of falsely stamping whoever's device
+  // happened to run the rollover.
+  const who = whoOverride !== undefined ? whoOverride : (myName() || null);
+  const ev = {id: uid(), ts: Date.now(), who, kind,
               taskId: td.id, text: td.text, space: td.space || null, detail: detail || null};
   const evs = store.get('events', []);
   evs.push(ev);
@@ -3288,8 +3311,9 @@ async function startSpaceSync(sp){
   flushPendingEvents(sp);
   flushPendingReceipts(sp);
   // shared per-space settings live on the household doc — read once at connect:
-  // custody schedule (C1e, co-parenting) and care recipient profile (C2a, care)
-  if ((sp.type === 'coparenting' || sp.type === 'care') && fbFs.getDoc){
+  // the member roster (ALL space types, so a family's People list actually
+  // syncs and delegation targets resolve), custody (co-parenting), profile (care)
+  if (fbFs.getDoc){
     fbFs.getDoc(fbFs.doc(rt.db, 'households', sp.hid)).then(snap => {
       const d = snap && snap.exists && snap.exists() ? snap.data() : (snap && snap.data && snap.data());
       if (!d) return;
@@ -3547,10 +3571,13 @@ function briefingInput(sp){
   const evs = histEvents.filter(e => e.ts >= since);
   const line = (e) => new Date(e.ts).toLocaleDateString() + ' — ' + (e.who || 'someone') + ': ' + e.text +
     (e.detail ? ' (' + e.detail + ')' : '');
+  // missed doses aren't attributable to a person — phrase as "not recorded"
+  const missedLine = (e) => new Date(e.ts).toLocaleDateString() + ' — ' + e.text + ' — not recorded as done' +
+    (e.detail ? ' (' + e.detail + ')' : '');
   return {
     notes: evs.filter(e => e.kind === 'note').map(line),
     ticked: evs.filter(e => e.kind === 'ticked').map(line),
-    missed: evs.filter(e => e.kind === 'missed').map(line),
+    missed: evs.filter(e => e.kind === 'missed').map(missedLine),
     open: todos.filter(t => t.space === sp.hid && !t.done)
       .map(t => t.text + (t.recur ? ' (' + recurLabel(t.recur).replace('↻ ', 'repeats ') + (t.time ? ' at ' + fmtTime(t.time) : '') + ')' : ''))
   };
@@ -4178,15 +4205,30 @@ async function openLedger(sp){
   renderLedger();
 }
 
-function ledgerBalances(rcs){
-  const paid = {};
-  rcs.forEach(r => { const w = r.who || 'unknown'; paid[w] = (paid[w] || 0) + (r.amount || 0); });
-  const people = Object.keys(paid);
+function ledgerBalances(rcs, hid){
+  // normalize payer names case-insensitively so "Sam"/"sam" aren't two people
+  const disp = {}, paid = {};
+  rcs.forEach(r => {
+    const raw = r.who || 'unknown';
+    const key = raw.toLowerCase();
+    if (!(key in disp)) disp[key] = raw;
+    paid[key] = (paid[key] || 0) + (r.amount || 0);
+  });
+  // Split across the SPACE'S members (the parents), not just whoever happened to
+  // log something — otherwise a one-sided ledger (one parent fronts every cost)
+  // wrongly shows nobody owes anything. Seed each member at $0 paid.
+  (spaceMembers(hid) || []).forEach(n => {
+    const key = (n || '').toLowerCase();
+    if (!key) return;
+    if (!(key in paid)) paid[key] = 0;
+    if (!(key in disp)) disp[key] = n.charAt(0).toUpperCase() + n.slice(1);
+  });
+  const keys = Object.keys(paid);
   const total = Object.values(paid).reduce((a, b) => a + b, 0);
-  const share = people.length ? total / people.length : 0;
-  const balances = people.map(w => ({who: w, paid: paid[w], net: paid[w] - share}));
+  const share = keys.length ? total / keys.length : 0;
+  const balances = keys.map(k => ({who: disp[k], paid: paid[k], net: paid[k] - share}));
   let owes = null;
-  if (people.length === 2){
+  if (keys.length === 2){
     const [a, b] = balances;
     const diff = Math.abs(a.net);
     if (diff >= 0.01) owes = {from: a.net < 0 ? a.who : b.who, to: a.net < 0 ? b.who : a.who, amount: diff};
@@ -4202,7 +4244,7 @@ function renderLedger(){
     list.innerHTML = '<p class="side-note">No expenses yet — open a task → 💵 Expense to log the first one.</p>';
     return;
   }
-  const {total, balances, owes} = ledgerBalances(ledgerRcs);
+  const {total, balances, owes} = ledgerBalances(ledgerRcs, ledgerSpace && ledgerSpace.hid);
   const bal = document.createElement('div');
   bal.className = 'ledger-balance';
   bal.appendChild(document.createTextNode(`Total: $${total.toFixed(2)} · split equally between ${balances.length}`));
@@ -4352,38 +4394,56 @@ function openSpaceCreate(type){
   }, 120);
 }
 
-// v43: after a space is created, walk the user through the type-specific first
-// steps (invite + custody / profile+med / name+delegate) instead of dropping
-// them on Settings with a passive toast.
+// set the device's display name from anywhere (shared by Settings + setup sheet)
+function setMyName(v){
+  store.set('myName', (v || '').trim().slice(0, 24));
+  if (typeof refreshMyName === 'function') refreshMyName();
+  if (typeof updateSwConfig === 'function') updateSwConfig();
+}
+
+// v43/v47: after a space is created, walk the user through the type-specific
+// first steps. This is a PERSISTENT CHECKLIST — tapping a step runs it and marks
+// it done, but the list stays open so the remaining steps aren't skipped (the
+// old version hid the whole sheet on the first tap).
 function guideSpaceSetup(sp){
   if (!sp){ return; }
+  const done = new Set();
   const steps = [];
-  if (!myName()) steps.push(['✍️ Add your name',
-    'So “added by” and “done by” show on tasks.',
-    () => { showView('settings'); setTimeout(() => { const n = document.getElementById('myNameInput'); if (n){ n.scrollIntoView({block: 'center'}); n.focus(); } }, 100); }]);
-  steps.push(['📤 Invite the others', 'Share the join code so everyone syncs.', () => shareSpaceInvite(sp)]);
-  if (sp.type === 'coparenting') steps.push(['🗓 Set custody days',
-    'Whose day it is, with a handover heads-up.', () => openCustody(sp)]);
+  if (!myName()) steps.push({label: '✍️ Add your name', desc: 'So “added by” and “done by” show on tasks.',
+    fn: () => { const v = prompt('Your name (shown on tasks you add or tick):', myName()); if (v && v.trim()){ setMyName(v); toast('Name saved ✓'); return true; } return false; }});
+  steps.push({label: '📤 Invite the others', desc: 'Share the join code so everyone syncs.', fn: () => { shareSpaceInvite(sp); return true; }});
+  if (sp.type === 'coparenting') steps.push({label: '🗓 Set custody days',
+    desc: 'Whose day it is, with a handover heads-up.', fn: () => { openCustody(sp); return true; }});
   if (sp.type === 'care'){
-    steps.push(['💙 Fill the care profile', 'One shared picture of the person.', () => openProfile(sp)]);
-    steps.push(['💊 Add a medication or routine', 'A timed, repeating task — every tick is a record.',
-      () => openMeds(sp)]);
+    steps.push({label: '💙 Fill the care profile', desc: 'One shared picture of the person.', fn: () => { openProfile(sp); return true; }});
+    steps.push({label: '💊 Add a medication or routine', desc: 'A timed, repeating task — every tick is a record.',
+      fn: () => { openMeds(sp); return true; }});
   }
-  if (sp.type === 'family') steps.push(['👥 Add people to delegate to',
-    'Assign tasks to who they’re for.', () => editSpaceMembers(sp)]);
+  if (sp.type === 'family') steps.push({label: '👥 Add people to delegate to',
+    desc: 'Assign tasks to who they’re for.', fn: () => { editSpaceMembers(sp); return true; }});
   document.getElementById('setupTitle').textContent = `${SPACE_ICON[sp.type] || '👥'} “${sp.name}” is ready`;
   document.getElementById('setupIntro').textContent = 'A couple of quick things to make it work for you:';
   const host = document.getElementById('setupSteps');
-  host.innerHTML = '';
-  steps.forEach(([label, desc, fn]) => {
-    const b = document.createElement('button');
-    b.className = 'setup-step';
-    b.innerHTML = `<b></b><span></span>`;
-    b.querySelector('b').textContent = label;
-    b.querySelector('span').textContent = desc;
-    b.addEventListener('click', () => { document.getElementById('setupSheet').style.display = 'none'; fn(); });
-    host.appendChild(b);
-  });
+  const render = () => {
+    host.innerHTML = '';
+    steps.forEach((step, i) => {
+      const b = document.createElement('button');
+      b.className = 'setup-step' + (done.has(i) ? ' done' : '');
+      const t = document.createElement('b');
+      t.textContent = (done.has(i) ? '✓ ' : '') + step.label;
+      const d = document.createElement('span');
+      d.textContent = step.desc;
+      b.appendChild(t); b.appendChild(d);
+      b.addEventListener('click', () => {
+        // keep the sheet OPEN; any sub-sheet the step opens stacks on top
+        const ok = step.fn();
+        if (ok !== false) done.add(i);
+        render();
+      });
+      host.appendChild(b);
+    });
+  };
+  render();
   document.getElementById('setupSheet').style.display = 'flex';
 }
 document.getElementById('setupDone').addEventListener('click', () => {
@@ -4523,7 +4583,7 @@ document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
   // in z-order, most-modal first
   const closers = [
-    ['onboarding', () => finishOnboarding()],
+    ['onboarding', () => dismissOnboarding()],
     ['scopeSheet', () => closeScopeSheet()],
     ['setupSheet', () => { document.getElementById('setupSheet').style.display = 'none'; }],
     ['toneSheet', () => closeToneSheet(null)],
@@ -4616,6 +4676,14 @@ function finishOnboarding(){
   document.getElementById('onboarding').style.display = 'none';
   document.body.style.overflow = '';
   track('onboarded');
+}
+// Escape shouldn't silently FINALIZE first-run setup. If they've already
+// onboarded (re-opened from Settings), persist edits; on first run, just hide it
+// so the walkthrough returns next launch instead of being skipped by a stray key.
+function dismissOnboarding(){
+  if (store.get('onboarded', false)){ finishOnboarding(); return; }
+  document.getElementById('onboarding').style.display = 'none';
+  document.body.style.overflow = '';
 }
 function startOnboarding(reopen){
   obSelected = new Set(cohorts());
