@@ -160,7 +160,7 @@ tier, so ~1% paid conversion covers all infrastructure.
 | # | Step | Status |
 |---|------|--------|
 | P1 ✅ v31 | **Managed backend** — one operator-owned Firebase project baked into `managed-config.js`; anonymous Auth; membership-enforcing `firestore.rules` (join = add-only-yourself; events append-only server-side); one-tap space creation; keyless `ITODO2` invites; self-hosted mode kept as advanced path | Code shipped + tested; **inert until the operator completes the 15-min runbook in OPERATORS.md** |
-| P2 | **AI proxy** — Cloud Function holding the operator's Gemini key: verifies Auth token, per-uid daily quota (the free/paid dial), forwards summarize / break-down / tone / briefing; also serves the digest for managed spaces (fixes the P1 digest limitation) | Next build step |
+| P2 ✅ v35 | **AI proxy** — Cloud Function (`functions/`) holding the operator's Gemini key: verifies Auth token, per-uid daily quota (the free/paid dial), forwards summarize / break-down / tone / briefing. Client routes proxy-vs-key transparently; a pasted key always overrides | Code shipped + tested; **inert until the operator deploys it** (functions/README.md) |
 | P3 | **Play Store TWA** — Bubblewrap wrapper, assetlinks.json, store listing ($25 one-off) | After P2 |
 | P4 | **Billing** — Play Billing / Stripe wired to the P2 quota flags; prices per the monetization mapping below | When charging starts |
 

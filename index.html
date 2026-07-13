@@ -431,7 +431,7 @@
       <input type="file" id="importFile" accept=".json,application/json" style="display:none">
       <button class="btn ghost" id="wipeBtn">Delete all data</button>
     </div>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v35<br><span id="envInfo"></span></p>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v36<br><span id="envInfo"></span></p>
   </section>
 </main>
 
@@ -468,7 +468,11 @@
   <div class="sheet">
     <h3>🗓 Which days do you have the kids?</h3>
     <p class="side-note">Tick the weekdays the children are with you. The other parent has the rest. Both of you see the same schedule.</p>
-    <div id="custodyDays" style="margin:6px 0 12px;"></div>
+    <div id="custodyDays" style="margin:6px 0 8px;"></div>
+    <label class="scope-member" style="margin-bottom:8px;">
+      <input type="checkbox" id="custodyAlt">
+      <span>Alternates every other week (this pattern one week, swapped the next)</span>
+    </label>
     <button class="btn primary" id="custodySave">Save schedule</button>
     <button class="btn ghost" id="custodyCancel">Cancel</button>
   </div>
@@ -2582,7 +2586,7 @@ function openScopeSheet(td){
       spWrap.appendChild(b);
     });
   }
-  const members = store.get('members', []);
+  const members = scopeTask.space ? spaceMembers(scopeTask.space) : store.get('members', []);
   const wrap = document.getElementById('scopeMembers');
   wrap.innerHTML = '';
   if (!members.length){
@@ -2620,7 +2624,7 @@ document.getElementById('scopePrivate').addEventListener('click', () => applySco
 document.getElementById('scopeFamily').addEventListener('click', () => applyScope('family'));
 document.getElementById('scopeAssign').addEventListener('click', () => {
   const names = [...document.querySelectorAll('#scopeMembers input:checked')].map(c => c.value);
-  const members = store.get('members', []);
+  const members = scopeTask && scopeTask.space ? spaceMembers(scopeTask.space) : store.get('members', []);
   if (!names.length || names.length === members.length) applyScope('family');
   else applyScope('assign', names);
 });
@@ -2641,6 +2645,18 @@ const spaceRt = {};    // hid → {db, unsub, lastPush: {id → serialized core}
 const SPACE_ICON = {family: '👥', coparenting: '🤝', care: '💙'};
 const spacesList = () => store.get('spaces', []);
 const spaceName = (hid) => { const sp = spacesList().find(s => s.hid === hid); return sp ? sp.name : null; };
+
+// per-space member lists (synced on the household doc); fall back to the global
+// list so existing single-list behaviour is unchanged until a space sets its own
+function spaceMembers(hid){
+  const m = (store.get('spaceMembers', {}) || {})[hid];
+  return (Array.isArray(m) && m.length) ? m : store.get('members', []);
+}
+function setSpaceMembers(hid, list){
+  const m = store.get('spaceMembers', {}) || {};
+  m[hid] = list;
+  store.set('spaceMembers', m);
+}
 
 // legacy mirror: sw digest + older code paths read fbConfig/householdId —
 // keep them pointing at the default space
@@ -2795,6 +2811,7 @@ async function startSpaceSync(sp){
       if (!d) return;
       if (d.custody){ setLocalCustody(sp.hid, d.custody); }
       if (d.profile){ setLocalProfile(sp.hid, d.profile); }
+      if (Array.isArray(d.memberNames)){ setSpaceMembers(sp.hid, d.memberNames); }
       renderTodos();
     }).catch(() => {});
   }
@@ -3174,22 +3191,33 @@ function localCustody(){ return store.get('custody', {}); }
 function setLocalCustody(hid, c){ const m = localCustody(); m[hid] = c; store.set('custody', m); }
 function getCustody(hid){ return localCustody()[hid] || null; }
 
-// who has the kids on a given weekday, from the viewer's perspective:
-// 'me' | 'them' | null (unknown / not configured / viewer isn't a parent)
-function custodyOn(hid, weekday){
+// which "side" of the schedule applies on a date: for an alternating schedule
+// the marked days flip every other week, anchored to c.anchor (a Sunday).
+function custodyFlipped(c, dateStr){
+  if (!c.alternate || !c.anchor) return false;
+  const a = new Date(c.anchor + 'T00:00:00Z').getTime();
+  const d = new Date(dateStr + 'T00:00:00Z').getTime();
+  const weeks = Math.floor((d - a) / (7 * 86400000));
+  return ((weeks % 2) + 2) % 2 === 1;   // odd weeks since the anchor are flipped
+}
+
+// who has the kids on a given date, from the viewer's perspective:
+// 'me' | 'them' | 'setter' | 'other' | null
+function custodyOn(hid, dateStr){
   const c = getCustody(hid);
   if (!c || !Array.isArray(c.days)) return null;
+  const weekday = new Date(dateStr + 'T00:00:00Z').getUTCDay();
+  let isBySetDay = c.days.includes(weekday);
+  if (custodyFlipped(c, dateStr)) isBySetDay = !isBySetDay;   // alternating week
   const byMe = (c.by || '').toLowerCase() === myName().toLowerCase() && myName();
-  const isBySetDay = c.days.includes(weekday);
-  if (!myName()) return isBySetDay ? 'setter' : 'other';   // no identity — label absolutely
+  if (!myName()) return isBySetDay ? 'setter' : 'other';     // no identity — label absolutely
   return (isBySetDay === !!byMe) ? 'me' : 'them';
 }
 
 function custodyLabel(hid, dateStr){
   const c = getCustody(hid);
   if (!c) return null;
-  const wd = new Date(dateStr + 'T00:00:00Z').getUTCDay();
-  const who = custodyOn(hid, wd);
+  const who = custodyOn(hid, dateStr);
   // the co-parent from the viewer's side is whichever of {by, other} isn't me
   const me = (myName() || '').toLowerCase();
   const coParent = (c.by || '').toLowerCase() === me ? (c.other || 'the other parent') : (c.by || 'the other parent');
@@ -3221,10 +3249,20 @@ function renderCustodyBanner(){
   host.style.display = host.children.length ? '' : 'none';
 }
 
-async function saveCustody(sp, days){
-  const others = (store.get('members', []) || []).filter(m => m.toLowerCase() !== (myName() || '').toLowerCase());
+// the Sunday on or before today — anchor for alternating weeks
+function weekAnchor(){
+  const now = new Date();
+  const sun = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - now.getUTCDay()));
+  return sun.toISOString().slice(0, 10);
+}
+
+async function saveCustody(sp, days, alternate){
+  const others = (spaceMembers(sp.hid) || []).filter(m => m.toLowerCase() !== (myName() || '').toLowerCase());
+  const prev = getCustody(sp.hid);
   const c = {days: days.slice().sort(), by: myName() || 'Parent A',
-             other: others[0] || 'the other parent', updated: Date.now()};
+             other: others[0] || 'the other parent', alternate: !!alternate,
+             anchor: (prev && prev.anchor && prev.alternate === !!alternate) ? prev.anchor : weekAnchor(),
+             updated: Date.now()};
   setLocalCustody(sp.hid, c);
   const rt = spaceRt[sp.hid];
   if (rt && rt.db) fbFs.setDoc(fbFs.doc(rt.db, 'households', sp.hid), {custody: c}, {merge: true}).catch(() => {});
@@ -3239,6 +3277,7 @@ function openCustody(sp){
   // if the schedule was set by the OTHER parent, show it from my side (invert)
   const mineSet = c && (c.by || '').toLowerCase() === (myName() || '').toLowerCase();
   const myDays = c ? (mineSet ? c.days : WEEKDAYS.map((_, i) => i).filter(i => !c.days.includes(i))) : [];
+  document.getElementById('custodyAlt').checked = !!(c && c.alternate);
   WEEKDAYS.forEach((name, i) => {
     const lab = document.createElement('label');
     lab.className = 'scope-member';
@@ -3255,8 +3294,9 @@ document.getElementById('custodySave').addEventListener('click', () => {
   const hid = document.getElementById('custodySheet').dataset.hid;
   const sp = spacesList().find(s => s.hid === hid);
   const days = [...document.querySelectorAll('#custodyDays input:checked')].map(c => +c.value);
+  const alt = document.getElementById('custodyAlt').checked;
   document.getElementById('custodySheet').style.display = 'none';
-  if (sp) saveCustody(sp, days);
+  if (sp) saveCustody(sp, days, alt);
 });
 document.getElementById('custodyCancel').addEventListener('click', () => {
   document.getElementById('custodySheet').style.display = 'none';
@@ -3466,6 +3506,17 @@ document.getElementById('ledgerCsvBtn').addEventListener('click', () => {
   toast('Ledger exported as CSV ⬇');
 });
 
+function editSpaceMembers(sp){
+  const cur = ((store.get('spaceMembers', {}) || {})[sp.hid] || []).join(', ');
+  const v = prompt(`People in "${sp.name}" (comma-separated). Tasks here can be delegated to them; leave blank to use your global member list.`, cur);
+  if (v === null) return;
+  const list = v.split(',').map(s => s.toLowerCase().replace(/[^a-z0-9 -]/g, '').trim()).filter(Boolean).slice(0, 12);
+  setSpaceMembers(sp.hid, list);
+  const rt = spaceRt[sp.hid];
+  if (rt && rt.db) fbFs.setDoc(fbFs.doc(rt.db, 'households', sp.hid), {memberNames: list}, {merge: true}).catch(() => {});
+  toast(list.length ? `${sp.name} members: ${list.join(', ')}` : `${sp.name} uses your global member list`);
+}
+
 function renderSpacesList(){
   const el = document.getElementById('spacesList');
   if (!el) return;
@@ -3488,6 +3539,11 @@ function renderSpacesList(){
     hist.textContent = '📜 History & export';
     hist.addEventListener('click', () => openHistory(sp));
     row.appendChild(hist);
+    const mem = document.createElement('button');
+    mem.className = 'btn ghost members-btn';
+    mem.textContent = '👤 Members';
+    mem.addEventListener('click', () => editSpaceMembers(sp));
+    row.appendChild(mem);
     const led = document.createElement('button');
     led.className = 'btn ghost ledger-btn';
     led.textContent = '💵 Ledger';
@@ -3593,19 +3649,30 @@ async function updateSwConfig(){
     if (!('serviceWorker' in navigator)) return;
     const reg = await navigator.serviceWorker.ready;
     const cfg = store.get('fbConfig', {}) || {};
+    // Managed spaces can't be read by the SW's unauthenticated REST fetch, so
+    // the page hands the SW a snapshot of the tasks the digest needs (the data
+    // as of the last time the app was open). Works for self-hosted too.
+    const me = store.get('myName', '');
+    const snapshot = todos.filter(t => visibleToMe(t) && !t.someday && (t.space || null) !== null)
+      .map(t => ({text: t.text, done: !!t.done, date: t.date, assignees: t.assignees || [],
+        createdBy: t.createdBy || null, createdAt: t.createdAt || 0,
+        doneBy: t.doneBy || null, doneAt: t.doneAt || 0}));
     reg.active && reg.active.postMessage({type: 'config', cfg: {
       apiKey: cfg.apiKey || null, projectId: cfg.projectId || null,
-      hid: store.get('householdId', '') || null, me: store.get('myName', '')
+      hid: store.get('householdId', '') || null, me,
+      managed: spacesList().some(s => s.managed), snapshot, snapshotAt: Date.now()
     }});
   } catch (_) {}
 }
 updateSwConfig();
+// keep the SW's digest snapshot fresh as tasks change
+document.addEventListener('visibilitychange', () => { if (document.hidden) updateSwConfig(); });
 
 const digestStatus = document.getElementById('digestStatus');
 if (store.get('digestOn', false)) digestStatus.textContent = '✅ Daily digest enabled.';
 document.getElementById('digestBtn').addEventListener('click', async () => {
-  if (!store.get('householdId', '')){
-    digestStatus.textContent = 'Set up Family sync first — the digest reads the shared list.';
+  if (!spacesList().length){
+    digestStatus.textContent = 'Join or create a space first — the digest reads the shared list.';
     return;
   }
   if (!('Notification' in window)){

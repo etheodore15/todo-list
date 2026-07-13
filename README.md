@@ -136,8 +136,12 @@ untouched.
   kids are with them (Settings → the space → 🗓 Custody days); both parents
   then see the schedule from their own side. The Today view shows *"Today is
   your day with the kids"* or *"Today is Alex's day"*, with a **🔄 handover
-  tomorrow** flag on the day before a switch. Schedule is shared on the space
-  and read when the app opens.
+  tomorrow** flag on the day before a switch. Tick **"alternates every other
+  week"** for week-on/week-off arrangements. Schedule is shared on the space.
+- **👤 Per-space members** (Settings → any space → 👤 Members): give a space
+  its own member list so tasks there are delegated to the right people —
+  useful when your co-parenting space and your household have different
+  members. Spaces with no list of their own fall back to your global members.
 
 > **Scope note:** care features coordinate a family/care team. They are not a
 > medical device, give no dosing or clinical advice, and pairing dose times

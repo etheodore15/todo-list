@@ -58,7 +58,7 @@ const { chromium } = require('playwright');
   await page.click('nav.tabs button[data-view="settings"]');
   await page.click('#digestBtn');
   const ds = await page.locator('#digestStatus').textContent();
-  check('digest requires family sync first', /Family sync first/.test(ds));
+  check('digest requires a space first', /space first/.test(ds));
 
   console.log(errors.length ? 'ERRORS:\n' + errors.join('\n') : 'NO JS ERRORS');
   console.log(`${pass} passed, ${fail} failed`);

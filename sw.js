@@ -1,4 +1,4 @@
-const CACHE = 'idea-todo-v35';
+const CACHE = 'idea-todo-v36';
 const LIB_CACHE = 'idea-todo-libs-v1';
 const ASSETS = [
   './',
@@ -85,18 +85,27 @@ self.addEventListener('periodicsync', (e) => {
 async function runDigest(){
   try {
     const cfg = await idbGet('cfg');
-    if (!cfg || !cfg.hid || !cfg.projectId) return;
+    if (!cfg) return;
     const since = (await idbGet('digestAt')) || (Date.now() - 86400000);
-    const url = 'https://firestore.googleapis.com/v1/projects/' + cfg.projectId +
-      '/databases/(default)/documents/households/' + cfg.hid + '/items?pageSize=300&key=' + cfg.apiKey;
-    const res = await fetch(url);
-    if (!res.ok) return;
-    const data = await res.json();
-    const items = (data.documents || []).map(parseFsDoc);
     const today = new Date().toISOString().slice(0, 10);
+    let items = null;
+    // Managed spaces: the SW can't authenticate, so use the page-provided
+    // snapshot. Self-hosted with open rules: fetch live via REST.
+    if (cfg.managed && Array.isArray(cfg.snapshot)){
+      items = cfg.snapshot;
+    } else if (cfg.hid && cfg.projectId){
+      const url = 'https://firestore.googleapis.com/v1/projects/' + cfg.projectId +
+        '/databases/(default)/documents/households/' + cfg.hid + '/items?pageSize=300&key=' + cfg.apiKey;
+      const res = await fetch(url);
+      if (!res.ok){ if (Array.isArray(cfg.snapshot)) items = cfg.snapshot; else return; }
+      else items = ((await res.json()).documents || []).map(parseFsDoc);
+    } else if (Array.isArray(cfg.snapshot)){
+      items = cfg.snapshot;
+    }
+    if (!items) return;
     const d = composeDigest(items, cfg.me, since, today);
     await idbSet('digestAt', Date.now());
-    if (d.openToday || d.news.length || d.ticks.length){
+    if (d.openToday || d.dueTomorrow || d.news.length || d.ticks.length){
       await self.registration.showNotification(d.title,
         {body: d.body, icon: 'icons/icon-192.png', badge: 'icons/icon-192.png', tag: 'daily-digest'});
     }
