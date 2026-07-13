@@ -98,6 +98,11 @@ untouched.
 
 ### Care team features (spaces created as *Care team*)
 
+- **💙 Care recipient profile** — a care space is *about* someone (Mum) who
+  isn't a device holder. Fill in their profile once (Settings → the space →
+  💙 Care profile): name, age, conditions, allergies, key contacts, notes.
+  It's shared with the whole care team, shown at the top of that space's Today
+  view, and folded into the doctor-visit briefing automatically.
 - **Routines & meds** — say *"give mum her Ramipril at 8am every morning"*:
   the task repeats daily with a 🕗 time chip, and every tick is attributed
   (who gave it, when) — a de-facto medication administration record in the

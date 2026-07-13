@@ -133,6 +133,16 @@
   #custodyBanner{margin-bottom:12px; display:flex; flex-direction:column; gap:6px;}
   .custody-line{background:rgba(255,179,71,.1); border:1px solid rgba(255,179,71,.35);
     color:var(--text); border-radius:12px; padding:10px 13px; font-size:.84rem; line-height:1.5;}
+  #profileCards{display:flex; flex-direction:column; gap:8px; margin-bottom:12px;}
+  .profile-card{background:rgba(79,140,255,.08); border:1px solid rgba(79,140,255,.3);
+    border-radius:12px; padding:11px 13px;}
+  .profile-head{display:flex; align-items:center; gap:8px; font-size:.95rem;}
+  .profile-head b{flex:1;}
+  .profile-age{color:var(--muted); font-size:.8rem;}
+  .profile-edit{background:var(--card2); border:none; color:var(--text); font-size:.72rem;
+    padding:4px 10px; border-radius:8px; cursor:pointer;}
+  .profile-row{font-size:.82rem; line-height:1.5; margin-top:5px; color:var(--text);}
+  .profile-row .pl{color:var(--muted); margin-right:6px;}
 
   /* Todo */
   .prio-section{margin-bottom:18px;}
@@ -289,6 +299,7 @@
     <div class="progress"><div id="progressBar"></div></div>
     <div id="awayBanner" style="display:none;"></div>
     <div id="spaceFilter" style="display:flex; gap:8px; overflow-x:auto; margin-bottom:10px; scrollbar-width:none;"></div>
+    <div id="profileCards" style="display:none;"></div>
     <div id="custodyBanner" style="display:none;"></div>
     <button class="btn ghost" id="focusBtn" style="display:none; width:100%; margin-bottom:12px;">🎯 Just one thing</button>
     <div class="addrow">
@@ -417,7 +428,7 @@
       <input type="file" id="importFile" accept=".json,application/json" style="display:none">
       <button class="btn ghost" id="wipeBtn">Delete all data</button>
     </div>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v33<br><span id="envInfo"></span></p>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v34<br><span id="envInfo"></span></p>
   </section>
 </main>
 
@@ -437,6 +448,16 @@
     <div id="scopeMembers" style="margin:4px 0 10px;"></div>
     <button class="btn primary" id="scopeAssign">Assign to selected</button>
     <button class="btn ghost" id="scopeCancel">Cancel</button>
+  </div>
+</div>
+
+<div id="profileSheet" class="sheet-overlay" style="display:none;">
+  <div class="sheet">
+    <h3>💙 Care recipient profile</h3>
+    <p class="side-note">Shared with everyone in this care space and included in the doctor-visit briefing.</p>
+    <div id="profileFields" style="max-height:52vh; overflow-y:auto;"></div>
+    <button class="btn primary" id="profileSave" style="margin-top:12px;">Save profile</button>
+    <button class="btn ghost" id="profileCancel">Cancel</button>
   </div>
 </div>
 
@@ -1738,6 +1759,7 @@ function renderEasyChip(list){
 function renderTodos(){
   const el = document.getElementById('todoList');
   renderSpaceFilter();
+  renderProfileCards();
   renderCustodyBanner();
   let list = todayTodos().filter(visibleToMe).filter(inActiveSpace);
   renderTagFilter(list);
@@ -2737,11 +2759,15 @@ async function startSpaceSync(sp){
   syncPush();
   flushPendingEvents(sp);
   flushPendingReceipts(sp);
-  // custody schedule (C1e) lives on the household doc — read it once at connect
-  if (sp.type === 'coparenting' && fbFs.getDoc){
+  // shared per-space settings live on the household doc — read once at connect:
+  // custody schedule (C1e, co-parenting) and care recipient profile (C2a, care)
+  if ((sp.type === 'coparenting' || sp.type === 'care') && fbFs.getDoc){
     fbFs.getDoc(fbFs.doc(rt.db, 'households', sp.hid)).then(snap => {
       const d = snap && snap.exists && snap.exists() ? snap.data() : (snap && snap.data && snap.data());
-      if (d && d.custody){ setLocalCustody(sp.hid, d.custody); renderTodos(); }
+      if (!d) return;
+      if (d.custody){ setLocalCustody(sp.hid, d.custody); }
+      if (d.profile){ setLocalProfile(sp.hid, d.profile); }
+      renderTodos();
     }).catch(() => {});
   }
   const col = fbFs.collection(rt.db, 'households', sp.hid, 'items');
@@ -2997,6 +3023,9 @@ function briefingInput(sp){
 
 async function geminiBriefing(sp, key){
   const inp = briefingInput(sp);
+  const p = getProfile(sp.hid) || {};
+  const profileText = PROFILE_FIELDS.filter(f => (p[f.k] || '').trim())
+    .map(f => f.label + ': ' + p[f.k]).join('\n') || '(no profile on file)';
   const model = await geminiModel(key);
   const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
     method: 'POST',
@@ -3004,6 +3033,9 @@ async function geminiBriefing(sp, key){
     body: JSON.stringify({
       contents: [{role: 'user', parts: [{text:
 `You prepare a family's notes for a doctor visit. From this care team's last 4 weeks of shared records about the person they care for, write a concise brief the family can hand to the GP. Plain factual language, no diagnoses, no medication advice — just organize what was observed and done. Dates matter.
+
+Care recipient:
+${profileText}
 
 Journal notes:
 ${inp.notes.join('\n') || '(none)'}
@@ -3211,6 +3243,93 @@ document.getElementById('custodyCancel').addEventListener('click', () => {
   document.getElementById('custodySheet').style.display = 'none';
 });
 
+/* ---------- care recipient profile (C2a) ----------
+   A care space is "about" someone who isn't a device holder. Their profile
+   (name, age, conditions, allergies, key contacts) lives on the household doc
+   so the whole care team shares it, shows atop the care space's Today view,
+   and feeds the doctor-visit briefing. */
+const PROFILE_FIELDS = [
+  {k: 'name', label: 'Name', ph: 'e.g. Mum / Margaret'},
+  {k: 'age', label: 'Age / date of birth', ph: 'e.g. 82, or 1943-05-02'},
+  {k: 'conditions', label: 'Conditions', ph: 'e.g. dementia, type 2 diabetes'},
+  {k: 'allergies', label: 'Allergies', ph: 'e.g. penicillin'},
+  {k: 'contacts', label: 'Key contacts', ph: 'e.g. Dr Lee 555-0100; district nurse'},
+  {k: 'notes', label: 'Notes', ph: 'anything the care team should know'}
+];
+function localProfile(){ return store.get('careProfile', {}); }
+function setLocalProfile(hid, p){ const m = localProfile(); m[hid] = p; store.set('careProfile', m); }
+function getProfile(hid){ return localProfile()[hid] || null; }
+
+function renderProfileCards(){
+  const host = document.getElementById('profileCards');
+  if (!host) return;
+  const spaces = spacesList().filter(s => s.type === 'care' && getProfile(s.hid))
+    .filter(s => activeSpace === 'all' || activeSpace === s.hid);
+  host.innerHTML = '';
+  spaces.forEach(sp => {
+    const p = getProfile(sp.hid);
+    const filled = PROFILE_FIELDS.filter(f => (p[f.k] || '').trim());
+    if (!filled.length) return;
+    const card = document.createElement('div');
+    card.className = 'profile-card';
+    const head = document.createElement('div');
+    head.className = 'profile-head';
+    head.innerHTML = `<b>💙 ${p.name || sp.name}</b>` +
+      (p.age ? `<span class="profile-age">${p.age}</span>` : '');
+    const edit = document.createElement('button');
+    edit.className = 'profile-edit'; edit.textContent = 'Edit';
+    edit.addEventListener('click', () => openProfile(sp));
+    head.appendChild(edit);
+    card.appendChild(head);
+    filled.filter(f => f.k !== 'name' && f.k !== 'age').forEach(f => {
+      const row = document.createElement('div');
+      row.className = 'profile-row';
+      row.innerHTML = `<span class="pl">${f.label}</span>`;
+      row.appendChild(document.createTextNode(p[f.k]));
+      card.appendChild(row);
+    });
+    host.appendChild(card);
+  });
+  host.style.display = host.children.length ? '' : 'none';
+}
+
+function openProfile(sp){
+  const wrap = document.getElementById('profileFields');
+  wrap.innerHTML = '';
+  const p = getProfile(sp.hid) || {};
+  PROFILE_FIELDS.forEach(f => {
+    const lab = document.createElement('label');
+    lab.style.cssText = 'display:block; font-size:.78rem; color:var(--muted); margin:8px 0 2px;';
+    lab.textContent = f.label;
+    const inp = document.createElement(f.k === 'notes' || f.k === 'conditions' || f.k === 'contacts' ? 'textarea' : 'input');
+    inp.className = 'profile-input'; inp.dataset.k = f.k;
+    inp.placeholder = f.ph; inp.value = p[f.k] || '';
+    inp.style.cssText = 'width:100%; background:var(--bg); border:1px solid #2a3245; border-radius:9px; color:var(--text); padding:9px 11px; font-size:.9rem;';
+    if (inp.tagName === 'TEXTAREA') inp.rows = 2;
+    wrap.appendChild(lab); wrap.appendChild(inp);
+  });
+  document.getElementById('profileSheet').dataset.hid = sp.hid;
+  document.getElementById('profileSheet').style.display = 'flex';
+}
+document.getElementById('profileSave').addEventListener('click', () => {
+  const hid = document.getElementById('profileSheet').dataset.hid;
+  const sp = spacesList().find(s => s.hid === hid);
+  const p = {};
+  document.querySelectorAll('#profileFields .profile-input').forEach(i => {
+    const v = i.value.trim(); if (v) p[i.dataset.k] = v;
+  });
+  p.updated = Date.now();
+  setLocalProfile(hid, p);
+  const rt = spaceRt[hid];
+  if (rt && rt.db) fbFs.setDoc(fbFs.doc(rt.db, 'households', hid), {profile: p}, {merge: true}).catch(() => {});
+  document.getElementById('profileSheet').style.display = 'none';
+  renderTodos();
+  toast('Care profile saved ✓');
+});
+document.getElementById('profileCancel').addEventListener('click', () => {
+  document.getElementById('profileSheet').style.display = 'none';
+});
+
 /* ---------- ledger view (C1d) ---------- */
 let ledgerRcs = [], ledgerSpace = null;
 
@@ -3361,6 +3480,13 @@ function renderSpacesList(){
       cust.textContent = '🗓 Custody days';
       cust.addEventListener('click', () => openCustody(sp));
       row.appendChild(cust);
+    }
+    if (sp.type === 'care'){
+      const prof = document.createElement('button');
+      prof.className = 'btn ghost profile-btn';
+      prof.textContent = '💙 Care profile';
+      prof.addEventListener('click', () => openProfile(sp));
+      row.appendChild(prof);
     }
     const leave = document.createElement('button');
     leave.className = 'btn ghost';
