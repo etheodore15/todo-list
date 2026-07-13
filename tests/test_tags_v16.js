@@ -33,6 +33,7 @@ const { chromium } = require('playwright');
   const check = (n, c) => { console.log((c?'PASS':'FAIL')+': '+n); c?pass++:fail++; };
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
+  await page.addInitScript(() => { try { localStorage.setItem("onboarded", "true"); } catch(e){} });
   await page.goto('http://localhost:8906/', { waitUntil: 'networkidle' });
 
   // capture → prompt should include the existing tag vocabulary

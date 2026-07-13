@@ -20,6 +20,7 @@ const { chromium } = require('playwright');
   await page.addInitScript(() => localStorage.setItem('geminiKey', JSON.stringify('AIza-test-key')));
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
+  await page.addInitScript(() => { try { localStorage.setItem("onboarded", "true"); } catch(e){} });
   await page.goto('http://localhost:8906/', { waitUntil: 'networkidle' });
 
   await page.fill('#liveText', 'the tap is leaking I need to call the plumber');

@@ -55,6 +55,7 @@ const { chromium } = require('playwright');
     const page = await ctx.newPage();
     page.on('pageerror', e => errors.push(e.message));
     if (opts.init) await page.addInitScript(opts.init);
+    await page.addInitScript(() => { try { localStorage.setItem("onboarded", "true"); } catch(e){} });
     await page.goto('http://localhost:8906/', { waitUntil: 'load' });
     await page.waitForTimeout(300);
     page.__proxyHits = proxyHits; page.__directHits = directHits;

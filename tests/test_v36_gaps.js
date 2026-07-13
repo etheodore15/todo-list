@@ -16,6 +16,7 @@ const { chromium } = require('playwright');
     localStorage.setItem('spaces', JSON.stringify([
       {hid: 'hh-cop', name: 'Co-parenting', type: 'coparenting', cfg: {apiKey:'k', projectId:'p'}}]));
   });
+  await page.addInitScript(() => { try { localStorage.setItem("onboarded", "true"); } catch(e){} });
   await page.goto('http://localhost:8906/', { waitUntil: 'load' });
   await page.waitForTimeout(300);
 

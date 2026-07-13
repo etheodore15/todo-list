@@ -93,6 +93,7 @@ const MANAGED_CFG = `window.MANAGED = {apiKey: 'AizaManaged', authDomain: 'x.fir
     await ctx.route('**/vendor/firebase-firestore.js', r => r.fulfill({ contentType: 'application/javascript', body: FAKE_FS }));
     const page = await ctx.newPage();
     page.on('pageerror', e => errors.push(e.message));
+    await page.addInitScript(() => { try { localStorage.setItem("onboarded", "true"); } catch(e){} });
     await page.goto('http://localhost:8906/', { waitUntil: 'networkidle' });
     await page.click('nav.tabs button[data-view="settings"]');
     if (name){ await page.fill('#myNameInput', name); await page.click('#saveMyNameBtn'); }

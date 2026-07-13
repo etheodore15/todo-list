@@ -1,4 +1,4 @@
-const CACHE = 'idea-todo-v36';
+const CACHE = 'idea-todo-v37';
 const LIB_CACHE = 'idea-todo-libs-v1';
 const ASSETS = [
   './',

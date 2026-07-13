@@ -203,6 +203,34 @@
     padding:5px 10px; border-radius:9px; cursor:pointer; margin:2px 6px 0 0;}
   .energy-chip{background:rgba(139,148,167,.14);}
 
+  /* onboarding (v37) */
+  #onboarding{position:fixed; inset:0; z-index:80; background:var(--bg); overflow-y:auto;
+    display:flex; align-items:flex-start; justify-content:center;
+    padding:calc(24px + env(safe-area-inset-top)) 20px calc(24px + env(safe-area-inset-bottom));}
+  .ob-inner{max-width:460px; width:100%; margin:auto;}
+  .ob-eyebrow{color:var(--accent); font-size:.78rem; text-transform:uppercase; letter-spacing:.12em;
+    margin:0 0 6px;}
+  #onboarding h2{font-size:1.5rem; margin:0 0 8px; line-height:1.25;}
+  .ob-sub{color:var(--muted); font-size:.92rem; line-height:1.6; margin:0 0 20px;}
+  #obChips{display:flex; flex-direction:column; gap:10px; margin-bottom:20px;}
+  .ob-chip{display:flex; align-items:flex-start; gap:13px; text-align:left; width:100%;
+    background:var(--card); border:2px solid #2a3245; border-radius:14px; padding:14px 15px;
+    cursor:pointer; color:var(--text); font-size:1rem; transition:border-color .12s, background .12s;}
+  .ob-chip:hover{border-color:#3a4560;}
+  .ob-chip[aria-pressed="true"]{border-color:var(--accent); background:rgba(79,140,255,.1);}
+  .ob-chip .obc-ico{font-size:1.6rem; line-height:1.1; flex:0 0 auto;}
+  .ob-chip > span:nth-child(2){display:flex; flex-direction:column;}
+  .ob-chip .obc-t{font-weight:600; display:block;}
+  .ob-chip .obc-d{color:var(--muted); font-size:.82rem; line-height:1.45; margin-top:2px; display:block;}
+  .ob-chip .obc-check{margin-left:auto; color:var(--accent); font-weight:700; opacity:0; flex:0 0 auto;}
+  .ob-chip[aria-pressed="true"] .obc-check{opacity:1;}
+  #obToolkit{margin-bottom:20px;}
+  .ob-tk-group{margin-bottom:18px;}
+  .ob-tk-group h3{font-size:.95rem; margin:0 0 8px; display:flex; align-items:center; gap:8px;}
+  .ob-tk-item{display:flex; gap:10px; padding:6px 0; font-size:.88rem; line-height:1.5;}
+  .ob-tk-item b{color:var(--text);}
+  .ob-tk-item .obt-d{color:var(--muted);}
+
   /* tone check (C1c) */
   .tone-block{background:var(--bg); border:1px solid #2a3245; border-radius:10px;
     padding:10px 12px; font-size:.88rem; line-height:1.5; margin:8px 0;}
@@ -323,6 +351,11 @@
   <!-- SETTINGS -->
   <section id="view-settings" class="view">
     <div class="set-block">
+      <h3>What I use this for</h3>
+      <p id="cohortStatus"></p>
+      <button class="btn primary" id="cohortBtn">Choose / update &amp; see my toolkit</button>
+    </div>
+    <div class="set-block">
       <h3>Offline voice recognition (no API key)</h3>
       <p>Download a small speech model once (~80 MB, use Wi-Fi) and transcription runs
          entirely on your phone — works with no internet and nothing leaves the device.</p>
@@ -431,7 +464,7 @@
       <input type="file" id="importFile" accept=".json,application/json" style="display:none">
       <button class="btn ghost" id="wipeBtn">Delete all data</button>
     </div>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v36<br><span id="envInfo"></span></p>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v37<br><span id="envInfo"></span></p>
   </section>
 </main>
 
@@ -451,6 +484,27 @@
     <div id="scopeMembers" style="margin:4px 0 10px;"></div>
     <button class="btn primary" id="scopeAssign">Assign to selected</button>
     <button class="btn ghost" id="scopeCancel">Cancel</button>
+  </div>
+</div>
+
+<div id="onboarding" role="dialog" aria-modal="true" aria-labelledby="obTitle" style="display:none;">
+  <div class="ob-inner">
+    <div id="obStep1">
+      <p class="ob-eyebrow">Welcome to Idea → Todo</p>
+      <h2 id="obTitle">What brings you here?</h2>
+      <p class="ob-sub">Pick anything that fits — you can choose more than one, and change it later.
+         We use this to show you the features that help most.</p>
+      <div id="obChips" role="group" aria-label="What you'll use the app for"></div>
+      <button class="btn primary" id="obContinue" style="width:100%; margin-top:8px;">Continue</button>
+      <button class="btn ghost" id="obSkip" style="width:100%;">Skip for now</button>
+    </div>
+    <div id="obStep2" style="display:none;">
+      <p class="ob-eyebrow">Your toolkit</p>
+      <h2 id="obToolkitTitle">Here's what will help you</h2>
+      <div id="obToolkit"></div>
+      <button class="btn primary" id="obStart" style="width:100%; margin-top:8px;">Get started</button>
+      <button class="btn ghost" id="obBack" style="width:100%;">← Back</button>
+    </div>
   </div>
 </div>
 
@@ -558,6 +612,54 @@ const saveTodos = () => { store.set('todos', todos); syncPush(); };
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 
 const myName = () => store.get('myName', '');
+
+/* ---------- cohorts + onboarding (v37) ----------
+   Users self-select what they use the app for on first run. This segments them
+   for the operator (cohort tracking) and drives a tailored explainer of which
+   features help them. Multi-select — real users cross audiences. */
+const COHORTS = [
+  {id: 'adhd', ico: '🧠', title: 'Focus & ADHD',
+   desc: 'I get overwhelmed, forget things, or find starting hard.',
+   features: [
+     ['🎤 Voice brain-dump', 'Talk out everything on your mind; the app sorts it into tasks.'],
+     ['🪄 Break it down', 'Turn a daunting task into tiny, obvious first steps.'],
+     ['🎯 Just one thing', 'A full-screen single task so a long list can’t overwhelm you.'],
+     ['🔋 Energy & easy wins', 'Match tasks to the energy you actually have right now.'],
+     ['No-shame carry-over', 'Nothing goes red or nags — unfinished tasks just wait, kindly.'],
+     ['🏆 Wins', 'See what you finished; the streak counts any activity, never punishes.']
+   ],
+   actions: [{label: 'Turn on quiet visual mode', fn: () => { store.set('quietMode', true); if (typeof applyQuiet === 'function') applyQuiet(); }}]},
+  {id: 'coparenting', ico: '🤝', title: 'Co-parenting',
+   desc: 'I share parenting and need clear, provable coordination.',
+   features: [
+     ['🤝 A shared co-parenting space', 'One list both parents see, with who-did-what and when.'],
+     ['📜 Append-only history + export', 'A record neither parent can rewrite; export as PDF/CSV.'],
+     ['🕊 Tone check', 'Flags hostile wording before it reaches the other parent and offers a calm rewrite.'],
+     ['💵 Expenses & ledger', 'Log costs with receipts; see who owes whom.'],
+     ['🗓 Custody days', 'Whose day it is, with a handover-tomorrow heads-up.']
+   ],
+   actions: [{label: 'Create a co-parenting space', fn: () => { showView('settings'); setTimeout(() => document.getElementById('addSpaceBtn') && document.getElementById('addSpaceBtn').click(), 200); }}]},
+  {id: 'caregiving', ico: '💙', title: 'Caring for someone',
+   desc: 'I help coordinate care for a parent, relative, or friend.',
+   features: [
+     ['💙 A care-team space + profile', 'Everyone caring shares one picture of the person.'],
+     ['💊 Routines & meds', 'Timed repeating tasks; every tick is a record, misses are flagged.'],
+     ['📝 Care journal', 'Voice-capture observations and share them to the team.'],
+     ['🩺 Doctor briefing', 'Turn weeks of notes into a one-page brief for the GP.'],
+     ['Shift handoff', 'See exactly what happened since you were last on.']
+   ],
+   actions: [{label: 'Create a care-team space', fn: () => { showView('settings'); setTimeout(() => document.getElementById('addSpaceBtn') && document.getElementById('addSpaceBtn').click(), 200); }}]},
+  {id: 'family', ico: '👪', title: 'Household & family',
+   desc: 'We juggle a busy household and want to share the load.',
+   features: [
+     ['👥 A shared family list', 'New tasks and ticks appear on everyone’s phone in real time.'],
+     ['Delegate tasks', 'Assign to a person; they see just what’s theirs.'],
+     ['Who did what', 'Every add and tick shows who and when.'],
+     ['🔔 Daily digest', 'A once-a-day summary of what’s open and what the family did.']
+   ],
+   actions: [{label: 'Create a family space', fn: () => { showView('settings'); setTimeout(() => document.getElementById('addSpaceBtn') && document.getElementById('addSpaceBtn').click(), 200); }}]}
+];
+const cohorts = () => store.get('cohorts', []);
 
 function setDone(td, done, silent){
   td.done = done;
@@ -3700,8 +3802,112 @@ document.getElementById('digestBtn').addEventListener('click', async () => {
   }
 });
 
+/* ---------- onboarding controller (v37) ---------- */
+let obSelected = new Set();
+function renderObChips(){
+  const host = document.getElementById('obChips');
+  host.innerHTML = '';
+  COHORTS.forEach(c => {
+    const b = document.createElement('button');
+    b.className = 'ob-chip';
+    b.type = 'button';
+    b.setAttribute('aria-pressed', obSelected.has(c.id) ? 'true' : 'false');
+    b.innerHTML = `<span class="obc-ico" aria-hidden="true">${c.ico}</span>` +
+      `<span><span class="obc-t">${c.title}</span><span class="obc-d">${c.desc}</span></span>` +
+      `<span class="obc-check" aria-hidden="true">✓</span>`;
+    b.addEventListener('click', () => {
+      if (obSelected.has(c.id)) obSelected.delete(c.id); else obSelected.add(c.id);
+      b.setAttribute('aria-pressed', obSelected.has(c.id) ? 'true' : 'false');
+    });
+    host.appendChild(b);
+  });
+}
+function renderToolkit(){
+  const host = document.getElementById('obToolkit');
+  host.innerHTML = '';
+  const chosen = COHORTS.filter(c => obSelected.has(c.id));
+  document.getElementById('obToolkitTitle').textContent =
+    chosen.length ? 'Here’s what will help you' : 'A few things to try';
+  (chosen.length ? chosen : [COHORTS[0], COHORTS[3]]).forEach(c => {
+    const g = document.createElement('div');
+    g.className = 'ob-tk-group';
+    g.innerHTML = `<h3><span aria-hidden="true">${c.ico}</span> ${c.title}</h3>`;
+    c.features.forEach(([t, d]) => {
+      const it = document.createElement('div');
+      it.className = 'ob-tk-item';
+      it.innerHTML = `<span>•</span><span><b>${t}</b> — <span class="obt-d">${d}</span></span>`;
+      g.appendChild(it);
+    });
+    (c.actions || []).forEach(a => {
+      const btn = document.createElement('button');
+      btn.className = 'btn ghost';
+      btn.style.cssText = 'width:100%; margin-top:8px;';
+      btn.textContent = a.label;
+      btn.addEventListener('click', () => { finishOnboarding(); a.fn(); });
+      g.appendChild(btn);
+    });
+    host.appendChild(g);
+  });
+}
+function saveCohorts(){
+  const list = [...obSelected];
+  store.set('cohorts', list);
+  refreshCohortSetting();
+  // cohort tracking: write to the user's own doc in managed mode (best effort)
+  if (aiProxyUrl() || spacesList().some(s => s.managed)){
+    ensureManaged().then(() => {
+      fbFs.setDoc(fbFs.doc(managedDb, 'cohorts', managedUid),
+        {cohorts: list, updated: Date.now()}, {merge: true}).catch(() => {});
+    }).catch(() => {});
+  }
+}
+function finishOnboarding(){
+  saveCohorts();
+  store.set('onboarded', true);
+  document.getElementById('onboarding').style.display = 'none';
+  document.body.style.overflow = '';
+}
+function startOnboarding(reopen){
+  obSelected = new Set(cohorts());
+  renderObChips();
+  document.getElementById('obStep1').style.display = '';
+  document.getElementById('obStep2').style.display = 'none';
+  document.getElementById('onboarding').style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+  setTimeout(() => { const f = document.querySelector('#obChips .ob-chip'); if (f) f.focus(); }, 60);
+}
+document.getElementById('obContinue').addEventListener('click', () => {
+  saveCohorts();
+  renderToolkit();
+  document.getElementById('obStep1').style.display = 'none';
+  document.getElementById('obStep2').style.display = '';
+  document.getElementById('obToolkit').scrollIntoView({block: 'start'});
+});
+document.getElementById('obBack').addEventListener('click', () => {
+  document.getElementById('obStep2').style.display = 'none';
+  document.getElementById('obStep1').style.display = '';
+});
+document.getElementById('obSkip').addEventListener('click', finishOnboarding);
+document.getElementById('obStart').addEventListener('click', finishOnboarding);
+document.getElementById('cohortBtn').addEventListener('click', () => startOnboarding(true));
+
+/* ---------- settings: what I use this for ---------- */
+function refreshCohortSetting(){
+  const el = document.getElementById('cohortStatus');
+  if (!el) return;
+  const chosen = COHORTS.filter(c => cohorts().includes(c.id));
+  el.textContent = chosen.length ? 'You use this for: ' + chosen.map(c => c.ico + ' ' + c.title).join(', ') + '.'
+    : 'Not set — tap to tell us what you use this for.';
+}
+
 /* ---------- init ---------- */
 updateBadge();
+refreshCohortSetting();
+// Only greet genuinely new users — someone upgrading (with tasks, ideas, or a
+// space already) shouldn't be interrupted; they can revisit from Settings.
+if (!store.get('onboarded', false) && !todos.length && !ideas.length && !spacesList().length){
+  startOnboarding();
+}
 
 // Diagnostic: show which browser engine this is running in and whether it's
 // the installed standalone app or just a browser tab.

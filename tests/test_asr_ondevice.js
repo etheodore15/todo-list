@@ -10,6 +10,8 @@ const { chromium } = require('playwright');
   page.on('pageerror', e => errors.push('PAGEERROR: ' + e.message));
   page.on('console', m => { if (m.type() === 'error') errors.push('CONSOLE: ' + m.text().slice(0, 300)); });
 
+  await page.addInitScript(() => { try { localStorage.setItem("onboarded", "true"); } catch(e){} });
+
   await page.goto('http://localhost:8906/', { waitUntil: 'networkidle' });
 
   // Point the worker's model hub at the locally-served copies.

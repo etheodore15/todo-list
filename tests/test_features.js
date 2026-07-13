@@ -9,6 +9,8 @@ const { chromium } = require('playwright');
   let pass = 0, fail = 0;
   const check = (name, cond) => { console.log((cond ? 'PASS' : 'FAIL') + ': ' + name); cond ? pass++ : fail++; };
 
+  await page.addInitScript(() => { try { localStorage.setItem("onboarded", "true"); } catch(e){} });
+
   await page.goto('http://localhost:8904/', { waitUntil: 'networkidle' });
 
   // --- priority scoring ---

@@ -3,6 +3,7 @@ const { chromium } = require('playwright');
 (async () => {
   const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--no-sandbox'] });
   const page = await browser.newPage();
+  await page.addInitScript(() => { try { localStorage.setItem("onboarded", "true"); } catch(e){} });
   await page.goto('http://localhost:8906/', { waitUntil: 'networkidle' });
   const r = await page.evaluate(async () => {
     try {

@@ -6,6 +6,7 @@ const { chromium } = require('playwright');
   page.on('pageerror', e => errors.push(e.message));
   let pass = 0, fail = 0;
   const check = (n, c) => { console.log((c?'PASS':'FAIL')+': '+n); c?pass++:fail++; };
+  await page.addInitScript(() => { try { localStorage.setItem("onboarded", "true"); } catch(e){} });
   await page.goto('http://localhost:8906/', { waitUntil: 'networkidle' });
 
   // The user's exact transcript (no Gemini key → built-in heuristic path)

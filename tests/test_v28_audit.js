@@ -75,6 +75,7 @@ export function onSnapshot(col, cb, errCb){
     await ctx.route('**/vendor/firebase-firestore.js', r => r.fulfill({ contentType: 'application/javascript', body: FAKE_FS }));
     const page = await ctx.newPage();
     page.on('pageerror', e => errors.push(e.message));
+    await page.addInitScript(() => { try { localStorage.setItem("onboarded", "true"); } catch(e){} });
     await page.goto('http://localhost:8906/', { waitUntil: 'networkidle' });
     if (name){
       await page.click('nav.tabs button[data-view="settings"]');

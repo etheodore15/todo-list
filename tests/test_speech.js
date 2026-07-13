@@ -16,6 +16,8 @@ const { chromium } = require('playwright');
     };
   });
 
+  await page.addInitScript(() => { try { localStorage.setItem("onboarded", "true"); } catch(e){} });
+
   await page.goto('http://localhost:8902/', { waitUntil: 'networkidle' });
 
   const fire = (parts) => page.evaluate((parts) => {

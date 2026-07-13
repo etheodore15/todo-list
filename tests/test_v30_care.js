@@ -103,6 +103,7 @@ export function onSnapshot(col, cb){
       {id: 'idea1', raw: 'mum seemed dizzy this morning when she got up, steadied after breakfast',
        summary: 'Mum was dizzy this morning.', priority: 'medium', engine: 'built-in', ts: Date.now()}]));
   }, {yest});
+  await page.addInitScript(() => { try { localStorage.setItem("onboarded", "true"); } catch(e){} });
   await page.goto('http://localhost:8906/', { waitUntil: 'load' });
   await page.waitForTimeout(600);
 
