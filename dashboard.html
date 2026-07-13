@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Idea → Todo — operator dashboard</title>
+<script src="managed-config.js"></script>
+<style>
+  :root{
+    --bg:#f9f9f7; --surface:#fcfcfb; --ink:#14140f; --ink2:#52514e; --muted:#898781;
+    --hair:rgba(11,11,11,.10); --grid:#e1e0d9;
+    --s1:#2a78d6; --s2:#1baf7a; --s3:#eda100; --s4:#e34948; --s5:#eb6834;
+    --ok:#0ca30c;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --bg:#0d0d0d; --surface:#1a1a19; --ink:#f2f1ea; --ink2:#c3c2b7; --muted:#898781;
+      --hair:rgba(255,255,255,.10); --grid:#2c2c2a;
+      --s1:#3987e5; --s2:#199e70; --s3:#c98500; --s4:#e66767; --s5:#d95926; --ok:#0ca30c; }
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; background:var(--bg); color:var(--ink); line-height:1.5;
+    font-family:system-ui,-apple-system,"Segoe UI",sans-serif; padding:28px 18px 60px;}
+  .wrap{max-width:940px; margin:0 auto;}
+  .eyebrow{font-size:.72rem; text-transform:uppercase; letter-spacing:.14em; color:var(--muted); margin:0 0 4px;}
+  h1{font-size:1.5rem; margin:0 0 3px;}
+  .sub{color:var(--ink2); font-size:.9rem; margin:0 0 24px;}
+  .card{background:var(--surface); border:1px solid var(--hair); border-radius:12px; padding:16px 18px; margin-bottom:16px;}
+  button{font:inherit; cursor:pointer; border-radius:10px; border:1px solid var(--hair);
+    background:var(--surface); color:var(--ink); padding:10px 16px; font-weight:600;}
+  button.primary{background:var(--s1); color:#fff; border-color:var(--s1);}
+  button:focus-visible{outline:3px solid var(--s1); outline-offset:2px;}
+  .tiles{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin-bottom:16px;}
+  .tile{background:var(--surface); border:1px solid var(--hair); border-radius:12px; padding:14px 16px;}
+  .tile .v{font-size:1.7rem; font-weight:700; letter-spacing:-.01em; font-variant-numeric:tabular-nums;}
+  .tile .k{font-size:.76rem; color:var(--ink2); margin-top:2px;}
+  h2{font-size:1rem; margin:22px 0 10px;}
+  .bar-row{display:flex; align-items:center; gap:10px; margin:7px 0; font-size:.86rem;}
+  .bar-row .lbl{width:130px; flex:0 0 auto; color:var(--ink2);}
+  .bar-track{flex:1; background:var(--grid); border-radius:6px; height:16px; overflow:hidden;}
+  .bar-fill{height:100%; border-radius:6px;}
+  .bar-row .n{width:52px; text-align:right; font-variant-numeric:tabular-nums; font-weight:600;}
+  .docs{display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:10px;}
+  .doc{display:block; text-decoration:none; color:var(--ink); background:var(--surface);
+    border:1px solid var(--hair); border-radius:10px; padding:12px 14px;}
+  .doc:hover{border-color:var(--s1);}
+  .doc b{display:block;} .doc span{color:var(--ink2); font-size:.8rem;}
+  .muted{color:var(--muted); font-size:.85rem;}
+  #signInView, #deniedView{text-align:center; padding:40px 0;}
+  .topbar{display:flex; align-items:center; gap:12px; margin-bottom:20px;}
+  .topbar .who{margin-left:auto; font-size:.82rem; color:var(--ink2);}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <p class="eyebrow">Idea → Todo</p>
+  <h1>Operator dashboard</h1>
+  <p class="sub">Anonymous, first-party usage — read live from your Firestore. No task content is ever stored or shown.</p>
+
+  <div id="signInView" class="card">
+    <p>Sign in with the Google account that owns this Firebase project.</p>
+    <button class="primary" id="signInBtn">Sign in with Google</button>
+    <p class="muted" id="signInMsg" style="margin-top:12px;"></p>
+  </div>
+
+  <div id="deniedView" class="card" style="display:none;">
+    <p><b>Not an operator.</b></p>
+    <p class="muted">Add your Firebase Auth UID to the <code>isOperator()</code> allowlist in
+      <code>firestore.rules</code>, then <code>./deploy-backend.sh rules</code>. Your UID:
+      <code id="myUid"></code></p>
+    <button id="signOutBtn2">Sign out</button>
+  </div>
+
+  <div id="dashView" style="display:none;">
+    <div class="topbar">
+      <button id="refreshBtn">↻ Refresh</button>
+      <span class="who" id="whoami"></span>
+      <button id="signOutBtn">Sign out</button>
+    </div>
+    <div class="tiles" id="tiles"></div>
+
+    <div class="card">
+      <h2 style="margin-top:0;">Users by cohort</h2>
+      <div id="cohortBars"></div>
+      <p class="muted" id="cohortNote"></p>
+    </div>
+
+    <div class="card">
+      <h2 style="margin-top:0;">Feature usage</h2>
+      <div id="featureBars"></div>
+    </div>
+
+    <div class="card">
+      <h2 style="margin-top:0;">Spaces created by type</h2>
+      <div id="spaceBars"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0;">Build notes &amp; user-flow docs</h2>
+    <div class="docs">
+      <a class="doc" href="https://github.com/etheodore15/todo-list/blob/main/USERFLOWS.md" target="_blank" rel="noopener"><b>User flows &amp; architecture</b><span>How the app works, data model, release loop</span></a>
+      <a class="doc" href="https://github.com/etheodore15/todo-list/blob/main/ROADMAP.md" target="_blank" rel="noopener"><b>Roadmap</b><span>Shipped features, productization track, decisions</span></a>
+      <a class="doc" href="https://github.com/etheodore15/todo-list/blob/main/OPERATORS.md" target="_blank" rel="noopener"><b>Operator runbook</b><span>Managed backend, deploy, analytics setup</span></a>
+      <a class="doc" href="https://github.com/etheodore15/todo-list/blob/main/functions/README.md" target="_blank" rel="noopener"><b>AI proxy</b><span>Deploy + quota configuration</span></a>
+      <a class="doc" href="https://github.com/etheodore15/todo-list/blob/main/README.md" target="_blank" rel="noopener"><b>README</b><span>Install, features, privacy</span></a>
+      <a class="doc" href="https://console.firebase.google.com/" target="_blank" rel="noopener"><b>Firebase console ↗</b><span>Auth, Firestore, Functions, billing</span></a>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+const SERIES = ['var(--s1)','var(--s2)','var(--s3)','var(--s4)','var(--s5)'];
+const $ = (id) => document.getElementById(id);
+const show = (id, on) => { $(id).style.display = on ? '' : 'none'; };
+
+let fbAuth = null, fbFs = null, db = null;
+
+async function boot(){
+  if (!window.MANAGED){ $('signInMsg').textContent = 'This build has no managed backend configured (managed-config.js).'; return; }
+  const appMod = await import('./vendor/firebase-app.js');
+  fbAuth = await import('./vendor/firebase-auth.js');
+  fbFs = await import('./vendor/firebase-firestore.js');
+  const app = appMod.initializeApp(window.MANAGED, 'dash');
+  db = fbFs.initializeFirestore(app, {});
+  const auth = fbAuth.getAuth(app);
+  fbAuth.onAuthStateChanged(auth, (u) => u ? onSignedIn(u) : onSignedOut());
+}
+
+$('signInBtn').addEventListener('click', async () => {
+  try { await fbAuth.signInWithPopup(fbAuth.getAuth(), new fbAuth.GoogleAuthProvider()); }
+  catch (e){ $('signInMsg').textContent = 'Sign-in failed: ' + e.message; }
+});
+const doSignOut = () => fbAuth.signOut(fbAuth.getAuth());
+$('signOutBtn').addEventListener('click', doSignOut);
+$('signOutBtn2').addEventListener('click', doSignOut);
+$('refreshBtn').addEventListener('click', loadData);
+
+function onSignedOut(){ show('signInView', true); show('dashView', false); show('deniedView', false); }
+
+async function onSignedIn(u){
+  show('signInView', false);
+  $('whoami').textContent = u.email || u.uid;
+  $('myUid').textContent = u.uid;
+  try {
+    await loadData();               // succeeds only if rules say we're an operator
+    show('dashView', true); show('deniedView', false);
+  } catch (e){
+    // permission-denied → not on the operator allowlist
+    show('deniedView', true); show('dashView', false);
+  }
+}
+
+const COHORT_NAMES = {adhd:'🧠 Focus & ADHD', coparenting:'🤝 Co-parenting', caregiving:'💙 Caregiving', family:'👪 Household'};
+const FEATURE_NAMES = {break_down:'Break it down', focus_mode:'Just one thing', tone_check:'Tone check',
+  briefing:'Doctor briefing', expense:'Expenses', custody:'Custody days', care_profile:'Care profile'};
+
+async function loadData(){
+  const snap = await fbFs.getDocs(fbFs.collection(db, 'cohorts'));
+  const docs = [];
+  snap.forEach(d => docs.push(d.data() || {}));
+  render(docs);
+}
+
+function render(docs){
+  const now = Date.now();
+  const active7 = docs.filter(d => (d.lastSeen||0) > now - 7*864e5).length;
+  const active30 = docs.filter(d => (d.lastSeen||0) > now - 30*864e5).length;
+  const sum = (k) => docs.reduce((a,d) => a + (typeof d[k]==='number'?d[k]:0), 0);
+  const totalSpaces = sum('spacesCreated');
+
+  $('tiles').innerHTML = '';
+  const tile = (v, k) => `<div class="tile"><div class="v">${v}</div><div class="k">${k}</div></div>`;
+  $('tiles').innerHTML =
+    tile(docs.length, 'installs (unique users)') +
+    tile(active7, 'active last 7 days') +
+    tile(active30, 'active last 30 days') +
+    tile(sum('aiCalls').toLocaleString(), 'AI calls (all time)') +
+    tile(totalSpaces, 'spaces created') +
+    tile(sum('onboards'), 'completed onboarding');
+
+  // cohort bars (a user can be in several)
+  const cohortCounts = {};
+  docs.forEach(d => (d.cohorts||[]).forEach(c => cohortCounts[c] = (cohortCounts[c]||0)+1));
+  bars('cohortBars', Object.keys(COHORT_NAMES).map((k,i) => ({label: COHORT_NAMES[k], n: cohortCounts[k]||0, color: SERIES[i]})));
+  const noCohort = docs.filter(d => !(d.cohorts||[]).length).length;
+  $('cohortNote').textContent = noCohort ? noCohort + ' user(s) haven’t chosen a cohort.' : '';
+
+  // feature usage
+  const feat = {};
+  docs.forEach(d => Object.keys(d).forEach(k => { if (k.startsWith('feat_')) feat[k.slice(5)] = (feat[k.slice(5)]||0) + d[k]; }));
+  const featRows = Object.keys(FEATURE_NAMES).map((k,i) => ({label: FEATURE_NAMES[k], n: feat[k]||0, color: SERIES[i%5]}))
+    .sort((a,b) => b.n - a.n);
+  bars('featureBars', featRows);
+
+  // spaces by type
+  const sp = {};
+  docs.forEach(d => Object.keys(d).forEach(k => { if (k.startsWith('sp_')) sp[k.slice(3)] = (sp[k.slice(3)]||0) + d[k]; }));
+  bars('spaceBars', [['family','👥 Family'],['coparenting','🤝 Co-parenting'],['care','💙 Care team']]
+    .map(([k,l],i) => ({label:l, n: sp[k]||0, color: SERIES[i]})));
+}
+
+function bars(hostId, rows){
+  const max = Math.max(1, ...rows.map(r => r.n));
+  $(hostId).innerHTML = rows.map(r =>
+    `<div class="bar-row"><span class="lbl">${r.label}</span>` +
+    `<span class="bar-track"><span class="bar-fill" style="width:${Math.round(r.n/max*100)}%; background:${r.color};"></span></span>` +
+    `<span class="n">${r.n.toLocaleString()}</span></div>`).join('');
+}
+
+boot().catch(e => { $('signInMsg').textContent = 'Load error: ' + e.message; });
+</script>
+</body>
+</html>

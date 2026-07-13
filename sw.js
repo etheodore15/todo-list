@@ -1,4 +1,4 @@
-const CACHE = 'idea-todo-v39';
+const CACHE = 'idea-todo-v40';
 const LIB_CACHE = 'idea-todo-libs-v1';
 const ASSETS = [
   './',
@@ -7,6 +7,7 @@ const ASSETS = [
   './ai-worker.js',
   './digest.js',
   './managed-config.js',
+  './dashboard.html',
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/icon-maskable-512.png'

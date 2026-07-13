@@ -52,6 +52,21 @@ instructions.
   is re-attributed). Google sign-in (planned) removes this.
 - Gemini features still use per-user keys until **P2 (AI proxy)** ships.
 
+## Operator dashboard
+
+`dashboard.html` (e.g. `https://etheodore15.github.io/todo-list/dashboard.html`)
+is an auth-gated page showing anonymous usage read live from Firestore:
+installs, active users, AI calls, users by cohort, feature usage, spaces by
+type — plus a hub linking these build/flow docs. Access:
+
+1. Sign in with the Google account that owns the Firebase project (enable the
+   **Google** sign-in provider in Auth first).
+2. Add your Firebase Auth UID to the `isOperator()` allowlist in
+   `firestore.rules` and `./deploy-backend.sh rules`. The dashboard shows your
+   UID on the "not an operator" screen if you're not yet allowlisted.
+
+No task content is ever stored or shown — only the anonymized counters.
+
 ## Deploying the backend (Infrastructure-as-Code)
 
 The whole backend lives in the repo and deploys with one command — no
