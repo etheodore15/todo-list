@@ -130,6 +130,9 @@
     line-height:1.6; margin-bottom:14px; position:relative;}
   #awayBanner .close{position:absolute; top:8px; right:10px; background:none; border:none;
     color:var(--muted); font-size:1rem; cursor:pointer;}
+  #custodyBanner{margin-bottom:12px; display:flex; flex-direction:column; gap:6px;}
+  .custody-line{background:rgba(255,179,71,.1); border:1px solid rgba(255,179,71,.35);
+    color:var(--text); border-radius:12px; padding:10px 13px; font-size:.84rem; line-height:1.5;}
 
   /* Todo */
   .prio-section{margin-bottom:18px;}
@@ -286,6 +289,7 @@
     <div class="progress"><div id="progressBar"></div></div>
     <div id="awayBanner" style="display:none;"></div>
     <div id="spaceFilter" style="display:flex; gap:8px; overflow-x:auto; margin-bottom:10px; scrollbar-width:none;"></div>
+    <div id="custodyBanner" style="display:none;"></div>
     <button class="btn ghost" id="focusBtn" style="display:none; width:100%; margin-bottom:12px;">🎯 Just one thing</button>
     <div class="addrow">
       <input id="quickAdd" placeholder="Quick add a task…" enterkeyhint="done">
@@ -413,7 +417,7 @@
       <input type="file" id="importFile" accept=".json,application/json" style="display:none">
       <button class="btn ghost" id="wipeBtn">Delete all data</button>
     </div>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v32<br><span id="envInfo"></span></p>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v33<br><span id="envInfo"></span></p>
   </section>
 </main>
 
@@ -433,6 +437,16 @@
     <div id="scopeMembers" style="margin:4px 0 10px;"></div>
     <button class="btn primary" id="scopeAssign">Assign to selected</button>
     <button class="btn ghost" id="scopeCancel">Cancel</button>
+  </div>
+</div>
+
+<div id="custodySheet" class="sheet-overlay" style="display:none;">
+  <div class="sheet">
+    <h3>🗓 Which days do you have the kids?</h3>
+    <p class="side-note">Tick the weekdays the children are with you. The other parent has the rest. Both of you see the same schedule.</p>
+    <div id="custodyDays" style="margin:6px 0 12px;"></div>
+    <button class="btn primary" id="custodySave">Save schedule</button>
+    <button class="btn ghost" id="custodyCancel">Cancel</button>
   </div>
 </div>
 
@@ -1724,6 +1738,7 @@ function renderEasyChip(list){
 function renderTodos(){
   const el = document.getElementById('todoList');
   renderSpaceFilter();
+  renderCustodyBanner();
   let list = todayTodos().filter(visibleToMe).filter(inActiveSpace);
   renderTagFilter(list);
   renderEasyChip(list);
@@ -2722,6 +2737,13 @@ async function startSpaceSync(sp){
   syncPush();
   flushPendingEvents(sp);
   flushPendingReceipts(sp);
+  // custody schedule (C1e) lives on the household doc — read it once at connect
+  if (sp.type === 'coparenting' && fbFs.getDoc){
+    fbFs.getDoc(fbFs.doc(rt.db, 'households', sp.hid)).then(snap => {
+      const d = snap && snap.exists && snap.exists() ? snap.data() : (snap && snap.data && snap.data());
+      if (d && d.custody){ setLocalCustody(sp.hid, d.custody); renderTodos(); }
+    }).catch(() => {});
+  }
   const col = fbFs.collection(rt.db, 'households', sp.hid, 'items');
   rt.unsub = fbFs.onSnapshot(col, snap => {
     applyingRemote = true;
@@ -3091,6 +3113,104 @@ th{background:#eee;}</style></head><body>
   w.print();
 });
 
+/* ---------- custody-aware days (C1e) ----------
+   A co-parenting space can carry a weekly custody pattern on its household
+   doc so both parents share it. One parent marks the weekdays THEY have the
+   kids (custody.days, 0=Sun..6=Sat) and is recorded as custody.by; with two
+   parents that fully implies the other parent's days. The viewer sees it from
+   their own side. Stored per-space in localStorage, mirrored to the doc. */
+function localCustody(){ return store.get('custody', {}); }
+function setLocalCustody(hid, c){ const m = localCustody(); m[hid] = c; store.set('custody', m); }
+function getCustody(hid){ return localCustody()[hid] || null; }
+
+// who has the kids on a given weekday, from the viewer's perspective:
+// 'me' | 'them' | null (unknown / not configured / viewer isn't a parent)
+function custodyOn(hid, weekday){
+  const c = getCustody(hid);
+  if (!c || !Array.isArray(c.days)) return null;
+  const byMe = (c.by || '').toLowerCase() === myName().toLowerCase() && myName();
+  const isBySetDay = c.days.includes(weekday);
+  if (!myName()) return isBySetDay ? 'setter' : 'other';   // no identity — label absolutely
+  return (isBySetDay === !!byMe) ? 'me' : 'them';
+}
+
+function custodyLabel(hid, dateStr){
+  const c = getCustody(hid);
+  if (!c) return null;
+  const wd = new Date(dateStr + 'T00:00:00Z').getUTCDay();
+  const who = custodyOn(hid, wd);
+  // the co-parent from the viewer's side is whichever of {by, other} isn't me
+  const me = (myName() || '').toLowerCase();
+  const coParent = (c.by || '').toLowerCase() === me ? (c.other || 'the other parent') : (c.by || 'the other parent');
+  if (who === 'me') return 'your day with the kids';
+  if (who === 'them') return coParent + '’s day';
+  if (who === 'setter') return (c.by || 'Parent A') + '’s day';
+  if (who === 'other') return 'the other parent’s day';
+  return null;
+}
+
+function renderCustodyBanner(){
+  const host = document.getElementById('custodyBanner');
+  if (!host) return;
+  const spaces = spacesList().filter(s => s.type === 'coparenting' && getCustody(s.hid));
+  const shown = spaces.filter(s => activeSpace === 'all' || activeSpace === s.hid);
+  if (!shown.length){ host.style.display = 'none'; host.innerHTML = ''; return; }
+  host.innerHTML = '';
+  shown.forEach(sp => {
+    const today = custodyLabel(sp.hid, todayStr());
+    const tomo = custodyLabel(sp.hid, addDays(1));
+    if (!today) return;
+    const line = document.createElement('div');
+    line.className = 'custody-line';
+    const handover = tomo && tomo !== today;
+    line.innerHTML = `<b>${SPACE_ICON[sp.type]} ${sp.name}:</b> Today is <b>${today}</b>` +
+      (handover ? ` · 🔄 handover tomorrow (then ${tomo})` : '');
+    host.appendChild(line);
+  });
+  host.style.display = host.children.length ? '' : 'none';
+}
+
+async function saveCustody(sp, days){
+  const others = (store.get('members', []) || []).filter(m => m.toLowerCase() !== (myName() || '').toLowerCase());
+  const c = {days: days.slice().sort(), by: myName() || 'Parent A',
+             other: others[0] || 'the other parent', updated: Date.now()};
+  setLocalCustody(sp.hid, c);
+  const rt = spaceRt[sp.hid];
+  if (rt && rt.db) fbFs.setDoc(fbFs.doc(rt.db, 'households', sp.hid), {custody: c}, {merge: true}).catch(() => {});
+  renderTodos();
+  toast('Custody schedule saved ✓');
+}
+
+function openCustody(sp){
+  const wrap = document.getElementById('custodyDays');
+  wrap.innerHTML = '';
+  const c = getCustody(sp.hid);
+  // if the schedule was set by the OTHER parent, show it from my side (invert)
+  const mineSet = c && (c.by || '').toLowerCase() === (myName() || '').toLowerCase();
+  const myDays = c ? (mineSet ? c.days : WEEKDAYS.map((_, i) => i).filter(i => !c.days.includes(i))) : [];
+  WEEKDAYS.forEach((name, i) => {
+    const lab = document.createElement('label');
+    lab.className = 'scope-member';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox'; cb.value = i; cb.checked = myDays.includes(i);
+    lab.appendChild(cb);
+    lab.appendChild(document.createTextNode(name.charAt(0).toUpperCase() + name.slice(1)));
+    wrap.appendChild(lab);
+  });
+  document.getElementById('custodySheet').dataset.hid = sp.hid;
+  document.getElementById('custodySheet').style.display = 'flex';
+}
+document.getElementById('custodySave').addEventListener('click', () => {
+  const hid = document.getElementById('custodySheet').dataset.hid;
+  const sp = spacesList().find(s => s.hid === hid);
+  const days = [...document.querySelectorAll('#custodyDays input:checked')].map(c => +c.value);
+  document.getElementById('custodySheet').style.display = 'none';
+  if (sp) saveCustody(sp, days);
+});
+document.getElementById('custodyCancel').addEventListener('click', () => {
+  document.getElementById('custodySheet').style.display = 'none';
+});
+
 /* ---------- ledger view (C1d) ---------- */
 let ledgerRcs = [], ledgerSpace = null;
 
@@ -3235,6 +3355,13 @@ function renderSpacesList(){
     led.textContent = '💵 Ledger';
     led.addEventListener('click', () => openLedger(sp));
     row.appendChild(led);
+    if (sp.type === 'coparenting'){
+      const cust = document.createElement('button');
+      cust.className = 'btn ghost custody-btn';
+      cust.textContent = '🗓 Custody days';
+      cust.addEventListener('click', () => openCustody(sp));
+      row.appendChild(cust);
+    }
     const leave = document.createElement('button');
     leave.className = 'btn ghost';
     if (i === 0) leave.id = 'leaveHhBtn';

@@ -58,8 +58,8 @@ Our attribution timestamps are already the seed of an evidence trail.
 | C1a ✅ v28 | **Audit log** — append-only event stream per space (created/edited/ticked/deleted, by whom, when, with prior values). Deletes become tombstones in the log even though the list tidies | The core promise: neither parent can rewrite history. Firestore append-only subcollection |
 | C1b ✅ v28 | **Export for records** — one tap: date-ranged PDF (print stylesheet) / CSV of the audit log and task history | "For your lawyer/mediator" is the killer feature OurFamilyWizard charges for |
 | C1c ✅ v29 | **Tone check** — before a task/note syncs to the co-parent space, Gemini flags hostile phrasing and suggests a neutral rewrite ("Tell your father he's late again" → "Pickup was 25 min after the agreed time") | ToneMeter is OurFamilyWizard's most-cited feature; trivial for our Gemini pipeline |
-| C1d | **Expenses lite** — a task can carry an amount + photo of receipt; running ledger per space with "owed" split and CSV export | Money is the #2 co-parenting conflict; photos via camera input, stored as Firestore-linked images (needs Storage or base64-thumbnails — size limits to respect) |
-| C1e | **Custody-aware days** — mark repeating "their days/my days"; delegation defaults and digest adapt ("handover tomorrow: 3 items") | Builds on A2/A3 recurrence |
+| C1d ✅ v32 | **Expenses lite** — a task can carry an amount + photo of receipt; running ledger per space with "owed" split and CSV export | Money is the #2 co-parenting conflict; receipt photos compressed client-side to ≤250 KB JPEGs in an append-only `receipts` subcollection (the credit-card-free path from the storage decision above) |
+| C1e ✅ v33 | **Custody-aware days** — mark repeating "my days"; the other parent's days are implied; Today shows whose day it is + a handover-tomorrow flag | Weekly pattern on the household doc, read per viewer from their own side. Alternating-week patterns and digest integration still TODO |
 
 **Effort:** C1a/C1b ~2 sessions; C1c ~half (prompt + intercept); C1d medium
 (storage decisions); C1e after A2/A3. **Requires Phase A6 (spaces)** so a

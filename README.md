@@ -127,6 +127,12 @@ untouched.
   space — a plain "**Alex owes Sam $40.00**" line. One tap exports the whole
   ledger as **CSV** (receipts flagged), and tapping a receipt opens the photo
   full-size.
+- **🗓 Custody days** (co-parenting spaces): one parent marks the weekdays the
+  kids are with them (Settings → the space → 🗓 Custody days); both parents
+  then see the schedule from their own side. The Today view shows *"Today is
+  your day with the kids"* or *"Today is Alex's day"*, with a **🔄 handover
+  tomorrow** flag on the day before a switch. Schedule is shared on the space
+  and read when the app opens.
 
 > **Scope note:** care features coordinate a family/care team. They are not a
 > medical device, give no dosing or clinical advice, and pairing dose times
