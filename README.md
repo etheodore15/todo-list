@@ -116,6 +116,18 @@ untouched.
   looked"* divider, so whoever comes on duty sees exactly what the others
   did.
 
+### Expenses & the shared ledger (co-parenting / any space)
+
+- **💵 Log an expense** on any task (detail panel → 💵 Expense): an amount and
+  an optional **receipt photo**. The photo is compressed on your phone to a
+  small JPEG (≤250 KB) and stored in the space's append-only ledger — no
+  cloud-storage account or credit card needed.
+- **Shared ledger** (Settings → the space → **💵 Ledger**): every expense with
+  who paid, running totals per person, an equal split, and — for a two-person
+  space — a plain "**Alex owes Sam $40.00**" line. One tap exports the whole
+  ledger as **CSV** (receipts flagged), and tapping a receipt opens the photo
+  full-size.
+
 > **Scope note:** care features coordinate a family/care team. They are not a
 > medical device, give no dosing or clinical advice, and pairing dose times
 > with a phone's native alarm is still recommended (PWAs can't fire
@@ -188,15 +200,19 @@ service cloud.firestore {
         allow read, create: if true;   // append-only history
         allow update, delete: if false;
       }
+      match /receipts/{receipt} {
+        allow read, create: if true;   // append-only expense ledger (v32)
+        allow update, delete: if false;
+      }
     }
   }
 }
 ```
 
-> Upgrading from a version before v28? Re-paste these rules (the `events`
-> block is new) so the shared history works. The `update, delete: if false`
-> line is what makes the history append-only at the server, not just in the
-> app.
+> Upgrading from a version before v32? Re-paste these rules (the `events` and
+> `receipts` blocks are new) so shared history and the expense ledger work.
+> The `update, delete: if false` lines are what make history and receipts
+> append-only at the server, not just in the app.
 
 Households are addressed by long random IDs that only your invite code contains —
 the rules forbid listing them, so knowing the invite is what grants access.

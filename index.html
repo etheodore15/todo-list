@@ -103,6 +103,7 @@
   .date-chip{background:rgba(255,179,71,.14); color:var(--med);}
   .recur-chip{background:rgba(62,207,142,.13); color:var(--ok);}
   .time-chip{background:rgba(79,140,255,.12); color:var(--accent);}
+  .amount-chip{background:rgba(62,207,142,.13); color:var(--ok); font-weight:700;}
   .todo .attr{width:100%; font-size:.68rem; color:var(--ok); margin-top:4px; opacity:.9;}
   .scope-chip{background:rgba(79,140,255,.16); color:var(--accent); cursor:pointer;}
   .sheet-overlay{position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:60;
@@ -195,9 +196,19 @@
   .tone-suggested{border-color:var(--ok);}
 
   /* history / audit log (C1) */
-  #histOverlay{position:fixed; inset:0; z-index:64; background:var(--bg); overflow-y:auto;
+  #histOverlay, #ledgerOverlay{position:fixed; inset:0; z-index:64; background:var(--bg); overflow-y:auto;
     padding:calc(14px + env(safe-area-inset-top)) 16px calc(24px + env(safe-area-inset-bottom));
     max-width:640px; margin:0 auto;}
+  .ledger-line{display:flex; gap:10px; padding:9px 2px; border-bottom:1px solid #1f2634;
+    font-size:.86rem; align-items:center;}
+  .ledger-line img{width:44px; height:44px; object-fit:cover; border-radius:8px; cursor:pointer;
+    border:1px solid #2a3245;}
+  .ledger-line .lmain{flex:1; line-height:1.4;}
+  .ledger-line .lwho{color:var(--muted); font-size:.74rem;}
+  .ledger-line .lamt{font-weight:700; font-variant-numeric:tabular-nums; white-space:nowrap;}
+  .ledger-balance{background:var(--card); border:1px solid #2a3245; border-radius:12px;
+    padding:12px 14px; margin:12px 0; font-size:.9rem; line-height:1.7;}
+  .ledger-owes{color:var(--med); font-weight:700;}
   .hist-head{display:flex; align-items:center; gap:8px;}
   .hist-head b{flex:1; font-size:1.05rem;}
   .hist-head .btn{flex:0 0 auto; width:auto; padding:9px 12px; font-size:.8rem; margin:0;}
@@ -402,7 +413,7 @@
       <input type="file" id="importFile" accept=".json,application/json" style="display:none">
       <button class="btn ghost" id="wipeBtn">Delete all data</button>
     </div>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v31<br><span id="envInfo"></span></p>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v32<br><span id="envInfo"></span></p>
   </section>
 </main>
 
@@ -425,6 +436,21 @@
   </div>
 </div>
 
+<div id="expSheet" class="sheet-overlay" style="display:none;">
+  <div class="sheet">
+    <h3>💵 Log an expense</h3>
+    <p class="side-note" id="expTaskName"></p>
+    <input id="expAmount" type="number" inputmode="decimal" min="0" step="0.01" placeholder="Amount, e.g. 42.50"
+      style="width:100%; background:var(--bg); border:1px solid #2a3245; border-radius:10px; color:var(--text); padding:12px; font-size:1rem; margin-bottom:10px;">
+    <label class="btn ghost" style="display:block; text-align:center; margin-bottom:8px;">
+      📷 Add receipt photo <span id="expPhotoState" style="color:var(--ok)"></span>
+      <input id="expPhoto" type="file" accept="image/*" capture="environment" style="display:none;">
+    </label>
+    <button class="btn primary" id="expSave">Save expense</button>
+    <button class="btn ghost" id="expCancel">Cancel</button>
+  </div>
+</div>
+
 <div id="toneSheet" class="sheet-overlay" style="display:none;">
   <div class="sheet">
     <h3>🕊 How will this land?</h3>
@@ -435,6 +461,16 @@
     <button class="btn ghost" id="toneKeep">Keep mine as written</button>
     <button class="btn ghost" id="toneCancel">Cancel</button>
   </div>
+</div>
+
+<div id="ledgerOverlay" style="display:none;">
+  <div class="hist-head">
+    <b id="ledgerTitle">Ledger</b>
+    <button class="btn ghost" id="ledgerCsvBtn">⬇ CSV</button>
+    <button class="fo-close" id="ledgerClose" aria-label="Close" style="position:static;">✕</button>
+  </div>
+  <div id="ledgerTotals"></div>
+  <div id="ledgerList"></div>
 </div>
 
 <div id="histOverlay" style="display:none;">
@@ -962,6 +998,93 @@ function closeToneSheet(answer){
   document.getElementById('toneSheet').style.display = 'none';
   if (toneResolve){ toneResolve(answer); toneResolve = null; }
 }
+
+/* ---------- expenses + receipts (C1d) ----------
+   An expense is an append-only receipt doc in the space: amount, who paid,
+   when, the task it belongs to, and an optional photo compressed client-side
+   to a small JPEG that fits comfortably inside a Firestore document (the
+   no-credit-card constraint rules out Cloud Storage — see ROADMAP.md). */
+const THUMB_MAX_BYTES = 250 * 1024;
+
+async function compressImage(file){
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((res, rej) => {
+      const i = new Image();
+      i.onload = () => res(i); i.onerror = rej; i.src = url;
+    });
+    const canvas = document.createElement('canvas');
+    let scale = Math.min(1, 1024 / Math.max(img.width, img.height));
+    for (let q = 0.7; q >= 0.3; q -= 0.1){
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      const data = canvas.toDataURL('image/jpeg', q);
+      if (data.length <= THUMB_MAX_BYTES) return data;
+      if (q <= 0.45) scale *= 0.75;          // quality alone isn't enough — shrink too
+    }
+    return null;                              // couldn't get it small enough
+  } finally { URL.revokeObjectURL(url); }
+}
+
+function pushReceipt(rc){
+  if (rc.space && spaceRt[rc.space] && spaceRt[rc.space].db){
+    fbFs.setDoc(fbFs.doc(spaceRt[rc.space].db, 'households', rc.space, 'receipts', rc.id), rc)
+      .catch(() => {});
+  } else if (rc.space){
+    const pend = store.get('pendingRc', []);
+    pend.push(rc);
+    if (pend.length > 50) pend.splice(0, pend.length - 50);   // thumbs are big — keep few
+    store.set('pendingRc', pend);
+  }
+}
+function flushPendingReceipts(sp){
+  const pend = store.get('pendingRc', []);
+  if (!pend.length) return;
+  const rest = [];
+  pend.forEach(rc => {
+    if (rc.space === sp.hid)
+      fbFs.setDoc(fbFs.doc(spaceRt[sp.hid].db, 'households', sp.hid, 'receipts', rc.id), rc).catch(() => {});
+    else rest.push(rc);
+  });
+  store.set('pendingRc', rest);
+}
+
+let expTask = null, expThumb = null;
+function openExpense(td){
+  expTask = td; expThumb = null;
+  document.getElementById('expTaskName').textContent = '“' + td.text + '”' +
+    (td.space ? '' : ' — personal task: the amount stays on this device (receipts need a space)');
+  document.getElementById('expAmount').value = td.amount || '';
+  document.getElementById('expPhotoState').textContent = '';
+  document.getElementById('expPhoto').value = '';
+  document.getElementById('expSheet').style.display = 'flex';
+}
+document.getElementById('expPhoto').addEventListener('change', async (e) => {
+  const f = e.target.files[0];
+  if (!f) return;
+  document.getElementById('expPhotoState').textContent = '… compressing';
+  expThumb = await compressImage(f);
+  document.getElementById('expPhotoState').textContent =
+    expThumb ? '✓ attached (' + Math.round(expThumb.length / 1024) + ' KB)' : "✗ couldn't compress enough";
+});
+document.getElementById('expCancel').addEventListener('click', () => {
+  document.getElementById('expSheet').style.display = 'none'; expTask = null;
+});
+document.getElementById('expSave').addEventListener('click', () => {
+  if (!expTask) return;
+  const amount = Math.round(parseFloat(document.getElementById('expAmount').value) * 100) / 100;
+  if (!(amount >= 0.01)){ toast('Enter an amount first.'); return; }
+  expTask.amount = amount;
+  if (expTask.space){
+    pushReceipt({id: uid(), taskId: expTask.id, ts: Date.now(), who: myName() || null,
+      amount, note: expTask.text, space: expTask.space, thumb: expThumb || null});
+  }
+  logEvent('expense', expTask, '$' + amount.toFixed(2));
+  saveTodos(); renderTodos();
+  document.getElementById('expSheet').style.display = 'none'; expTask = null;
+  toast('Expense logged: $' + amount.toFixed(2) + ' 💵');
+});
 
 /* ---------- break it down (B1) ---------- */
 async function geminiBreakdown(text, key, isRetry){
@@ -1746,6 +1869,14 @@ function todoRow(td){
       tc.textContent = '🕗 ' + fmtTime(td.time);
       tg.appendChild(tc);
     }
+    if (td.amount){
+      const ac = document.createElement('span');
+      ac.className = 'ttag amount-chip';
+      ac.textContent = '💵 $' + td.amount.toFixed(2);
+      ac.title = 'Tap to edit the expense';
+      ac.addEventListener('click', (e) => { e.stopPropagation(); openExpense(td); });
+      tg.appendChild(ac);
+    }
     {
       const ec = document.createElement('span');
       ec.className = 'ttag energy-chip';
@@ -1896,6 +2027,7 @@ function todoRow(td){
     mkAct('📅 When', editDate);
     mkAct('↻ Repeat', editRecur);
     mkAct('🪄 Break down', breakDown);
+    mkAct('💵 Expense', openExpense);
     div.appendChild(acts);
     row.appendChild(div);
   });
@@ -2508,7 +2640,7 @@ function flushPendingEvents(sp){
 const EVENT_LABEL = {created: '➕ added', edited: '✏️ edited', ticked: '✓ ticked off',
   unticked: '↩ un-ticked', deleted: '🗑 deleted', restored: '↩ restored',
   rescheduled: '📅 rescheduled', parked: '🌙 parked for someday', moved: '📦 moved',
-  missed: '⚠️ missed', note: '📝 noted'};
+  missed: '⚠️ missed', note: '📝 noted', expense: '💵 logged an expense on'};
 
 // joining/creating the FIRST space adopts existing shareable tasks into it,
 // matching the old "everything local syncs up" behaviour
@@ -2526,7 +2658,7 @@ function todoCore(td){
           assignees: td.assignees || [], recur: td.recur || null, time: td.time || null,
           subtasks: (td.subtasks || []).map(s => ({text: s.text, done: !!s.done})),
           energy: td.energy || null, minutes: td.minutes || null,
-          someday: !!td.someday, carried: td.carried || 0};
+          someday: !!td.someday, carried: td.carried || 0, amount: td.amount || null};
 }
 function syncMsg(text){
   const el = document.getElementById('syncMsg');
@@ -2589,6 +2721,7 @@ async function startSpaceSync(sp){
   todos.forEach(td => { if ((td.space || null) === sp.hid) rt.lastPush[td.id] = null; });
   syncPush();
   flushPendingEvents(sp);
+  flushPendingReceipts(sp);
   const col = fbFs.collection(rt.db, 'households', sp.hid, 'items');
   rt.unsub = fbFs.onSnapshot(col, snap => {
     applyingRemote = true;
@@ -2958,6 +3091,123 @@ th{background:#eee;}</style></head><body>
   w.print();
 });
 
+/* ---------- ledger view (C1d) ---------- */
+let ledgerRcs = [], ledgerSpace = null;
+
+async function openLedger(sp){
+  ledgerSpace = sp;
+  ledgerRcs = [];
+  document.getElementById('ledgerTitle').textContent = `💵 ${sp.name} — ledger`;
+  document.getElementById('ledgerList').innerHTML = '<p class="side-note">Loading…</p>';
+  document.getElementById('ledgerTotals').innerHTML = '';
+  document.getElementById('ledgerOverlay').style.display = 'block';
+  const rt = spaceRt[sp.hid];
+  if (rt && rt.db){
+    await new Promise(res => {
+      let unsub = null, done = false;
+      const finish = () => { if (!done){ done = true; if (unsub) unsub(); res(); } };
+      unsub = fbFs.onSnapshot(fbFs.collection(rt.db, 'households', sp.hid, 'receipts'), snap => {
+        snap.docChanges().forEach(ch => { if (ch.type !== 'removed') ledgerRcs.push({id: ch.doc.id, ...ch.doc.data()}); });
+        finish();
+      }, finish);
+      setTimeout(finish, 5000);
+    });
+  }
+  // include anything still queued locally for this space
+  store.get('pendingRc', []).filter(r => r.space === sp.hid).forEach(r => {
+    if (!ledgerRcs.some(x => x.id === r.id)) ledgerRcs.push(r);
+  });
+  ledgerRcs.sort((a, b) => b.ts - a.ts);
+  renderLedger();
+}
+
+function ledgerBalances(rcs){
+  const paid = {};
+  rcs.forEach(r => { const w = r.who || 'unknown'; paid[w] = (paid[w] || 0) + (r.amount || 0); });
+  const people = Object.keys(paid);
+  const total = Object.values(paid).reduce((a, b) => a + b, 0);
+  const share = people.length ? total / people.length : 0;
+  const balances = people.map(w => ({who: w, paid: paid[w], net: paid[w] - share}));
+  let owes = null;
+  if (people.length === 2){
+    const [a, b] = balances;
+    const diff = Math.abs(a.net);
+    if (diff >= 0.01) owes = {from: a.net < 0 ? a.who : b.who, to: a.net < 0 ? b.who : a.who, amount: diff};
+  }
+  return {total, share, balances, owes};
+}
+
+function renderLedger(){
+  const list = document.getElementById('ledgerList');
+  const totals = document.getElementById('ledgerTotals');
+  list.innerHTML = ''; totals.innerHTML = '';
+  if (!ledgerRcs.length){
+    list.innerHTML = '<p class="side-note">No expenses yet — open a task → 💵 Expense to log the first one.</p>';
+    return;
+  }
+  const {total, balances, owes} = ledgerBalances(ledgerRcs);
+  const bal = document.createElement('div');
+  bal.className = 'ledger-balance';
+  bal.appendChild(document.createTextNode(`Total: $${total.toFixed(2)} · split equally between ${balances.length}`));
+  balances.forEach(b => {
+    bal.appendChild(document.createElement('br'));
+    bal.appendChild(document.createTextNode(`${b.who} paid $${b.paid.toFixed(2)}`));
+  });
+  if (owes){
+    bal.appendChild(document.createElement('br'));
+    const o = document.createElement('span');
+    o.className = 'ledger-owes';
+    o.textContent = `→ ${owes.from} owes ${owes.to} $${owes.amount.toFixed(2)}`;
+    bal.appendChild(o);
+  }
+  totals.appendChild(bal);
+  ledgerRcs.slice(0, 300).forEach(rc => {
+    const l = document.createElement('div');
+    l.className = 'ledger-line';
+    if (rc.thumb){
+      const img = document.createElement('img');
+      img.src = rc.thumb; img.alt = 'receipt';
+      img.addEventListener('click', () => {
+        const w = window.open('', '_blank');
+        if (w){ w.document.write('<img src="' + rc.thumb + '" style="max-width:100%">'); w.document.close(); }
+      });
+      l.appendChild(img);
+    }
+    const main = document.createElement('div');
+    main.className = 'lmain';
+    const note = document.createElement('div');
+    note.textContent = rc.note || '(expense)';
+    const who = document.createElement('div');
+    who.className = 'lwho';
+    who.textContent = (rc.who || 'someone') + ' · ' + new Date(rc.ts).toLocaleDateString();
+    main.appendChild(note); main.appendChild(who);
+    const amt = document.createElement('span');
+    amt.className = 'lamt';
+    amt.textContent = '$' + (rc.amount || 0).toFixed(2);
+    l.appendChild(main); l.appendChild(amt);
+    list.appendChild(l);
+  });
+}
+
+document.getElementById('ledgerClose').addEventListener('click', () => {
+  document.getElementById('ledgerOverlay').style.display = 'none';
+});
+document.getElementById('ledgerCsvBtn').addEventListener('click', () => {
+  if (!ledgerSpace) return;
+  const esc = (s) => '"' + String(s == null ? '' : s).replace(/"/g, '""') + '"';
+  const rows = [['timestamp','date','who','task','amount','has_receipt'].join(',')];
+  [...ledgerRcs].sort((a, b) => a.ts - b.ts).forEach(rc =>
+    rows.push([rc.ts, new Date(rc.ts).toLocaleDateString(), esc(rc.who || ''), esc(rc.note || ''),
+      (rc.amount || 0).toFixed(2), rc.thumb ? 'yes' : 'no'].join(',')));
+  const blob = new Blob([rows.join('\n')], {type: 'text/csv'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `idea-todo-ledger-${ledgerSpace.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${todayStr()}.csv`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  toast('Ledger exported as CSV ⬇');
+});
+
 function renderSpacesList(){
   const el = document.getElementById('spacesList');
   if (!el) return;
@@ -2980,6 +3230,11 @@ function renderSpacesList(){
     hist.textContent = '📜 History & export';
     hist.addEventListener('click', () => openHistory(sp));
     row.appendChild(hist);
+    const led = document.createElement('button');
+    led.className = 'btn ghost ledger-btn';
+    led.textContent = '💵 Ledger';
+    led.addEventListener('click', () => openLedger(sp));
+    row.appendChild(led);
     const leave = document.createElement('button');
     leave.className = 'btn ghost';
     if (i === 0) leave.id = 'leaveHhBtn';
