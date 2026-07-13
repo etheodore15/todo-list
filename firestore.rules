@@ -4,9 +4,25 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // cohort tracking (v37): each signed-in user may write only their own doc
+    // OPERATOR allowlist — put your own Firebase Auth UID(s) here to unlock the
+    // dashboard (Settings → your account → copy UID, or Firebase console → Auth).
+    function isOperator() {
+      return request.auth != null && request.auth.uid in [
+        'REPLACE_WITH_YOUR_OPERATOR_UID'
+      ];
+    }
+
+    // cohort + first-party analytics (v37/v39): each user writes only their own
+    // doc; the operator may read them all for the dashboard, but never write.
     match /cohorts/{uid} {
-      allow read, write: if request.auth != null && request.auth.uid == uid;
+      allow read: if (request.auth != null && request.auth.uid == uid) || isOperator();
+      allow write: if request.auth != null && request.auth.uid == uid;
+      allow list: if isOperator();
+    }
+    // operator-only read of usage counters across the AI proxy
+    match /aiQuota/{uid} {
+      allow read, list: if isOperator();
+      // (writes happen server-side in the Cloud Function via the Admin SDK)
     }
 
     match /households/{hid} {

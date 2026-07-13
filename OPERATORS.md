@@ -52,6 +52,38 @@ instructions.
   is re-attributed). Google sign-in (planned) removes this.
 - Gemini features still use per-user keys until **P2 (AI proxy)** ships.
 
+## Deploying the backend (Infrastructure-as-Code)
+
+The whole backend lives in the repo and deploys with one command — no
+click-ops. After the P1 console setup:
+
+```
+npm i -g firebase-tools && firebase login
+cp .firebaserc.example .firebaserc      # put your project id in it
+firebase functions:secrets:set GEMINI_KEY   # for the AI proxy (P2)
+./deploy-backend.sh                     # rules + indexes + functions
+./deploy-backend.sh rules               # just re-push rules (e.g. after editing
+                                        # the operator UID allowlist)
+```
+
+`firestore.rules`, `firestore.indexes.json`, `functions/`, `firebase.json`,
+and `deploy-backend.sh` are the transportable backend definition; the
+front-end ships via GitHub Pages on `git push`.
+
+## Analytics (first-party always; GA4 optional, opt-in)
+
+- **First-party (always on in managed mode):** each user's *own*
+  `cohorts/{uid}` doc accumulates anonymized counters (opens, onboards,
+  spaces created, AI calls, feature usage, per-space-type, cohorts, last
+  seen). No content, names, or amounts — ever. This is what the dashboard
+  reads. To read them, add your Firebase Auth UID to the `isOperator()`
+  allowlist in `firestore.rules` and re-deploy rules.
+- **GA4 (optional, opt-in):** set `gaId: 'G-…'` in `managed-config.js` to
+  offer users an **anonymous analytics** opt-in (onboarding + Settings). Only
+  after they consent does GA load, sending the same anonymized events + cohort
+  with IP anonymization and Google ad signals off. No `gaId` → the toggle is
+  hidden and GA never loads.
+
 ## P2 — AI proxy (built, v35)
 
 Removes the last configuration step: with the proxy deployed, every user gets

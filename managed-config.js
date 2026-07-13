@@ -14,5 +14,9 @@ window.MANAGED = null;
 //   apiKey: 'AIza…',
 //   authDomain: 'your-project.firebaseapp.com',
 //   projectId: 'your-project',
-//   appId: '1:1234567890:web:abc123'
+//   appId: '1:1234567890:web:abc123',
+//   aiProxy: 'https://us-central1-your-project.cloudfunctions.net/ai',  // optional (P2)
+//   gaId: 'G-XXXXXXXXXX'   // optional: Google Analytics 4 measurement id.
+//     // GA only ever loads AFTER the user opts in, sends anonymized events +
+//     // cohort (never content/names), with IP anonymization and ad signals off.
 // };

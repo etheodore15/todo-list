@@ -236,7 +236,11 @@
   .ob-chip .obc-d{color:var(--muted); font-size:.82rem; line-height:1.45; margin-top:2px; display:block;}
   .ob-chip .obc-check{margin-left:auto; color:var(--accent); font-weight:700; opacity:0; flex:0 0 auto;}
   .ob-chip[aria-pressed="true"] .obc-check{opacity:1;}
-  #obToolkit{margin-bottom:20px;}
+  #obToolkit{margin-bottom:16px;}
+  .ob-consent{display:flex; gap:10px; align-items:flex-start; background:var(--card);
+    border:1px solid #2a3245; border-radius:12px; padding:12px 13px; margin-bottom:14px;
+    font-size:.83rem; line-height:1.5; color:var(--muted); cursor:pointer;}
+  .ob-consent input{width:18px; height:18px; margin-top:1px; flex:0 0 auto; accent-color:var(--accent);}
   .ob-tk-group{margin-bottom:18px;}
   .ob-tk-group h3{font-size:.95rem; margin:0 0 8px; display:flex; align-items:center; gap:8px;}
   .ob-tk-item{display:flex; gap:10px; padding:6px 0; font-size:.88rem; line-height:1.5;}
@@ -367,6 +371,13 @@
       <p id="cohortStatus"></p>
       <button class="btn primary" id="cohortBtn">Choose / update &amp; see my toolkit</button>
     </div>
+    <div class="set-block" id="analyticsBlock" style="display:none;">
+      <h3>Help improve the app (optional)</h3>
+      <p>Share <b>anonymous</b> usage — which features get used, nothing you type. No task
+         or idea content, names, or amounts are ever sent. Off by default; change any time.</p>
+      <button class="btn" id="analyticsBtn">Turn on anonymous analytics</button>
+      <p id="analyticsStatus"></p>
+    </div>
     <div class="set-block">
       <h3>Offline voice recognition (no API key)</h3>
       <p>Download a small speech model once (~80 MB, use Wi-Fi) and transcription runs
@@ -476,7 +487,7 @@
       <input type="file" id="importFile" accept=".json,application/json" style="display:none">
       <button class="btn ghost" id="wipeBtn">Delete all data</button>
     </div>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v38<br><span id="envInfo"></span></p>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v39<br><span id="envInfo"></span></p>
   </section>
 </main>
 
@@ -514,6 +525,11 @@
       <p class="ob-eyebrow">Your toolkit</p>
       <h2 id="obToolkitTitle">Here's what will help you</h2>
       <div id="obToolkit"></div>
+      <label id="obAnalytics" class="ob-consent" style="display:none;">
+        <input type="checkbox" id="obAnalyticsCb">
+        <span>Help improve the app with <b>anonymous</b> usage stats (which features get used —
+          never anything you type). Optional; change any time in Settings.</span>
+      </label>
       <button class="btn primary" id="obStart" style="width:100%; margin-top:8px;">Get started</button>
       <button class="btn ghost" id="obBack" style="width:100%;">← Back</button>
     </div>
@@ -672,6 +688,68 @@ const COHORTS = [
    actions: [{label: 'Create a family space', fn: () => { showView('settings'); setTimeout(() => document.getElementById('addSpaceBtn') && document.getElementById('addSpaceBtn').click(), 200); }}]}
 ];
 const cohorts = () => store.get('cohorts', []);
+
+/* ---------- first-party product analytics (v39) ----------
+   PRIVACY: only anonymized, aggregate signals — event counters + cohort +
+   last-seen — written to the user's OWN cohorts/{uid} doc, and only when a
+   managed backend exists (the operator's project). NEVER task/idea content,
+   names, amounts, or anything a person typed. No third parties. Self-hosted
+   builds send nothing. This is the data the operator dashboard reads. */
+const COUNTER_FOR = {app_open: 'opens', onboarded: 'onboards',
+  space_created: 'spacesCreated', ai_call: 'aiCalls', feature_used: 'featureUses'};
+
+// Google Analytics 4 — OPT-IN ONLY. Loads gtag.js the first time it's needed
+// after the user has consented and the operator has set a gaId. Sends the same
+// anonymized events (never content/names), with IP anonymization and Google
+// ad signals off. A no-op without consent, gaId, or online access.
+const gaId = () => (window.MANAGED && window.MANAGED.gaId) || '';
+const analyticsConsent = () => store.get('analyticsConsent', false);
+let gaReady = false;
+function initGA(){
+  if (gaReady || !gaId() || !analyticsConsent()) return;
+  gaReady = true;
+  window.dataLayer = window.dataLayer || [];
+  window.gtag = function(){ window.dataLayer.push(arguments); };
+  const s = document.createElement('script');
+  s.async = true;
+  s.src = 'https://www.googletagmanager.com/gtag/js?id=' + encodeURIComponent(gaId());
+  s.onerror = () => { gaReady = false; };   // offline / blocked → silently give up
+  document.head.appendChild(s);
+  window.gtag('js', new Date());
+  window.gtag('config', gaId(), {
+    anonymize_ip: true, allow_google_signals: false, allow_ad_personalization_signals: false
+  });
+  window.gtag('set', 'user_properties', {cohorts: cohorts().join(',') || 'none'});
+}
+
+function track(event, props){
+  try {
+    props = props || {};
+    if (!window.MANAGED) return;   // only the managed backend has a place to write
+    // 1. first-party: anonymized counters to the user's own doc
+    ensureManaged().then(() => {
+      if (!fbFs.increment) return;
+      const data = {lastSeen: Date.now(), cohorts: cohorts()};
+      if (!store.get('trackedInstall', false)){ data.installedAt = Date.now(); store.set('trackedInstall', true); }
+      const c = COUNTER_FOR[event];
+      if (c) data[c] = fbFs.increment(1);
+      // low-cardinality, non-identifying dimensions only
+      if (event === 'feature_used' && /^[a-z_]{1,24}$/.test(props.feature || '')) data['feat_' + props.feature] = fbFs.increment(1);
+      if (event === 'space_created' && /^[a-z]{1,16}$/.test(props.type || '')) data['sp_' + props.type] = fbFs.increment(1);
+      fbFs.setDoc(fbFs.doc(managedDb, 'cohorts', managedUid), data, {merge: true}).catch(() => {});
+    }).catch(() => {});
+    // 2. GA4: opt-in only; same anonymized signal, no content
+    if (analyticsConsent() && gaId()){
+      initGA();
+      if (window.gtag){
+        const p = {};
+        if (event === 'feature_used' && /^[a-z_]{1,24}$/.test(props.feature || '')) p.feature = props.feature;
+        if (event === 'space_created' && /^[a-z]{1,16}$/.test(props.type || '')) p.space_type = props.type;
+        window.gtag('event', event, p);
+      }
+    }
+  } catch (_) {}
+}
 
 function setDone(td, done, silent){
   td.done = done;
@@ -1052,6 +1130,7 @@ async function geminiGenerate(body, isRetry){
     });
     if (res.status === 429) throw new Error('daily AI limit reached — resets tomorrow, or add your own key in Settings');
     if (!res.ok) throw new Error('API ' + res.status + (await apiErrMsg(res)));
+    track('ai_call');
     return res.json();
   }
   const key = userGeminiKey();
@@ -1179,6 +1258,7 @@ async function toneGate(text, spaceHid){
 
 let toneResolve = null;
 function openToneSheet(original, flag, resolve){
+  track('feature_used', {feature: 'tone_check'});
   toneResolve = resolve;
   document.getElementById('toneOriginal').textContent = original;
   document.getElementById('toneRewrite').textContent = flag.rewrite;
@@ -1273,6 +1353,7 @@ document.getElementById('expSave').addEventListener('click', () => {
       amount, note: expTask.text, space: expTask.space, thumb: expThumb || null});
   }
   logEvent('expense', expTask, '$' + amount.toFixed(2));
+  track('feature_used', {feature: 'expense'});
   saveTodos(); renderTodos();
   document.getElementById('expSheet').style.display = 'none'; expTask = null;
   toast('Expense logged: $' + amount.toFixed(2) + ' 💵');
@@ -1328,6 +1409,7 @@ async function breakDown(td){
   }
   td.subtasks = steps.map(s => ({text: s, done: false}));
   saveTodos(); renderTodos();
+  track('feature_used', {feature: 'break_down'});
   toast('Broken into ' + steps.length + ' small steps ✓');
 }
 
@@ -2331,6 +2413,7 @@ function openFocus(){
   focusIdx = 0;
   renderFocus();
   document.getElementById('focusOverlay').style.display = 'flex';
+  track('feature_used', {feature: 'focus_mode'});
 }
 function closeFocus(){
   document.getElementById('focusOverlay').style.display = 'none';
@@ -3044,6 +3127,7 @@ async function addSpace(sp){
   refreshSyncUI();
   await startSpaceSync(sp);
   updateSwConfig();
+  track('space_created', {type: sp.type});
   return true;
 }
 
@@ -3248,6 +3332,7 @@ document.getElementById('histBriefBtn').addEventListener('click', async () => {
   btn.disabled = true; btn.textContent = '🩺 Preparing…';
   try {
     const b = await geminiBriefing(histSpace);
+    track('feature_used', {feature: 'briefing'});
     const w = window.open('', '_blank');
     if (!w){ toast('Pop-ups are blocked — allow them to print.'); }
     else {
@@ -3384,6 +3469,7 @@ async function saveCustody(sp, days, alternate){
   const rt = spaceRt[sp.hid];
   if (rt && rt.db) fbFs.setDoc(fbFs.doc(rt.db, 'households', sp.hid), {custody: c}, {merge: true}).catch(() => {});
   renderTodos();
+  track('feature_used', {feature: 'custody'});
   toast('Custody schedule saved ✓');
 }
 
@@ -3500,6 +3586,7 @@ document.getElementById('profileSave').addEventListener('click', () => {
   if (rt && rt.db) fbFs.setDoc(fbFs.doc(rt.db, 'households', hid), {profile: p}, {merge: true}).catch(() => {});
   document.getElementById('profileSheet').style.display = 'none';
   renderTodos();
+  track('feature_used', {feature: 'care_profile'});
   toast('Care profile saved ✓');
 });
 document.getElementById('profileCancel').addEventListener('click', () => {
@@ -3861,6 +3948,11 @@ function renderObChips(){
 }
 function renderToolkit(){
   const host = document.getElementById('obToolkit');
+  const consent = document.getElementById('obAnalytics');
+  if (consent){
+    consent.style.display = gaId() ? 'flex' : 'none';
+    document.getElementById('obAnalyticsCb').checked = analyticsConsent();
+  }
   host.innerHTML = '';
   const chosen = COHORTS.filter(c => obSelected.has(c.id));
   document.getElementById('obToolkitTitle').textContent =
@@ -3891,7 +3983,7 @@ function saveCohorts(){
   store.set('cohorts', list);
   refreshCohortSetting();
   // cohort tracking: write to the user's own doc in managed mode (best effort)
-  if (aiProxyUrl() || spacesList().some(s => s.managed)){
+  if (window.MANAGED){
     ensureManaged().then(() => {
       fbFs.setDoc(fbFs.doc(managedDb, 'cohorts', managedUid),
         {cohorts: list, updated: Date.now()}, {merge: true}).catch(() => {});
@@ -3900,9 +3992,12 @@ function saveCohorts(){
 }
 function finishOnboarding(){
   saveCohorts();
+  const cb = document.getElementById('obAnalyticsCb');
+  if (cb && gaId()){ store.set('analyticsConsent', !!cb.checked); if (cb.checked) initGA(); refreshAnalytics(); }
   store.set('onboarded', true);
   document.getElementById('onboarding').style.display = 'none';
   document.body.style.overflow = '';
+  track('onboarded');
 }
 function startOnboarding(reopen){
   obSelected = new Set(cohorts());
@@ -3928,6 +4023,26 @@ document.getElementById('obSkip').addEventListener('click', finishOnboarding);
 document.getElementById('obStart').addEventListener('click', finishOnboarding);
 document.getElementById('cohortBtn').addEventListener('click', () => startOnboarding(true));
 
+/* ---------- settings: analytics consent (opt-in) ---------- */
+function refreshAnalytics(){
+  const block = document.getElementById('analyticsBlock');
+  if (!block) return;
+  block.style.display = gaId() ? '' : 'none';   // only shown where the operator enabled GA
+  const on = analyticsConsent();
+  const btn = document.getElementById('analyticsBtn');
+  btn.textContent = on ? 'Turn off anonymous analytics' : 'Turn on anonymous analytics';
+  btn.classList.toggle('primary', !on);
+  document.getElementById('analyticsStatus').textContent = on
+    ? '✅ On — thank you. Anonymous only; nothing you type is sent.' : '';
+}
+document.getElementById('analyticsBtn').addEventListener('click', () => {
+  const on = !analyticsConsent();
+  store.set('analyticsConsent', on);
+  if (on) initGA();
+  refreshAnalytics();
+  toast(on ? 'Anonymous analytics on — thank you' : 'Analytics off');
+});
+
 /* ---------- settings: what I use this for ---------- */
 function refreshCohortSetting(){
   const el = document.getElementById('cohortStatus');
@@ -3940,6 +4055,9 @@ function refreshCohortSetting(){
 /* ---------- init ---------- */
 updateBadge();
 refreshCohortSetting();
+refreshAnalytics();
+if (analyticsConsent()) initGA();
+track('app_open');
 // Only greet genuinely new users — someone upgrading (with tasks, ideas, or a
 // space already) shouldn't be interrupted; they can revisit from Settings.
 if (!store.get('onboarded', false) && !todos.length && !ideas.length && !spacesList().length){
