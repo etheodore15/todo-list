@@ -16,6 +16,18 @@
     --radius:16px;
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  /* visible keyboard focus for everyone (mouse/touch users don't see it) */
+  :focus-visible{outline:3px solid var(--accent); outline-offset:2px; border-radius:4px;}
+  a:focus-visible, button:focus-visible, input:focus-visible,
+  textarea:focus-visible, select:focus-visible, [tabindex]:focus-visible{
+    outline:3px solid var(--accent); outline-offset:2px;}
+  .sr-only{position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden;
+    clip:rect(0,0,0,0); white-space:nowrap; border:0;}
+  /* honour the OS "reduce motion" setting automatically, like quiet mode does on demand */
+  @media (prefers-reduced-motion: reduce){
+    *, *::before, *::after{animation-duration:.001ms !important; animation-iteration-count:1 !important;
+      transition-duration:.001ms !important; scroll-behavior:auto !important;}
+  }
   html,body{margin:0; padding:0; background:var(--bg); color:var(--text);
     font-family:-apple-system,'Segoe UI',Roboto,sans-serif; min-height:100%;}
   body{padding-bottom:calc(90px + env(safe-area-inset-bottom));}
@@ -307,9 +319,9 @@
   <section id="view-capture" class="view active">
     <div class="mic-wrap">
       <button id="micBtn" aria-label="Record idea">🎤</button>
-      <div class="mic-hint" id="micHint">Tap the mic and speak your idea.<br>Or type below.</div>
+      <div class="mic-hint" id="micHint" role="status" aria-live="polite">Tap the mic and speak your idea.<br>Or type below.</div>
     </div>
-    <textarea id="liveText" placeholder="Your transcribed idea appears here… you can also just type."></textarea>
+    <textarea id="liveText" aria-label="Your idea — speak or type" placeholder="Your transcribed idea appears here… you can also just type."></textarea>
     <div class="cap-actions">
       <button class="btn ghost" id="clearBtn">Clear</button>
       <button class="btn primary" id="saveIdeaBtn">Summarize &amp; Add</button>
@@ -331,7 +343,7 @@
     <div id="custodyBanner" style="display:none;"></div>
     <button class="btn ghost" id="focusBtn" style="display:none; width:100%; margin-bottom:12px;">🎯 Just one thing</button>
     <div class="addrow">
-      <input id="quickAdd" placeholder="Quick add a task…" enterkeyhint="done">
+      <input id="quickAdd" aria-label="Quick add a task" placeholder="Quick add a task…" enterkeyhint="done">
       <button id="quickAddBtn" aria-label="Add task">＋</button>
     </div>
     <div id="tagFilter"></div>
@@ -368,7 +380,7 @@
       <p>Add names, comma-separated, and tasks mentioning them are tagged automatically —
          say "remind Lulu to return the library books" and it lands under her tag, so each
          person can filter to their own tasks on the Today view.</p>
-      <input id="membersInput" placeholder="e.g. Emile, Lulu" autocomplete="off">
+      <input id="membersInput" aria-label="Household member names" placeholder="e.g. Emile, Lulu" autocomplete="off">
       <button class="btn primary" id="saveMembersBtn">Save members</button>
       <p id="membersStatus"></p>
     </div>
@@ -378,7 +390,7 @@
          team around someone. You can belong to several at once — tasks sync in real time to
          everyone in that space and work offline. Ideas and voice transcripts always stay
          private on each device; only tasks are shared.</p>
-      <input id="myNameInput" placeholder="Your name (shown on tasks you add or tick)" autocomplete="off">
+      <input id="myNameInput" aria-label="Your name" placeholder="Your name (shown on tasks you add or tick)" autocomplete="off">
       <button class="btn primary" id="saveMyNameBtn">Save name</button>
       <p id="myNameStatus"></p>
       <div id="syncActive" style="display:none;">
@@ -386,7 +398,7 @@
         <button class="btn ghost" id="addSpaceBtn">➕ Join or create another space</button>
       </div>
       <div id="syncSetup">
-        <input id="inviteInput" placeholder="Paste an invite code to join…" autocomplete="off">
+        <input id="inviteInput" aria-label="Invite code to join a space" placeholder="Paste an invite code to join…" autocomplete="off">
         <button class="btn primary" id="joinBtn">Join space</button>
         <details style="margin-top:12px;">
           <summary style="color:var(--accent); cursor:pointer;">First device? Create a space (one-time, ~3 min)</summary>
@@ -400,10 +412,10 @@
             5. Paste it below, name the space, and tap Create.<br>
             <span style="color:var(--muted)">Adding a second space (e.g. "Mum's care") can reuse the same
             Firebase project — just paste the same snippet again.</span></p>
-          <textarea id="fbConfigInput" placeholder="Paste the firebaseConfig snippet here…"
+          <textarea id="fbConfigInput" aria-label="Firebase config snippet" placeholder="Paste the firebaseConfig snippet here…"
             style="width:100%; min-height:90px; background:var(--bg); border:1px solid #2a3245; border-radius:10px; color:var(--text); padding:10px; font-size:.8rem; margin-top:6px;"></textarea>
-          <input id="spaceNameInput" placeholder="Space name (e.g. Home, Mum's care)" autocomplete="off">
-          <select id="spaceTypeSel">
+          <input id="spaceNameInput" aria-label="Space name" placeholder="Space name (e.g. Home, Mum's care)" autocomplete="off">
+          <select id="spaceTypeSel" aria-label="Space type">
             <option value="family">👥 Family / household</option>
             <option value="coparenting">🤝 Co-parenting</option>
             <option value="care">💙 Care team</option>
@@ -431,7 +443,7 @@
          generated by Gemini — much smarter than the built-in mode, at no cost. Get a key in
          under a minute at <a href="https://aistudio.google.com/apikey" target="_blank"
          style="color:var(--accent)">aistudio.google.com/apikey</a> (no credit card needed).</p>
-      <input id="geminiKeyInput" type="password" placeholder="AIza…" autocomplete="off">
+      <input id="geminiKeyInput" type="password" aria-label="Gemini API key" placeholder="AIza…" autocomplete="off">
       <button class="btn primary" id="saveGeminiKeyBtn">Save key</button>
       <p id="geminiKeyStatus"></p>
     </div>
@@ -440,7 +452,7 @@
       <p>Alternatively, paste an <b>Anthropic API key</b> for Claude-quality summaries
          (paid, a fraction of a cent per capture). If both keys are set, Gemini is used
          first and Claude is the backup.</p>
-      <input id="apiKeyInput" type="password" placeholder="sk-ant-…" autocomplete="off">
+      <input id="apiKeyInput" type="password" aria-label="Anthropic API key" placeholder="sk-ant-…" autocomplete="off">
       <button class="btn primary" id="saveKeyBtn">Save key</button>
       <p id="keyStatus"></p>
     </div>
@@ -464,18 +476,18 @@
       <input type="file" id="importFile" accept=".json,application/json" style="display:none">
       <button class="btn ghost" id="wipeBtn">Delete all data</button>
     </div>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v37<br><span id="envInfo"></span></p>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v38<br><span id="envInfo"></span></p>
   </section>
 </main>
 
-<nav class="tabs">
-  <button data-view="capture" class="active"><span class="ico">🎤</span>Capture</button>
-  <button data-view="ideas"><span class="ico">💡</span>Ideas</button>
-  <button data-view="today"><span class="ico">✅</span>Today<span id="todayBadge"></span></button>
-  <button data-view="settings"><span class="ico">⚙️</span>Settings</button>
+<nav class="tabs" aria-label="Main navigation">
+  <button data-view="capture" class="active" aria-current="page"><span class="ico" aria-hidden="true">🎤</span>Capture</button>
+  <button data-view="ideas"><span class="ico" aria-hidden="true">💡</span>Ideas</button>
+  <button data-view="today"><span class="ico" aria-hidden="true">✅</span>Today<span id="todayBadge"></span></button>
+  <button data-view="settings"><span class="ico" aria-hidden="true">⚙️</span>Settings</button>
 </nav>
 
-<div id="scopeSheet" class="sheet-overlay" style="display:none;">
+<div id="scopeSheet" class="sheet-overlay" role="dialog" aria-modal="true" aria-label="Who is this task for" style="display:none;">
   <div class="sheet">
     <h3>Who is this task for?</h3>
     <button class="btn ghost" id="scopePrivate">🔒 Private — only me, on this device</button>
@@ -508,7 +520,7 @@
   </div>
 </div>
 
-<div id="profileSheet" class="sheet-overlay" style="display:none;">
+<div id="profileSheet" class="sheet-overlay" role="dialog" aria-modal="true" aria-label="Care recipient profile" style="display:none;">
   <div class="sheet">
     <h3>💙 Care recipient profile</h3>
     <p class="side-note">Shared with everyone in this care space and included in the doctor-visit briefing.</p>
@@ -518,7 +530,7 @@
   </div>
 </div>
 
-<div id="custodySheet" class="sheet-overlay" style="display:none;">
+<div id="custodySheet" class="sheet-overlay" role="dialog" aria-modal="true" aria-label="Custody days" style="display:none;">
   <div class="sheet">
     <h3>🗓 Which days do you have the kids?</h3>
     <p class="side-note">Tick the weekdays the children are with you. The other parent has the rest. Both of you see the same schedule.</p>
@@ -532,11 +544,11 @@
   </div>
 </div>
 
-<div id="expSheet" class="sheet-overlay" style="display:none;">
+<div id="expSheet" class="sheet-overlay" role="dialog" aria-modal="true" aria-label="Log an expense" style="display:none;">
   <div class="sheet">
     <h3>💵 Log an expense</h3>
     <p class="side-note" id="expTaskName"></p>
-    <input id="expAmount" type="number" inputmode="decimal" min="0" step="0.01" placeholder="Amount, e.g. 42.50"
+    <input id="expAmount" type="number" inputmode="decimal" min="0" step="0.01" aria-label="Expense amount" placeholder="Amount, e.g. 42.50"
       style="width:100%; background:var(--bg); border:1px solid #2a3245; border-radius:10px; color:var(--text); padding:12px; font-size:1rem; margin-bottom:10px;">
     <label class="btn ghost" style="display:block; text-align:center; margin-bottom:8px;">
       📷 Add receipt photo <span id="expPhotoState" style="color:var(--ok)"></span>
@@ -547,7 +559,7 @@
   </div>
 </div>
 
-<div id="toneSheet" class="sheet-overlay" style="display:none;">
+<div id="toneSheet" class="sheet-overlay" role="dialog" aria-modal="true" aria-label="How will this land" style="display:none;">
   <div class="sheet">
     <h3>🕊 How will this land?</h3>
     <p class="side-note" id="toneReason"></p>
@@ -559,7 +571,7 @@
   </div>
 </div>
 
-<div id="ledgerOverlay" style="display:none;">
+<div id="ledgerOverlay" role="dialog" aria-modal="true" aria-label="Expense ledger" style="display:none;">
   <div class="hist-head">
     <b id="ledgerTitle">Ledger</b>
     <button class="btn ghost" id="ledgerCsvBtn">⬇ CSV</button>
@@ -569,7 +581,7 @@
   <div id="ledgerList"></div>
 </div>
 
-<div id="histOverlay" style="display:none;">
+<div id="histOverlay" role="dialog" aria-modal="true" aria-label="Space history" style="display:none;">
   <div class="hist-head">
     <b id="histTitle">History</b>
     <button class="btn ghost" id="histBriefBtn" style="display:none;">🩺 Doctor briefing</button>
@@ -582,7 +594,7 @@
   <div id="histList"></div>
 </div>
 
-<div id="focusOverlay" style="display:none;">
+<div id="focusOverlay" role="dialog" aria-modal="true" aria-label="Just one thing" style="display:none;">
   <button class="fo-close" id="focusClose" aria-label="Close">✕</button>
   <div class="fo-label">Just this one thing</div>
   <div class="fo-task" id="focusTask"></div>
@@ -592,7 +604,7 @@
   <button class="fo-skip" id="focusSkip">Not this one → show me another</button>
 </div>
 
-<div class="toast" id="toast"></div>
+<div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 
 <script src="managed-config.js"></script>
 <script>
@@ -899,8 +911,11 @@ function showView(name){
   views.forEach(v => {
     document.getElementById('view-' + v).classList.toggle('active', v === name);
   });
-  document.querySelectorAll('nav.tabs button').forEach(b =>
-    b.classList.toggle('active', b.dataset.view === name));
+  document.querySelectorAll('nav.tabs button').forEach(b => {
+    const on = b.dataset.view === name;
+    b.classList.toggle('active', on);
+    if (on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
+  });
   if (name === 'ideas') renderIdeas();
   if (name === 'today') renderTodos();
 }
@@ -3799,6 +3814,28 @@ document.getElementById('digestBtn').addEventListener('click', async () => {
     toast('Daily digest on ✓');
   } catch (err) {
     digestStatus.textContent = '⚠️ Could not enable: ' + err.message;
+  }
+});
+
+/* ---------- keyboard: Escape closes the topmost open dialog (v38) ---------- */
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  // in z-order, most-modal first
+  const closers = [
+    ['onboarding', () => finishOnboarding()],
+    ['scopeSheet', () => closeScopeSheet()],
+    ['toneSheet', () => closeToneSheet(null)],
+    ['expSheet', () => { document.getElementById('expSheet').style.display = 'none'; expTask = null; }],
+    ['custodySheet', () => { document.getElementById('custodySheet').style.display = 'none'; }],
+    ['profileSheet', () => { document.getElementById('profileSheet').style.display = 'none'; }],
+    ['histOverlay', () => { document.getElementById('histOverlay').style.display = 'none'; }],
+    ['ledgerOverlay', () => { document.getElementById('ledgerOverlay').style.display = 'none'; }],
+    ['focusOverlay', () => closeFocus()]
+  ];
+  for (const [id, close] of closers){
+    const el = document.getElementById(id);
+    if (el && el.style.display !== 'none' && el.style.display !== ''){ /* visible sheets use flex/block */ }
+    if (el && getComputedStyle(el).display !== 'none'){ close(); e.preventDefault(); return; }
   }
 });
 

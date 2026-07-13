@@ -24,6 +24,25 @@ No app store, no build tools, no account — it runs entirely on your phone.
 The app works offline after the first load. For fully offline voice recognition
 and summaries, enable the on-device AI models in Settings (see below).
 
+## First run
+
+On first launch the app asks **"What brings you here?"** — pick any of Focus &
+ADHD, Co-parenting, Caring for someone, or Household & family (more than one is
+fine). It then shows a tailored **toolkit**: the exact features that help the
+audiences you chose, with one-tap shortcuts to set them up. Change it any time
+from Settings → **What I use this for**. Your choice is stored on your device
+(and, in the hosted service, associated with your account so the operator can
+see which audiences use which features).
+
+## Accessibility
+
+The app is built for screen readers and keyboard use: status messages and the
+live transcript are announced (ARIA live regions), every dialog is a proper
+modal with a label and closes on **Escape**, keyboard focus is always visible,
+all controls have accessible names, and the OS "reduce motion" setting is
+honoured automatically (a manual **quiet visual mode** in Settings goes
+further — muted colours and no motion).
+
 ## How it works
 
 | Tab | What it does |
