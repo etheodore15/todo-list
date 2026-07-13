@@ -91,6 +91,8 @@ export function onSnapshot(col, cb, errCb){
   await A.fill('#fbConfigInput', 'const firebaseConfig = { apiKey: "AIzaFake123", projectId: "fake-project" };');
   await A.click('#createHhBtn');
   await A.waitForTimeout(800);
+  await A.click('#setupDone');  // v43: dismiss the guided-setup checklist
+  await A.waitForTimeout(100);
   const msgA = await A.locator('#syncMsg').textContent();
   check('A: household created, sync active', /active/.test(msgA));
 

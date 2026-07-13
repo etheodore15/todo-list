@@ -309,6 +309,25 @@
   body.quiet #micBtn{box-shadow:none;}
   body.quiet .progress > div{background:var(--accent);}
 
+  /* v43: space-aware Today — action bar + ADHD toolkit strip + setup steps */
+  .space-bar{display:flex; gap:8px; overflow-x:auto; margin-bottom:12px; scrollbar-width:none;}
+  .space-bar::-webkit-scrollbar{display:none;}
+  .space-act{white-space:nowrap; flex:0 0 auto; padding:8px 12px; font-size:.85rem;}
+  .adhd-strip{border:1px solid #2a3245; border-radius:12px; padding:10px 12px; margin-bottom:12px;
+    background:linear-gradient(180deg, rgba(125,138,165,.10), transparent);}
+  .adhd-strip-head{display:flex; justify-content:space-between; align-items:center; font-weight:700;
+    font-size:.9rem; margin-bottom:8px;}
+  .adhd-strip-x{background:none; border:none; color:var(--muted); font-size:1rem; cursor:pointer; padding:2px 6px;}
+  .adhd-strip-row{display:flex; gap:8px; overflow-x:auto; scrollbar-width:none;}
+  .adhd-strip-row::-webkit-scrollbar{display:none;}
+  .custody-set{background:none; border:none; color:var(--accent); font-weight:600; cursor:pointer;
+    padding:0; font-size:inherit; text-align:left;}
+  .setup-step{display:block; width:100%; text-align:left; background:var(--bg); border:1px solid #2a3245;
+    border-radius:12px; padding:12px 14px; margin-bottom:8px; cursor:pointer; color:var(--text);}
+  .setup-step b{display:block; font-size:.95rem;}
+  .setup-step span{display:block; color:var(--muted); font-size:.8rem; margin-top:2px;}
+  .setup-step:hover{border-color:var(--accent);}
+
 </style>
 </head>
 <body>
@@ -345,6 +364,8 @@
     <div id="spaceFilter" style="display:flex; gap:8px; overflow-x:auto; margin-bottom:10px; scrollbar-width:none;"></div>
     <div id="profileCards" style="display:none;"></div>
     <div id="custodyBanner" style="display:none;"></div>
+    <div id="spaceBar" style="display:none;"></div>
+    <div id="adhdStrip" style="display:none;"></div>
     <button class="btn ghost" id="focusBtn" style="display:none; width:100%; margin-bottom:12px;">🎯 Just one thing</button>
     <div class="addrow">
       <input id="quickAdd" aria-label="Quick add a task" placeholder="Quick add a task…" enterkeyhint="done">
@@ -487,7 +508,7 @@
       <input type="file" id="importFile" accept=".json,application/json" style="display:none">
       <button class="btn ghost" id="wipeBtn">Delete all data</button>
     </div>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v42<br><span id="envInfo"></span></p>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v43<br><span id="envInfo"></span></p>
   </section>
 </main>
 
@@ -557,6 +578,15 @@
     </label>
     <button class="btn primary" id="custodySave">Save schedule</button>
     <button class="btn ghost" id="custodyCancel">Cancel</button>
+  </div>
+</div>
+
+<div id="setupSheet" class="sheet-overlay" role="dialog" aria-modal="true" aria-label="Finish setting up your space" style="display:none;">
+  <div class="sheet">
+    <h3 id="setupTitle">Space created ✓</h3>
+    <p class="side-note" id="setupIntro"></p>
+    <div id="setupSteps" style="margin:4px 0 8px;"></div>
+    <button class="btn ghost" id="setupDone">I’ll finish later</button>
   </div>
 </div>
 
@@ -666,7 +696,7 @@ const COHORTS = [
      ['💵 Expenses & ledger', 'Log costs with receipts; see who owes whom.'],
      ['🗓 Custody days', 'Whose day it is, with a handover-tomorrow heads-up.']
    ],
-   actions: [{label: 'Create a co-parenting space', fn: () => { showView('settings'); setTimeout(() => document.getElementById('addSpaceBtn') && document.getElementById('addSpaceBtn').click(), 200); }}]},
+   actions: [{label: 'Create a co-parenting space', fn: () => openSpaceCreate('coparenting')}]},
   {id: 'caregiving', ico: '💙', title: 'Caring for someone',
    desc: 'I help coordinate care for a parent, relative, or friend.',
    features: [
@@ -676,7 +706,7 @@ const COHORTS = [
      ['🩺 Doctor briefing', 'Turn weeks of notes into a one-page brief for the GP.'],
      ['Shift handoff', 'See exactly what happened since you were last on.']
    ],
-   actions: [{label: 'Create a care-team space', fn: () => { showView('settings'); setTimeout(() => document.getElementById('addSpaceBtn') && document.getElementById('addSpaceBtn').click(), 200); }}]},
+   actions: [{label: 'Create a care-team space', fn: () => openSpaceCreate('care')}]},
   {id: 'family', ico: '👪', title: 'Household & family',
    desc: 'We juggle a busy household and want to share the load.',
    features: [
@@ -685,7 +715,7 @@ const COHORTS = [
      ['Who did what', 'Every add and tick shows who and when.'],
      ['🔔 Daily digest', 'A once-a-day summary of what’s open and what the family did.']
    ],
-   actions: [{label: 'Create a family space', fn: () => { showView('settings'); setTimeout(() => document.getElementById('addSpaceBtn') && document.getElementById('addSpaceBtn').click(), 200); }}]}
+   actions: [{label: 'Create a family space', fn: () => openSpaceCreate('family')}]}
 ];
 const cohorts = () => store.get('cohorts', []);
 
@@ -1995,11 +2025,116 @@ function renderEasyChip(list){
   bar.style.display = '';   // the bar may be empty of tag chips but still hold this one
 }
 
+// The single space the Today view is "about": the one being filtered to, or the
+// only space that exists. null when viewing All-across-many or Personal.
+function activeSpaceObj(){
+  const spaces = spacesList();
+  if (activeSpace === 'personal') return null;
+  if (activeSpace !== 'all') return spaces.find(s => s.hid === activeSpace) || null;
+  return spaces.length === 1 ? spaces[0] : null;
+}
+
+// v43: the highest-value features per space type, surfaced ON Today instead of
+// hiding in the Settings space-row. Handlers are the existing ones — reused.
+const SPACE_ACTIONS = {
+  coparenting: [
+    ['🗓 Custody', sp => openCustody(sp)],
+    ['💵 Ledger', sp => openLedger(sp)],
+    ['📜 History', sp => openHistory(sp)],
+    ['📤 Invite', sp => shareSpaceInvite(sp)]
+  ],
+  care: [
+    ['💙 Profile', sp => openProfile(sp)],
+    ['📝 Care note', () => { showView('capture'); toast('Speak or type an observation, then “Share to …” it to the team from Ideas.'); }],
+    ['📜 History & briefing', sp => openHistory(sp)],
+    ['📤 Invite', sp => shareSpaceInvite(sp)]
+  ],
+  family: [
+    ['👥 People', sp => editSpaceMembers(sp)],
+    ['📜 History', sp => openHistory(sp)],
+    ['📤 Invite', sp => shareSpaceInvite(sp)]
+  ]
+};
+function renderSpaceBar(){
+  const host = document.getElementById('spaceBar');
+  if (!host) return;
+  const sp = activeSpaceObj();
+  const acts = sp && SPACE_ACTIONS[sp.type];
+  if (!sp || !acts){ host.style.display = 'none'; host.innerHTML = ''; return; }
+  host.innerHTML = '';
+  const bar = document.createElement('div');
+  bar.className = 'space-bar';
+  acts.forEach(([label, fn]) => {
+    const b = document.createElement('button');
+    b.className = 'btn ghost space-act';
+    b.textContent = label;
+    b.addEventListener('click', () => fn(sp));
+    bar.appendChild(b);
+  });
+  host.appendChild(bar);
+  host.style.display = '';
+}
+
+// v43: the header reflects the active space, so the app visibly changes by type.
+function renderSpaceHeader(){
+  const t = document.getElementById('hdrTitle');
+  if (!t) return;
+  const sp = activeSpaceObj();
+  t.textContent = sp ? ((SPACE_ICON[sp.type] || '👥') + ' ' + sp.name) : 'Idea → Todo';
+}
+
+// v43: keep the ADHD toolkit reachable after the onboarding modal closes — a
+// dismissible strip of LIVE feature buttons on Today.
+function firstOpenTask(){
+  return todos.filter(t => visibleToMe(t) && inActiveSpace(t) && !t.done && !t.someday &&
+      (!t.date || t.date <= todayStr()))
+    .sort((a, b) => PRIOS.findIndex(p => p.key === a.priority) - PRIOS.findIndex(p => p.key === b.priority))[0] || null;
+}
+const ADHD_TOOLS = [
+  ['🎯 Just one thing', () => openFocus()],
+  ['🪄 Break down a task', () => { const t = firstOpenTask(); if (t) breakDown(t); else toast('Add a task first, then I’ll break it into steps.'); }],
+  ['🔋 Easy wins', () => { easyOnly = !easyOnly; renderTodos(); }],
+  ['🌿 Quiet mode', () => { store.set('quietMode', !store.get('quietMode', false)); applyQuiet(); toast(store.get('quietMode', false) ? 'Quiet mode on 🌿' : 'Quiet mode off'); }]
+];
+function renderAdhdStrip(){
+  const host = document.getElementById('adhdStrip');
+  if (!host) return;
+  if (!cohorts().includes('adhd') || store.get('adhdStripHidden', false)){
+    host.style.display = 'none'; host.innerHTML = ''; return;
+  }
+  host.innerHTML = '';
+  const wrap = document.createElement('div');
+  wrap.className = 'adhd-strip';
+  const head = document.createElement('div');
+  head.className = 'adhd-strip-head';
+  head.innerHTML = '<span>🧠 Your focus toolkit</span>';
+  const x = document.createElement('button');
+  x.className = 'adhd-strip-x'; x.setAttribute('aria-label', 'Hide focus toolkit'); x.textContent = '✕';
+  x.addEventListener('click', () => { store.set('adhdStripHidden', true); renderAdhdStrip(); });
+  head.appendChild(x);
+  wrap.appendChild(head);
+  const row = document.createElement('div');
+  row.className = 'adhd-strip-row';
+  ADHD_TOOLS.forEach(([label, fn]) => {
+    const b = document.createElement('button');
+    b.className = 'btn ghost space-act';
+    b.textContent = label;
+    b.addEventListener('click', fn);
+    row.appendChild(b);
+  });
+  wrap.appendChild(row);
+  host.appendChild(wrap);
+  host.style.display = '';
+}
+
 function renderTodos(){
   const el = document.getElementById('todoList');
   renderSpaceFilter();
   renderProfileCards();
   renderCustodyBanner();
+  renderSpaceBar();
+  renderAdhdStrip();
+  renderSpaceHeader();
   let list = todayTodos().filter(visibleToMe).filter(inActiveSpace);
   renderTagFilter(list);
   renderEasyChip(list);
@@ -3454,16 +3589,28 @@ function custodyLabel(hid, dateStr){
 function renderCustodyBanner(){
   const host = document.getElementById('custodyBanner');
   if (!host) return;
-  const spaces = spacesList().filter(s => s.type === 'coparenting' && getCustody(s.hid));
+  const spaces = spacesList().filter(s => s.type === 'coparenting');
   const shown = spaces.filter(s => activeSpace === 'all' || activeSpace === s.hid);
   if (!shown.length){ host.style.display = 'none'; host.innerHTML = ''; return; }
   host.innerHTML = '';
   shown.forEach(sp => {
+    const line = document.createElement('div');
+    line.className = 'custody-line';
+    // Not configured yet: advertise the feature AND give the entry point, rather
+    // than hiding it (you couldn't discover custody from Today otherwise).
+    if (!getCustody(sp.hid)){
+      line.innerHTML = `<b>${SPACE_ICON[sp.type]} ${sp.name}:</b> `;
+      const a = document.createElement('button');
+      a.className = 'custody-set';
+      a.textContent = '🗓 Set custody days to see whose day it is →';
+      a.addEventListener('click', () => openCustody(sp));
+      line.appendChild(a);
+      host.appendChild(line);
+      return;
+    }
     const today = custodyLabel(sp.hid, todayStr());
     const tomo = custodyLabel(sp.hid, addDays(1));
     if (!today) return;
-    const line = document.createElement('div');
-    line.className = 'custody-line';
     const handover = tomo && tomo !== today;
     line.innerHTML = `<b>${SPACE_ICON[sp.type]} ${sp.name}:</b> Today is <b>${today}</b>` +
       (handover ? ` · 🔄 handover tomorrow (then ${tomo})` : '');
@@ -3811,6 +3958,64 @@ function renderSpacesList(){
   });
 }
 
+// v43: guided create. The onboarding "create a … space" buttons used to click
+// #addSpaceBtn — which TOGGLES the (already-open) form shut on first run and
+// left the type as the default "family". Instead: reveal the form, pre-select
+// the intended type, and focus the name field.
+function openSpaceCreate(type){
+  showView('settings');
+  setTimeout(() => {
+    const setup = document.getElementById('syncSetup');
+    if (setup) setup.style.display = '';
+    const details = setup && setup.querySelector('details');
+    if (details) details.open = true;
+    const sel = document.getElementById('spaceTypeSel');
+    if (sel && type) sel.value = type;
+    const block = setup && setup.closest('.set-block');
+    if (block) block.scrollIntoView({block: 'start'});
+    const nameEl = document.getElementById('spaceNameInput');
+    if (nameEl) nameEl.focus();
+  }, 120);
+}
+
+// v43: after a space is created, walk the user through the type-specific first
+// steps (invite + custody / profile+med / name+delegate) instead of dropping
+// them on Settings with a passive toast.
+function guideSpaceSetup(sp){
+  if (!sp){ return; }
+  const steps = [];
+  if (!myName()) steps.push(['✍️ Add your name',
+    'So “added by” and “done by” show on tasks.',
+    () => { showView('settings'); setTimeout(() => { const n = document.getElementById('myNameInput'); if (n){ n.scrollIntoView({block: 'center'}); n.focus(); } }, 100); }]);
+  steps.push(['📤 Invite the others', 'Share the join code so everyone syncs.', () => shareSpaceInvite(sp)]);
+  if (sp.type === 'coparenting') steps.push(['🗓 Set custody days',
+    'Whose day it is, with a handover heads-up.', () => openCustody(sp)]);
+  if (sp.type === 'care'){
+    steps.push(['💙 Fill the care profile', 'One shared picture of the person.', () => openProfile(sp)]);
+    steps.push(['💊 Add a medication or routine', 'A timed, repeating task — every tick is a record.',
+      () => { activeSpace = sp.hid; showView('today'); renderTodos(); const q = document.getElementById('quickAdd'); if (q){ q.value = ''; q.focus(); } toast('Add e.g. “Morning meds 8am”, then tap 🔁 on it to repeat daily.'); }]);
+  }
+  if (sp.type === 'family') steps.push(['👥 Add people to delegate to',
+    'Assign tasks to who they’re for.', () => editSpaceMembers(sp)]);
+  document.getElementById('setupTitle').textContent = `${SPACE_ICON[sp.type] || '👥'} “${sp.name}” is ready`;
+  document.getElementById('setupIntro').textContent = 'A couple of quick things to make it work for you:';
+  const host = document.getElementById('setupSteps');
+  host.innerHTML = '';
+  steps.forEach(([label, desc, fn]) => {
+    const b = document.createElement('button');
+    b.className = 'setup-step';
+    b.innerHTML = `<b></b><span></span>`;
+    b.querySelector('b').textContent = label;
+    b.querySelector('span').textContent = desc;
+    b.addEventListener('click', () => { document.getElementById('setupSheet').style.display = 'none'; fn(); });
+    host.appendChild(b);
+  });
+  document.getElementById('setupSheet').style.display = 'flex';
+}
+document.getElementById('setupDone').addEventListener('click', () => {
+  document.getElementById('setupSheet').style.display = 'none';
+});
+
 document.getElementById('createHhBtn').addEventListener('click', async () => {
   try {
     const cfg = parseFbConfig(document.getElementById('fbConfigInput').value);
@@ -3822,7 +4027,7 @@ document.getElementById('createHhBtn').addEventListener('click', async () => {
     await fbFs.setDoc(fbFs.doc(spaceRt[hid].db, 'households', hid),
       {created: Date.now(), name, type, members: store.get('members', [])}, {merge: true});
     document.getElementById('spaceNameInput').value = '';
-    toast(`Space "${name}" created ✓ — now share the invite code`);
+    guideSpaceSetup(sp);
   } catch (err) {
     syncMsg('❌ ' + err.message);
   }
@@ -3853,9 +4058,10 @@ document.getElementById('createManagedBtn').addEventListener('click', async () =
     const hid = 'hh-' + uid() + Math.random().toString(36).slice(2, 10);
     await fbFs.setDoc(fbFs.doc(managedDb, 'households', hid),
       {created: Date.now(), name, type, members: {[managedUid]: myName() || 'member'}});
-    if (!await addSpace({hid, name, type, cfg: null, managed: true})) return;
+    const sp = {hid, name, type, cfg: null, managed: true};
+    if (!await addSpace(sp)) return;
     document.getElementById('spaceNameInput').value = '';
-    toast(`Space "${name}" created ✓ — now share the invite code`);
+    guideSpaceSetup(sp);
   } catch (err) {
     syncMsg('❌ ' + err.message);
   }
@@ -3945,6 +4151,7 @@ document.addEventListener('keydown', (e) => {
   const closers = [
     ['onboarding', () => finishOnboarding()],
     ['scopeSheet', () => closeScopeSheet()],
+    ['setupSheet', () => { document.getElementById('setupSheet').style.display = 'none'; }],
     ['toneSheet', () => closeToneSheet(null)],
     ['expSheet', () => { document.getElementById('expSheet').style.display = 'none'; expTask = null; }],
     ['custodySheet', () => { document.getElementById('custodySheet').style.display = 'none'; }],

@@ -93,6 +93,8 @@ export function onSnapshot(col, cb, errCb){
   await A.selectOption('#spaceTypeSel', 'coparenting');
   await A.click('#createHhBtn');
   await A.waitForTimeout(800);
+  await A.click('#setupDone');  // v43: dismiss the guided-setup checklist
+  await A.waitForTimeout(100);
 
   await A.click('nav.tabs button[data-view="today"]');
   await A.fill('#quickAdd', 'pack the school bag');

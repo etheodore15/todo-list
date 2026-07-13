@@ -112,6 +112,8 @@ const MANAGED_CFG = `window.MANAGED = {apiKey: 'AizaManaged', authDomain: 'x.fir
   await A.fill('#spaceNameInput', 'Home');
   await A.click('#createManagedBtn');
   await A.waitForTimeout(800);
+  await A.click('#setupDone');  // v43: dismiss the guided-setup checklist
+  await A.waitForTimeout(100);
   const spA = await A.evaluate(() => store.get('spaces'));
   check('P1: managed space created', spA.length === 1 && spA[0].managed === true && spA[0].name === 'Home');
   check('P1: sync active', /active|syncing/i.test(await A.locator('#syncMsg').textContent()));

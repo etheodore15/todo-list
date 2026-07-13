@@ -90,6 +90,9 @@ export function onSnapshot(col, cb, errCb){
   await A.fill('#spaceNameInput', 'Home');
   await A.click('#createHhBtn');
   await A.waitForTimeout(800);
+  // v43: creating a space now opens a guided-setup checklist — dismiss it
+  await A.click('#setupDone');
+  await A.waitForTimeout(100);
   check('A: first space created', /Sync active|1 space|spaces syncing/i.test(await A.locator('#syncMsg').textContent()));
 
   // second space (care team) reusing the same project — the details element
@@ -100,6 +103,8 @@ export function onSnapshot(col, cb, errCb){
   await A.selectOption('#spaceTypeSel', 'care');
   await A.click('#createHhBtn');
   await A.waitForTimeout(800);
+  await A.click('#setupDone');
+  await A.waitForTimeout(100);
   const spacesA = await A.evaluate(() => store.get('spaces'));
   check('A: two spaces stored', spacesA.length === 2 && spacesA[1].type === 'care');
   check('A: settings lists both spaces',
