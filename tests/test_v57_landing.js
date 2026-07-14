@@ -42,7 +42,7 @@ const { chromium } = require('playwright');
   await page.waitForTimeout(300);
   check('v57: app boots at /app.html (capture view present)',
     await page.locator('#view-capture').count() === 1);
-  check('v57: app version label is v57', /v57/.test(await page.locator('body').textContent()));
+  check('v57: app version label present', /Idea → Todo v\d+/.test(await page.locator('body').textContent()));
 
   console.log(errors.length ? 'ERRORS:\n' + errors.join('\n') : 'NO JS ERRORS');
   console.log(pass + ' passed, ' + fail + ' failed');
