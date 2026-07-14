@@ -364,6 +364,14 @@
   .missed-list .mrow{padding:2px 0;}
   .missed-cta{background:none; border:none; color:var(--danger); font-weight:600; cursor:pointer;
     padding:4px 0 0; font-size:.82rem; text-align:left;}
+  /* v49: care shift-handoff card */
+  .care-handoff{border:1px solid #2a3245; border-radius:12px; padding:11px 13px; margin-bottom:12px;
+    background:linear-gradient(180deg, rgba(94,160,255,.10), transparent);}
+  .ch-head{display:flex; justify-content:space-between; align-items:center;}
+  .ch-head b{font-size:.92rem;}
+  .ch-x{background:none; border:none; color:var(--muted); font-size:1rem; cursor:pointer; min-width:40px; min-height:40px;}
+  .ch-list{margin-top:6px; font-size:.85rem; color:var(--text);}
+  .ch-row{padding:3px 0; line-height:1.4;}
 
 </style>
 </head>
@@ -401,6 +409,7 @@
     <div id="awayBanner" style="display:none;"></div>
     <div id="spaceFilter" style="display:flex; gap:8px; overflow-x:auto; margin-bottom:10px; scrollbar-width:none;"></div>
     <div id="missedBanner" style="display:none;"></div>
+    <div id="careHandoff" style="display:none;"></div>
     <div id="profileCards" style="display:none;"></div>
     <div id="custodyBanner" style="display:none;"></div>
     <div id="spaceBar" style="display:none;"></div>
@@ -547,7 +556,7 @@
       <input type="file" id="importFile" accept=".json,application/json" style="display:none">
       <button class="btn ghost" id="wipeBtn">Delete all data</button>
     </div>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v48<br><span id="envInfo"></span></p>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v49<br><span id="envInfo"></span></p>
   </section>
 </main>
 
@@ -2306,6 +2315,7 @@ function renderTodos(){
   const el = document.getElementById('todoList');
   renderSpaceFilter();
   renderMissedBanner();
+  renderCareHandoff();
   renderProfileCards();
   renderCustodyBanner();
   renderSpaceBar();
@@ -3088,20 +3098,77 @@ function noteFamilyActivity(td){
 let awayDismissed = false;
 function renderAwayBanner(){
   const el = document.getElementById('awayBanner');
-  if (awayDismissed || !awayItems.length){ el.style.display = 'none'; return; }
+  // care spaces get the richer "since your last visit" handoff card instead
+  const sp = activeSpaceObj();
+  if (awayDismissed || !awayItems.length || (sp && sp.type === 'care')){ el.style.display = 'none'; return; }
   el.innerHTML = '';
   const close = document.createElement('button');
   close.className = 'close'; close.textContent = '✕';
   close.addEventListener('click', () => { awayDismissed = true; renderAwayBanner(); });
   el.appendChild(close);
   const strong = document.createElement('b');
-  strong.textContent = 'Family activity';
+  strong.textContent = 'While you were away';
   el.appendChild(strong);
   [...new Set(awayItems)].slice(-6).forEach(line => {
     el.appendChild(document.createElement('br'));
     el.appendChild(document.createTextNode(line));
   });
   el.style.display = '';
+}
+
+// v49: care shift handoff — one card on Today that shows what happened since the
+// carer last looked: journal notes, missed doses, and what others did. This is
+// the connective tissue that turns notes + missed + ticks into one loop instead
+// of three separate places.
+let careHandoffDismissed = false;
+function renderCareHandoff(){
+  const host = document.getElementById('careHandoff');
+  if (!host) return;
+  const cares = spacesList().filter(s => s.type === 'care')
+    .filter(s => activeSpace === 'all' || activeSpace === s.hid);
+  if (!cares.length || careHandoffDismissed){ host.style.display = 'none'; host.innerHTML = ''; return; }
+  const me = (myName() || '').toLowerCase();
+  const evs = store.get('events', []).filter(e => (e.ts || 0) > prevSeenAt
+      && cares.some(s => s.hid === e.space)
+      && ['note', 'missed', 'ticked', 'created'].includes(e.kind))
+    .sort((a, b) => a.ts - b.ts);
+  const lineFor = (e) => {
+    const clip = (s) => { s = String(s || ''); return s.length > 80 ? s.slice(0, 78) + '…' : s; };
+    if (e.kind === 'note')    return '📝 ' + (e.who || 'A carer') + ' noted: “' + clip(e.text) + '”';
+    if (e.kind === 'missed')  return '⚠️ ' + clip(e.text) + ' — not recorded' + (e.detail ? ' (' + e.detail + ')' : '');
+    if (e.kind === 'ticked')  return '✓ ' + (e.who || 'Someone') + ' did “' + clip(e.text) + '”';
+    if (e.kind === 'created') return '➕ ' + (e.who || 'Someone') + ' added “' + clip(e.text) + '”';
+    return clip(e.text);
+  };
+  // don't echo the carer's own ticks/adds back to them; keep notes + missed always
+  const lines = [...new Set(evs
+    .filter(e => e.kind === 'note' || e.kind === 'missed' || (e.who || '').toLowerCase() !== me)
+    .map(lineFor))];
+  if (!lines.length){ host.style.display = 'none'; host.innerHTML = ''; return; }
+  host.innerHTML = '';
+  const wrap = document.createElement('div');
+  wrap.className = 'care-handoff';
+  const head = document.createElement('div');
+  head.className = 'ch-head';
+  const b = document.createElement('b');
+  b.textContent = '💙 Since your last visit';
+  head.appendChild(b);
+  const x = document.createElement('button');
+  x.className = 'ch-x'; x.setAttribute('aria-label', 'Dismiss'); x.textContent = '✕';
+  x.addEventListener('click', () => { careHandoffDismissed = true; renderCareHandoff(); });
+  head.appendChild(x);
+  wrap.appendChild(head);
+  const list = document.createElement('div');
+  list.className = 'ch-list';
+  lines.slice(-8).forEach(l => {
+    const r = document.createElement('div');
+    r.className = 'ch-row';
+    r.textContent = l;
+    list.appendChild(r);
+  });
+  wrap.appendChild(list);
+  host.appendChild(wrap);
+  host.style.display = '';
 }
 
 /* ---------- task scope sheet ---------- */
@@ -4648,6 +4715,28 @@ document.addEventListener('keydown', (e) => {
     if (el && el.style.display !== 'none' && el.style.display !== ''){ /* visible sheets use flex/block */ }
     if (el && getComputedStyle(el).display !== 'none'){ close(); e.preventDefault(); return; }
   }
+});
+
+/* ---------- a11y (v49): trap Tab inside the open dialog ----------
+   Every overlay declares role="dialog" aria-modal, but focus wasn't trapped —
+   keyboard/screen-reader users could Tab out into the page behind the modal.
+   This keeps Tab (and the first Tab) within the topmost visible dialog. */
+function topmostDialog(){
+  const open = [...document.querySelectorAll('[role="dialog"]')]
+    .filter(d => getComputedStyle(d).display !== 'none');
+  return open.length ? open[open.length - 1] : null;   // last in DOM ≈ topmost
+}
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Tab') return;
+  const dlg = topmostDialog();
+  if (!dlg) return;
+  const foci = [...dlg.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')]
+    .filter(el => !el.disabled && el.offsetParent !== null);
+  if (!foci.length) return;
+  const first = foci[0], last = foci[foci.length - 1];
+  if (!dlg.contains(document.activeElement)){ e.preventDefault(); first.focus(); return; }
+  if (e.shiftKey && document.activeElement === first){ e.preventDefault(); last.focus(); }
+  else if (!e.shiftKey && document.activeElement === last){ e.preventDefault(); first.focus(); }
 });
 
 /* ---------- onboarding controller (v37) ---------- */
