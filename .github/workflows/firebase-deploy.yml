@@ -1,0 +1,69 @@
+# Deploy the app to Firebase Hosting on every push to main.
+#
+# This replaces the GitHub Pages auto-publish: push to main -> CI deploys the
+# live site at https://todo-list-50050.web.app. Works fine on a PRIVATE repo.
+#
+# One-time setup (see SETUP note at the bottom of this file):
+#   Add a repo secret named FIREBASE_SERVICE_ACCOUNT containing the JSON key of
+#   a Firebase service account with the "Firebase Hosting Admin" role.
+#
+# Pull requests get a temporary preview URL instead of touching production.
+
+name: Deploy to Firebase Hosting
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Avoid overlapping deploys if you push twice quickly — newer run wins.
+concurrency:
+  group: firebase-hosting-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    # Skip if the secret isn't set yet, so the repo doesn't show red X's before
+    # you've configured it.
+    if: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository }}
+    permissions:
+      checks: write
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v4
+
+      - name: Deploy
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          projectId: todo-list-50050
+          # push to main -> production ("live"); PRs -> a named, temporary
+          # preview channel (never touches production)
+          channelId: ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || 'live' }}
+
+# ---------------------------------------------------------------------------
+# SETUP (do this once):
+#
+# 1. Firebase console -> Project settings (gear) -> Service accounts ->
+#    "Generate new private key". A JSON file downloads.
+#      (Or: gcloud iam service-accounts keys create key.json \
+#         --iam-account=<name>@todo-list-50050.iam.gserviceaccount.com)
+#    The account needs the "Firebase Hosting Admin" role. The default
+#    App Engine / Firebase Admin SDK service account already has it.
+#
+# 2. GitHub repo -> Settings -> Secrets and variables -> Actions ->
+#    "New repository secret":
+#      Name:  FIREBASE_SERVICE_ACCOUNT
+#      Value: paste the ENTIRE contents of that JSON file.
+#
+# 3. Push to main (or re-run this workflow). It deploys automatically.
+#
+# That's it — after this, every push I make to main auto-deploys, and the repo
+# can be private. Delete the GitHub Pages source in repo Settings -> Pages once
+# you've confirmed the Firebase site is serving.
+# ---------------------------------------------------------------------------
