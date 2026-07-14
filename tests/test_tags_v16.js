@@ -34,7 +34,7 @@ const { chromium } = require('playwright');
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
   await page.addInitScript(() => { try { localStorage.setItem("onboarded", "true"); } catch(e){} });
-  await page.goto('http://localhost:8906/', { waitUntil: 'networkidle' });
+  await page.goto('http://localhost:8906/app.html', { waitUntil: 'networkidle' });
 
   // capture → prompt should include the existing tag vocabulary
   await page.fill('#liveText', 'I need to renew the car insurance');

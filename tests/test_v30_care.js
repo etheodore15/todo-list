@@ -104,7 +104,7 @@ export function onSnapshot(col, cb){
        summary: 'Mum was dizzy this morning.', priority: 'medium', engine: 'built-in', ts: Date.now()}]));
   }, {yest});
   await page.addInitScript(() => { try { localStorage.setItem("onboarded", "true"); } catch(e){} });
-  await page.goto('http://localhost:8906/', { waitUntil: 'load' });
+  await page.goto('http://localhost:8906/app.html', { waitUntil: 'load' });
   await page.waitForTimeout(600);
 
   // ---------- C2b: missed dose recorded, task respawned today ----------

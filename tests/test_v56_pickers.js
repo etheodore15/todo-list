@@ -24,7 +24,7 @@ const { chromium } = require('playwright');
       localStorage.setItem('todos', JSON.stringify([
         {id: 'a', text: 'Plan the trip', priority: 'medium', tags: ['home'], done: false, date: t, energy: 'medium', minutes: 20}]));
     }, t);
-    await page.goto('http://localhost:8906/', { waitUntil: 'load' });
+    await page.goto('http://localhost:8906/app.html', { waitUntil: 'load' });
     await page.waitForTimeout(300);
     await page.click('nav.tabs button[data-view="today"]');
     await page.waitForTimeout(200);

@@ -26,7 +26,7 @@ export function onSnapshot(col, cb){ cb({docChanges: () => []}); return () => {}
     const page = await ctx.newPage();
     page.on('pageerror', e => errors.push(e.message));
     await page.addInitScript(() => localStorage.setItem('onboarded', 'true'));
-    await page.goto('http://localhost:8906/', { waitUntil: 'load' });
+    await page.goto('http://localhost:8906/app.html', { waitUntil: 'load' });
     await page.waitForTimeout(200);
     return page;
   })();
@@ -76,7 +76,7 @@ export function onSnapshot(col, cb){ cb({docChanges: () => []}); return () => {}
         {id:'e3', ts: now - 10*86400000, who:'Alex', kind:'missed', taskId:'m3', text:'Ancient dose', space:'hh-care', detail:'long ago'}
       ]));
     }, now);
-    await page.goto('http://localhost:8906/', { waitUntil: 'load' });
+    await page.goto('http://localhost:8906/app.html', { waitUntil: 'load' });
     await page.waitForTimeout(400);
     await page.click('nav.tabs button[data-view="today"]');
     await page.waitForTimeout(250);

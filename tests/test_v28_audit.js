@@ -70,14 +70,14 @@ export function onSnapshot(col, cb, errCb){
   const errors = [];
 
   const mkDevice = async (name) => {
-    const ctx = await browser.newContext();
+    const ctx = await browser.newContext({ serviceWorkers: 'block' });
     await ctx.route('**/managed-config.js', r => r.fulfill({ contentType: 'application/javascript', body: 'window.MANAGED=null;' }));
     await ctx.route('**/vendor/firebase-app.js', r => r.fulfill({ contentType: 'application/javascript', body: FAKE_APP }));
     await ctx.route('**/vendor/firebase-firestore.js', r => r.fulfill({ contentType: 'application/javascript', body: FAKE_FS }));
     const page = await ctx.newPage();
     page.on('pageerror', e => errors.push(e.message));
     await page.addInitScript(() => { try { localStorage.setItem("onboarded", "true"); } catch(e){} });
-    await page.goto('http://localhost:8906/', { waitUntil: 'networkidle' });
+    await page.goto('http://localhost:8906/app.html', { waitUntil: 'networkidle' });
     if (name){
       await page.click('nav.tabs button[data-view="settings"]');
       await page.fill('#myNameInput', name);

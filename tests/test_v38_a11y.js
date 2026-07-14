@@ -20,7 +20,7 @@ const { chromium } = require('playwright');
       {hid:'hh-cop', name:'Co-parenting', type:'coparenting', cfg:{apiKey:'k', projectId:'p'}}]));
     localStorage.setItem('defaultSpace', JSON.stringify('hh-cop'));
   });
-  await page.goto('http://localhost:8906/', { waitUntil: 'load' });
+  await page.goto('http://localhost:8906/app.html', { waitUntil: 'load' });
   await page.waitForTimeout(300);
 
   // ---------- live regions ----------
@@ -88,7 +88,7 @@ const { chromium } = require('playwright');
   await bctx.route('**/managed-config.js', r => r.fulfill({ contentType: 'application/javascript', body: 'window.MANAGED=null;' }));
   const B = await bctx.newPage();
   B.on('pageerror', e => errors.push(e.message));
-  await B.goto('http://localhost:8906/', { waitUntil: 'load' });
+  await B.goto('http://localhost:8906/app.html', { waitUntil: 'load' });
   await B.waitForTimeout(300);
   check('a11y: onboarding shows for a new user', await B.locator('#onboarding').isVisible());
   await B.keyboard.press('Escape');

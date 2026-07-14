@@ -17,7 +17,7 @@ const { chromium } = require('playwright');
       {hid: 'hh-cop', name: 'Co-parenting', type: 'coparenting', cfg: {apiKey:'k', projectId:'p'}}]));
   });
   await page.addInitScript(() => { try { localStorage.setItem("onboarded", "true"); } catch(e){} });
-  await page.goto('http://localhost:8906/', { waitUntil: 'load' });
+  await page.goto('http://localhost:8906/app.html', { waitUntil: 'load' });
   await page.waitForTimeout(300);
 
   // ---------- Gap 1: per-space members override the global list ----------

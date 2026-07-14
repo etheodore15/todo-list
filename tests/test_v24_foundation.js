@@ -12,7 +12,7 @@ const { chromium } = require('playwright');
 
   await page.addInitScript(() => { try { localStorage.setItem("onboarded", "true"); } catch(e){} });
 
-  await page.goto('http://localhost:8906/', { waitUntil: 'networkidle' });
+  await page.goto('http://localhost:8906/app.html', { waitUntil: 'networkidle' });
   await page.click('nav.tabs button[data-view="today"]');
 
   const day = (n) => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);

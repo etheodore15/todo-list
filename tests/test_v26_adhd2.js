@@ -24,7 +24,7 @@ const { chromium } = require('playwright');
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
   await page.addInitScript(() => { try { localStorage.setItem("onboarded", "true"); } catch(e){} });
-  await page.goto('http://localhost:8906/', { waitUntil: 'networkidle' });
+  await page.goto('http://localhost:8906/app.html', { waitUntil: 'networkidle' });
   await page.click('nav.tabs button[data-view="today"]');
 
   // ---------- B3: energy auto-detected + chips ----------

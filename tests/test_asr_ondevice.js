@@ -12,7 +12,7 @@ const { chromium } = require('playwright');
 
   await page.addInitScript(() => { try { localStorage.setItem("onboarded", "true"); } catch(e){} });
 
-  await page.goto('http://localhost:8906/', { waitUntil: 'networkidle' });
+  await page.goto('http://localhost:8906/app.html', { waitUntil: 'networkidle' });
 
   // Point the worker's model hub at the locally-served copies.
   await page.evaluate(() => aiCall('config', { remoteHost: 'http://localhost:8906/testmodels/' }));

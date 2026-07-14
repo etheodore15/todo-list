@@ -1,6 +1,7 @@
 {
   "hosting": {
     "public": ".",
+    "cleanUrls": true,
     "ignore": [
       "firebase.json",
       ".firebaserc",
@@ -21,7 +22,7 @@
         "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }]
       },
       {
-        "source": "**/@(sw.js|index.html|dashboard.html|managed-config.js|digest.js|ai-worker.js|manifest.webmanifest)",
+        "source": "**/@(sw.js|index.html|app.html|investors.html|dashboard.html|managed-config.js|digest.js|ai-worker.js|manifest.webmanifest)",
         "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
       }
     ]

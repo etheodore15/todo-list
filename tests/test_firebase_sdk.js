@@ -4,7 +4,7 @@ const { chromium } = require('playwright');
   const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--no-sandbox'] });
   const page = await browser.newPage();
   await page.addInitScript(() => { try { localStorage.setItem("onboarded", "true"); } catch(e){} });
-  await page.goto('http://localhost:8906/', { waitUntil: 'networkidle' });
+  await page.goto('http://localhost:8906/app.html', { waitUntil: 'networkidle' });
   const r = await page.evaluate(async () => {
     try {
       const app = await import('./vendor/firebase-app.js');

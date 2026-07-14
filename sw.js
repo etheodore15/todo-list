@@ -1,8 +1,7 @@
-const CACHE = 'idea-todo-v56';
+const CACHE = 'idea-todo-v57';
 const LIB_CACHE = 'idea-todo-libs-v1';
 const ASSETS = [
-  './',
-  './index.html',
+  './app.html',
   './manifest.webmanifest',
   './ai-worker.js',
   './digest.js',
@@ -52,7 +51,7 @@ self.addEventListener('fetch', e => {
         caches.open(CACHE).then(c => c.put(e.request, copy));
         return res;
       })
-      .catch(() => caches.match(e.request).then(m => m || caches.match('./index.html')))
+      .catch(() => caches.match(e.request).then(m => m || caches.match('./app.html')))
   );
 });
 

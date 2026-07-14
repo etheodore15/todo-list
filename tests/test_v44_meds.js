@@ -36,7 +36,7 @@ export function onSnapshot(col, cb){ cb({docChanges: () => []}); return () => {}
     localStorage.setItem('fbConfig', JSON.stringify({apiKey:'k',projectId:'p'}));
     localStorage.setItem('defaultSpace', JSON.stringify('hh-care'));
   });
-  await p.goto('http://localhost:8906/', { waitUntil: 'load' });
+  await p.goto('http://localhost:8906/app.html', { waitUntil: 'load' });
   await p.waitForTimeout(400);
   await p.click('nav.tabs button[data-view="today"]');
   await p.waitForTimeout(200);

@@ -7,7 +7,7 @@ const { chromium } = require('playwright');
   let pass = 0, fail = 0;
   const check = (n, c) => { console.log((c?'PASS':'FAIL')+': '+n); c?pass++:fail++; };
   await page.addInitScript(() => { try { localStorage.setItem("onboarded", "true"); } catch(e){} });
-  await page.goto('http://localhost:8906/', { waitUntil: 'networkidle' });
+  await page.goto('http://localhost:8906/app.html', { waitUntil: 'networkidle' });
 
   // members for delegation
   await page.click('nav.tabs button[data-view="settings"]');

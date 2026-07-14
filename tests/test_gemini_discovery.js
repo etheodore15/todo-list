@@ -35,7 +35,7 @@ const { chromium } = require('playwright');
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
   await page.addInitScript(() => { try { localStorage.setItem("onboarded", "true"); } catch(e){} });
-  await page.goto('http://localhost:8906/', { waitUntil: 'networkidle' });
+  await page.goto('http://localhost:8906/app.html', { waitUntil: 'networkidle' });
 
   // capture: stale model 404s → rediscovery picks gemini-3.0-flash → succeeds
   await page.fill('#liveText', 'I need to book the dentist');

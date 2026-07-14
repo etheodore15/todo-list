@@ -7,7 +7,7 @@ const { chromium } = require('playwright');
   let pass = 0, fail = 0;
   const check = (n, c) => { console.log((c?'PASS':'FAIL')+': '+n); c?pass++:fail++; };
   await page.addInitScript(() => { try { localStorage.setItem("onboarded", "true"); } catch(e){} });
-  await page.goto('http://localhost:8906/', { waitUntil: 'networkidle' });
+  await page.goto('http://localhost:8906/app.html', { waitUntil: 'networkidle' });
 
   // The user's exact transcript (no Gemini key → built-in heuristic path)
   await page.fill('#liveText', "I had a very restless sleep last night and it wasn't enjoyable of working up quite tired. I need to make sure that I have a good sleep tonight. Also need to make sure that I put on my pajamas and brush my teeth and rinse my mouth out with salt because I have an ulcer that's giving me grief on my cheek.");

@@ -15,7 +15,7 @@ const fs = require('fs');
     const page = await ctx.newPage();
     page.on('pageerror', e => errors.push(e.message));
     await page.addInitScript(() => localStorage.setItem('onboarded', 'true'));
-    await page.goto('http://localhost:8906/', { waitUntil: 'load' });
+    await page.goto('http://localhost:8906/app.html', { waitUntil: 'load' });
     await page.waitForTimeout(200);
     return page;
   };

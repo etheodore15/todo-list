@@ -10,7 +10,7 @@ const { chromium } = require('playwright');
 
   await page.addInitScript(() => { try { localStorage.setItem("onboarded", "true"); } catch(e){} });
 
-  await page.goto('http://localhost:8906/', { waitUntil: 'networkidle' });
+  await page.goto('http://localhost:8906/app.html', { waitUntil: 'networkidle' });
 
   // Reported bug: multi-task split where only one task got tags.
   await page.fill('#liveText', "I need to book the car in for a service and I should buy a birthday present for Lulu");

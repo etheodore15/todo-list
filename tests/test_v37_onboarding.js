@@ -13,7 +13,7 @@ const { chromium } = require('playwright');
     await ctx.route('**/managed-config.js', r => r.fulfill({ contentType: 'application/javascript', body: 'window.MANAGED=null;' }));
     const page = await ctx.newPage();
     page.on('pageerror', e => errors.push(e.message));
-    await page.goto('http://localhost:8906/', { waitUntil: 'load' });
+    await page.goto('http://localhost:8906/app.html', { waitUntil: 'load' });
     await page.waitForTimeout(300);
     return page;
   };
@@ -43,8 +43,13 @@ const { chromium } = require('playwright');
   check('v37: cohorts persisted on continue',
     JSON.stringify(await A.evaluate(() => store.get('cohorts', []))) === '["adhd","coparenting"]');
 
-  // ---------- get started closes + marks onboarded ----------
+  // ---------- next → create-a-space step → solo closes + marks onboarded ----------
   await A.click('#obStart');
+  await A.waitForTimeout(150);
+  check('v37: step 3 (create a space) shows', await A.locator('#obStep3').isVisible());
+  check('v37: space choices offered for chosen cohorts',
+    await A.locator('#obSpaceChoices .ob-space').count() >= 1);
+  await A.click('#obSolo');
   await A.waitForTimeout(150);
   check('v37: onboarding dismissed', !(await A.locator('#onboarding').isVisible()));
   check('v37: onboarded flag set', await A.evaluate(() => store.get('onboarded', false)) === true);
@@ -66,6 +71,8 @@ const { chromium } = require('playwright');
   await A.locator('.ob-chip', { hasText: 'Caring for someone' }).click();
   await A.click('#obContinue');
   await A.click('#obStart');
+  await A.waitForTimeout(150);
+  await A.click('#obSolo');
   await A.waitForTimeout(150);
   check('v37: updated cohorts saved',
     (await A.evaluate(() => store.get('cohorts', []))).includes('caregiving'));

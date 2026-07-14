@@ -40,7 +40,7 @@ export function onSnapshot(col, cb){ cb({docChanges: () => []}); return () => {}
       }
       if (s.cohorts) localStorage.setItem('cohorts', JSON.stringify(s.cohorts));
     }, { spaces, cohorts, onboarded });
-    await page.goto('http://localhost:8906/', { waitUntil: 'load' });
+    await page.goto('http://localhost:8906/app.html', { waitUntil: 'load' });
     await page.waitForTimeout(400);
     return page;
   };

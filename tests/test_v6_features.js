@@ -10,7 +10,7 @@ const { chromium } = require('playwright');
 
   await page.addInitScript(() => { try { localStorage.setItem("onboarded", "true"); } catch(e){} });
 
-  await page.goto('http://localhost:8906/', { waitUntil: 'networkidle' });
+  await page.goto('http://localhost:8906/app.html', { waitUntil: 'networkidle' });
 
   // 1. Observations do NOT become tasks; actions do.
   await page.fill('#liveText', "the weather is really nice this morning, and I need to pay the electricity bill today it's urgent, and the dog seems much happier lately");

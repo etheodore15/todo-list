@@ -37,7 +37,7 @@ export function onSnapshot(col, cb){ cb({docChanges: () => []}); return () => {}
     localStorage.setItem('defaultSpace', JSON.stringify('hh-care'));
     // NOTE: no geminiKey — the briefing must still work with NO AI.
   });
-  await p.goto('http://localhost:8906/', { waitUntil: 'load' });
+  await p.goto('http://localhost:8906/app.html', { waitUntil: 'load' });
   await p.waitForTimeout(400);
 
   // ---------- capture screen is care-aware ----------
@@ -92,7 +92,7 @@ export function onSnapshot(col, cb){ cb({docChanges: () => []}); return () => {}
   await ctx2.route('**/managed-config.js', r => r.fulfill({ contentType: 'application/javascript', body: 'window.MANAGED=null;' }));
   const q = await ctx2.newPage();
   await q.addInitScript(() => localStorage.setItem('onboarded', 'true'));
-  await q.goto('http://localhost:8906/', { waitUntil: 'load' });
+  await q.goto('http://localhost:8906/app.html', { waitUntil: 'load' });
   await q.waitForTimeout(300);
   await q.click('nav.tabs button[data-view="capture"]');
   await q.waitForTimeout(150);

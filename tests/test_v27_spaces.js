@@ -72,14 +72,14 @@ export function onSnapshot(col, cb, errCb){
   const errors = [];
 
   const mkDevice = async () => {
-    const ctx = await browser.newContext();
+    const ctx = await browser.newContext({ serviceWorkers: 'block' });
     await ctx.route('**/managed-config.js', r => r.fulfill({ contentType: 'application/javascript', body: 'window.MANAGED=null;' }));
     await ctx.route('**/vendor/firebase-app.js', r => r.fulfill({ contentType: 'application/javascript', body: FAKE_APP }));
     await ctx.route('**/vendor/firebase-firestore.js', r => r.fulfill({ contentType: 'application/javascript', body: FAKE_FS }));
     const page = await ctx.newPage();
     page.on('pageerror', e => errors.push(e.message));
     await page.addInitScript(() => { try { localStorage.setItem("onboarded", "true"); } catch(e){} });
-    await page.goto('http://localhost:8906/', { waitUntil: 'networkidle' });
+    await page.goto('http://localhost:8906/app.html', { waitUntil: 'networkidle' });
     return page;
   };
 
@@ -184,7 +184,7 @@ export function onSnapshot(col, cb, errCb){
 
   // ---------- migration from single-household model ----------
   const C = await (async () => {
-    const ctx = await browser.newContext();
+    const ctx = await browser.newContext({ serviceWorkers: 'block' });
     await ctx.route('**/managed-config.js', r => r.fulfill({ contentType: 'application/javascript', body: 'window.MANAGED=null;' }));
     await ctx.route('**/vendor/firebase-app.js', r => r.fulfill({ contentType: 'application/javascript', body: FAKE_APP }));
     await ctx.route('**/vendor/firebase-firestore.js', r => r.fulfill({ contentType: 'application/javascript', body: FAKE_FS }));
@@ -203,7 +203,7 @@ export function onSnapshot(col, cb, errCb){
     page.on('pageerror', e => errors.push(e.message));
     // sync starts at boot on this device, so the network never goes idle
     await page.addInitScript(() => { try { localStorage.setItem("onboarded", "true"); } catch(e){} });
-    await page.goto('http://localhost:8906/', { waitUntil: 'load' });
+    await page.goto('http://localhost:8906/app.html', { waitUntil: 'load' });
     return page;
   })();
   await C.waitForTimeout(800);

@@ -87,7 +87,7 @@ export function onSnapshot(col, cb){ cb({docChanges: () => []}); return () => {}
     localStorage.setItem('householdId', JSON.stringify('hh-cop1'));
   });
   await page.addInitScript(() => { try { localStorage.setItem("onboarded", "true"); } catch(e){} });
-  await page.goto('http://localhost:8906/', { waitUntil: 'load' });
+  await page.goto('http://localhost:8906/app.html', { waitUntil: 'load' });
   await page.click('nav.tabs button[data-view="today"]');
   await page.waitForTimeout(400);
 
