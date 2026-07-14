@@ -443,6 +443,14 @@
 
   <!-- SETTINGS -->
   <section id="view-settings" class="view">
+    <h2 class="set-section" id="accountSection" style="display:none;">Account</h2>
+    <div class="set-block" id="accountBlock" style="display:none;">
+      <h3>Sync across your devices</h3>
+      <p id="accountStatus"></p>
+      <button class="btn primary" id="googleSignInBtn">Sign in with Google</button>
+      <button class="btn ghost" id="signOutBtn" style="display:none;">Sign out</button>
+    </div>
+
     <h2 class="set-section">You &amp; accessibility</h2>
     <div class="set-block">
       <h3>Quiet visual mode</h3>
@@ -570,7 +578,7 @@
       <input type="file" id="importFile" accept=".json,application/json" style="display:none">
       <button class="btn ghost" id="wipeBtn">Delete all data</button>
     </div>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v51<br><span id="envInfo"></span></p>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v52<br><span id="envInfo"></span></p>
   </section>
 </main>
 
@@ -680,7 +688,7 @@
     <h3 id="setupTitle">Space created ✓</h3>
     <p class="side-note" id="setupIntro"></p>
     <div id="setupSteps" style="margin:4px 0 8px;"></div>
-    <button class="btn ghost" id="setupDone">I’ll finish later</button>
+    <button class="btn primary" id="setupDone">Done — take me in</button>
   </div>
 </div>
 
@@ -3413,12 +3421,129 @@ async function ensureManaged(){
   const a = auth.getAuth(managedApp);
   managedUid = await new Promise((resolve, reject) => {
     let settled = false;
-    const unsub = auth.onAuthStateChanged(a, u => {
-      if (u && !settled){ settled = true; unsub(); resolve(u.uid); }
-    }, err => { if (!settled){ settled = true; reject(err); } });
-    if (a.currentUser){ settled = true; unsub(); resolve(a.currentUser.uid); return; }
+    const take = (u) => { settled = true; unsub(); accountEmail = u.email || ''; accountAnon = !!u.isAnonymous; resolve(u.uid); };
+    const unsub = auth.onAuthStateChanged(a, u => { if (u && !settled) take(u); },
+      err => { if (!settled){ settled = true; reject(err); } });
+    if (a.currentUser){ take(a.currentUser); return; }
     auth.signInAnonymously(a).catch(err => { if (!settled){ settled = true; reject(err); } });
   });
+  if (typeof refreshAccountUI === 'function') refreshAccountUI();
+}
+
+/* ---------- accounts (v52): optional Google sign-in for cross-device sync ----------
+   Anonymous stays the default (zero-friction). Signing in with Google LINKS to
+   the existing anonymous account so the uid — and every space membership — is
+   preserved. A per-user `users/{uid}` doc mirrors the space list so the same
+   account on a new device restores its spaces. */
+let accountEmail = '', accountAnon = true;
+
+async function managedAuth(){
+  await ensureManaged();
+  const m = await import('./vendor/firebase-auth.js');
+  return {m, a: m.getAuth(managedApp)};
+}
+function isSignedIn(){ return !!managedUid && !accountAnon && !!accountEmail; }
+
+// mirror this device's space list into the user's own doc (no secrets beyond the
+// self-hosted config, which already travels in invite codes)
+async function syncUserSpaces(){
+  if (!managedUid || !fbFs || !fbFs.setDoc) return;
+  const spaces = spacesList().map(s => ({hid: s.hid, name: s.name, type: s.type, managed: !!s.managed, cfg: s.cfg || null}));
+  try { await fbFs.setDoc(fbFs.doc(managedDb, 'users', managedUid), {spaces, updated: Date.now()}, {merge: true}); } catch (_) {}
+}
+async function restoreUserSpaces(){
+  if (!managedUid || !fbFs || !fbFs.getDoc) return 0;
+  let snap;
+  try { snap = await fbFs.getDoc(fbFs.doc(managedDb, 'users', managedUid)); } catch (_) { return 0; }
+  const d = snap && snap.exists && snap.exists() ? snap.data() : (snap && snap.data && snap.data());
+  if (!d || !Array.isArray(d.spaces)) return 0;
+  let added = 0;
+  for (const s of d.spaces){
+    if (!spacesList().some(x => x.hid === s.hid)){
+      await addSpace({hid: s.hid, name: s.name, type: s.type, cfg: s.cfg || null, managed: !!s.managed});
+      added++;
+    }
+  }
+  if (added){ refreshSyncUI(); renderTodos(); }
+  return added;
+}
+// after switching into an existing account (uid changed), re-assert membership
+// on this device's managed spaces and restart their listeners under the new auth
+async function reMemberLocalSpaces(){
+  for (const s of spacesList().filter(x => x.managed)){
+    try { await fbFs.setDoc(fbFs.doc(managedDb, 'households', s.hid), {members: {[managedUid]: myName() || 'member'}}, {merge: true}); } catch (_) {}
+    const rt = spaceRt[s.hid]; if (rt && rt.unsub) rt.unsub(); delete spaceRt[s.hid];
+    await startSpaceSync(s);
+  }
+}
+async function resumeManagedSyncs(){
+  for (const s of spacesList().filter(x => x.managed && !spaceRt[x.hid])) await startSpaceSync(s);
+}
+
+async function signInWithGoogle(){
+  const btn = document.getElementById('googleSignInBtn');
+  if (btn){ btn.disabled = true; btn.textContent = 'Signing in…'; }
+  try {
+    const {m, a} = await managedAuth();
+    const provider = new m.GoogleAuthProvider();
+    let res;
+    if (a.currentUser && a.currentUser.isAnonymous){
+      try {
+        res = await m.linkWithPopup(a.currentUser, provider);   // preserves uid + memberships
+      } catch (e){
+        if (e && (e.code === 'auth/credential-already-in-use' || e.code === 'auth/email-already-in-use')){
+          // this Google account already exists (used on another device) — sign into it
+          const cred = m.GoogleAuthProvider.credentialFromError(e);
+          res = await m.signInWithCredential(a, cred);
+          managedUid = res.user.uid; accountEmail = res.user.email || ''; accountAnon = false;
+          await reMemberLocalSpaces();
+        } else throw e;
+      }
+    } else {
+      res = await m.signInWithPopup(a, provider);
+    }
+    managedUid = res.user.uid; accountEmail = res.user.email || ''; accountAnon = !!res.user.isAnonymous;
+    await resumeManagedSyncs();
+    const n = await restoreUserSpaces();   // pull the account's spaces FIRST…
+    await syncUserSpaces();                // …then write back the merged list
+    refreshAccountUI();
+    toast(n ? `Signed in — restored ${n} space${n === 1 ? '' : 's'} ✓`
+            : 'Signed in ✓ — your spaces now sync across your devices');
+  } catch (e){
+    if (!(e && e.code === 'auth/popup-closed-by-user'))
+      toast('Sign-in didn’t complete' + (e && e.message ? ': ' + e.message : ''));
+  }
+  if (btn){ btn.disabled = false; }
+  refreshAccountUI();
+}
+
+async function signOutAccount(){
+  if (!confirm('Sign out? Your spaces stay safe in your account — sign back in on any device to get them. On this device they’ll pause syncing until you sign in again.')) return;
+  try { const {m, a} = await managedAuth(); await m.signOut(a); } catch (_) {}
+  spacesList().filter(s => s.managed).forEach(s => { const rt = spaceRt[s.hid]; if (rt && rt.unsub) rt.unsub(); delete spaceRt[s.hid]; });
+  managedUid = null; accountEmail = ''; accountAnon = true;
+  refreshAccountUI();
+  toast('Signed out');
+}
+
+function refreshAccountUI(){
+  const block = document.getElementById('accountBlock');
+  const section = document.getElementById('accountSection');
+  if (!block) return;
+  const show = !!window.MANAGED;
+  block.style.display = show ? '' : 'none';
+  if (section) section.style.display = show ? '' : 'none';
+  if (!show) return;
+  const status = document.getElementById('accountStatus');
+  const inBtn = document.getElementById('googleSignInBtn');
+  const outBtn = document.getElementById('signOutBtn');
+  if (isSignedIn()){
+    status.textContent = '✅ Signed in as ' + accountEmail + ' — your spaces sync across your devices.';
+    inBtn.style.display = 'none'; outBtn.style.display = '';
+  } else {
+    status.textContent = 'You’re on this device only. Sign in with Google to sync your spaces across devices and keep them if you reinstall — nothing changes for how you use the app.';
+    inBtn.style.display = ''; inBtn.textContent = 'Sign in with Google'; outBtn.style.display = 'none';
+  }
 }
 
 async function startSpaceSync(sp){
@@ -3563,6 +3688,7 @@ async function addSpace(sp){
   await startSpaceSync(sp);
   updateSwConfig();
   track('space_created', {type: sp.type});
+  if (window.MANAGED) syncUserSpaces();   // keep the cross-device space list current
   return true;
 }
 
@@ -3582,6 +3708,7 @@ function leaveSpace(hid){
   syncMsg(spacesList().length ? '' : 'Left the space.');
   toast('Left "' + sp.name + '" — your tasks are still here.');
   updateSwConfig();
+  if (window.MANAGED) syncUserSpaces();
 }
 
 // The app's public address for invite links. Defaults to the GitHub Pages URL;
@@ -4553,6 +4680,9 @@ function guideSpaceSetup(sp){
   const host = document.getElementById('setupSteps');
   const render = () => {
     host.innerHTML = '';
+    const doneBtn = document.getElementById('setupDone');
+    if (doneBtn) doneBtn.textContent = done.size >= steps.length ? 'All set — take me in ✓'
+      : done.size ? 'Done for now' : 'Done — take me in';
     steps.forEach((step, i) => {
       const b = document.createElement('button');
       b.className = 'setup-step' + (done.has(i) ? ' done' : '');
@@ -4643,9 +4773,13 @@ document.getElementById('addSpaceBtn').addEventListener('click', () => {
   el.style.display = el.style.display === 'none' ? '' : 'none';
 });
 
+document.getElementById('googleSignInBtn').addEventListener('click', signInWithGoogle);
+document.getElementById('signOutBtn').addEventListener('click', signOutAccount);
+
 rollover();
 syncLegacyMirror();
 refreshSyncUI();
+refreshAccountUI();
 if (spacesList().length) startSync().catch(err => syncMsg('❌ ' + err.message));
 
 /* ---------- daily digest (needs installed PWA + periodic background sync) ---------- */

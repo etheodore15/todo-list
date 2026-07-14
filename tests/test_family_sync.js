@@ -73,6 +73,7 @@ export function onSnapshot(col, cb, errCb){
 
   const mkDevice = async () => {
     const ctx = await browser.newContext({ permissions: ['clipboard-read', 'clipboard-write'] });
+    await ctx.route('**/managed-config.js', r => r.fulfill({ contentType: 'application/javascript', body: 'window.MANAGED=null;' }));
     await ctx.route('**/vendor/firebase-app.js', r => r.fulfill({ contentType: 'application/javascript', body: FAKE_APP }));
     await ctx.route('**/vendor/firebase-firestore.js', r => r.fulfill({ contentType: 'application/javascript', body: FAKE_FS }));
     const page = await ctx.newPage();
@@ -154,7 +155,8 @@ export function onSnapshot(col, cb, errCb){
   // un-ticking clears attribution everywhere
   await B.locator('.todo', { hasText: 'buy milk' }).locator('.chk').click();
   await A.waitForTimeout(1200);
-  check('A: untick clears attribution', (await A.locator('.todo .attr').count()) === 0);
+  // only the DONE attribution (✓) should clear; the inline "➕ added by" line (v48) stays
+  check('A: untick clears the done attribution', (await A.locator('.todo .attr:not(.attr-add)').count()) === 0);
   await B.locator('.todo', { hasText: 'buy milk' }).locator('.chk').click();
   await A.waitForTimeout(1200);
 
