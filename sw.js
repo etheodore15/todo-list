@@ -6,6 +6,7 @@ const ASSETS = [
   './ai-worker.js',
   './digest.js',
   './managed-config.js',
+  './icons.css',
   './dashboard.html',
   './icons/icon-192.png',
   './icons/icon-512.png',
