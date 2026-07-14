@@ -249,9 +249,22 @@
   .energy-chip{background:rgba(139,148,167,.14);}
 
   /* onboarding (v37) */
-  #onboarding{position:fixed; inset:0; z-index:80; background:var(--bg); overflow-y:auto;
+  #onboarding, #authGate{position:fixed; inset:0; z-index:80; background:var(--bg); overflow-y:auto;
     display:flex; align-items:flex-start; justify-content:center;
     padding:calc(24px + env(safe-area-inset-top)) 20px calc(24px + env(safe-area-inset-bottom));}
+  #authGate{z-index:85;}
+  #authGate h2{font-family:var(--font-display); font-size:1.7rem; font-weight:700; letter-spacing:-.5px;
+    margin:0 0 8px; line-height:1.18;}
+  .ag-btn{width:100%; margin-bottom:10px; display:flex; align-items:center; justify-content:center; gap:8px;}
+  .ag-note{color:var(--muted); font-size:.8rem; line-height:1.5; margin:6px 2px 0;}
+  .ag-lab{display:block; font-size:.78rem; color:var(--muted); margin:12px 0 4px;}
+  .ag-inp{width:100%; background:var(--card); border:1px solid var(--border); border-radius:10px;
+    color:var(--text); padding:12px 13px; font-size:1rem; outline:none;}
+  .ag-inp:focus{border-color:var(--accent);}
+  .ag-err{color:var(--danger); font-size:.82rem; line-height:1.4; margin:8px 2px; min-height:0;}
+  .ag-switch{font-size:.85rem; color:var(--muted); text-align:center; margin:4px 0 12px;}
+  .ag-link{background:none; border:none; color:var(--accent); font-weight:600; cursor:pointer;
+    font-size:.85rem; padding:2px;}
   .ob-inner{max-width:460px; width:100%; margin:auto;}
   .ob-eyebrow{color:var(--accent); font-size:.78rem; text-transform:uppercase; letter-spacing:.12em;
     margin:0 0 6px;}
@@ -473,6 +486,7 @@
       <h3>Sync across your devices</h3>
       <p id="accountStatus"></p>
       <button class="btn primary" id="googleSignInBtn">Sign in with Google</button>
+      <button class="btn ghost" id="emailSignInBtn">Sign in with email</button>
       <button class="btn ghost" id="signOutBtn" style="display:none;">Sign out</button>
     </div>
 
@@ -603,7 +617,7 @@
       <input type="file" id="importFile" accept=".json,application/json" style="display:none">
       <button class="btn ghost" id="wipeBtn">Delete all data</button>
     </div>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v54<br><span id="envInfo"></span></p>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v55<br><span id="envInfo"></span></p>
   </section>
 </main>
 
@@ -623,6 +637,36 @@
     <div id="scopeMembers" style="margin:4px 0 10px;"></div>
     <button class="btn primary" id="scopeAssign">Assign to selected</button>
     <button class="btn ghost" id="scopeCancel">Cancel</button>
+  </div>
+</div>
+
+<div id="authGate" role="dialog" aria-modal="true" aria-labelledby="agTitle" style="display:none;">
+  <div class="ob-inner">
+    <p class="ob-eyebrow">Idea → Todo</p>
+    <h2 id="agTitle">Capture it. We’ll sort it.</h2>
+    <p class="ob-sub">Turn a voice note into a clear, shareable to-do list. Choose how to start —
+       you can add or change this any time in Settings.</p>
+    <div id="agChoices">
+      <button class="btn primary ag-btn" id="agGoogleBtn"><span aria-hidden="true">🇬</span> Continue with Google</button>
+      <button class="btn ghost ag-btn" id="agEmailToggle">✉️ Continue with email</button>
+      <button class="btn ghost ag-btn" id="agGuestBtn">Continue without an account</button>
+      <p class="ag-note">No account? “Without an account” keeps everything on this device — you can sign
+         in later to sync across devices.</p>
+    </div>
+    <form id="agEmailForm" style="display:none;" autocomplete="on">
+      <label class="ag-lab" for="agEmail">Email</label>
+      <input id="agEmail" class="ag-inp" type="email" autocomplete="email" placeholder="you@example.com" required>
+      <label class="ag-lab" for="agPw">Password</label>
+      <input id="agPw" class="ag-inp" type="password" autocomplete="current-password" placeholder="At least 6 characters" required minlength="6">
+      <p id="agEmailErr" class="ag-err"></p>
+      <button class="btn primary ag-btn" id="agEmailSubmit" type="submit">Create account</button>
+      <p class="ag-switch">
+        <span id="agSwitchText">Already have an account?</span>
+        <button type="button" id="agSwitchMode" class="ag-link">Sign in</button>
+        <span id="agForgotWrap"> · <button type="button" id="agForgot" class="ag-link">Forgot password?</button></span>
+      </p>
+      <button class="btn ghost ag-btn" id="agEmailBack" type="button">← Back</button>
+    </form>
   </div>
 </div>
 
@@ -3505,35 +3549,42 @@ async function resumeManagedSyncs(){
   for (const s of spacesList().filter(x => x.managed && !spaceRt[x.hid])) await startSpaceSync(s);
 }
 
+// Shared post-sign-in: adopt the account, restore its spaces, sync back.
+// wasSwitched = we signed into a DIFFERENT (existing) account, so the uid changed.
+async function afterSignIn(res, wasSwitched){
+  managedUid = res.user.uid; accountEmail = res.user.email || ''; accountAnon = !!res.user.isAnonymous;
+  if (wasSwitched) await reMemberLocalSpaces();
+  await resumeManagedSyncs();
+  const n = await restoreUserSpaces();   // pull the account's spaces FIRST…
+  await syncUserSpaces();                // …then write back the merged list
+  refreshAccountUI();
+  return n;
+}
+function signInToast(n){
+  toast(n ? `Signed in — restored ${n} space${n === 1 ? '' : 's'} ✓`
+          : 'Signed in ✓ — your spaces now sync across your devices');
+}
+
 async function signInWithGoogle(){
   const btn = document.getElementById('googleSignInBtn');
   if (btn){ btn.disabled = true; btn.textContent = 'Signing in…'; }
   try {
     const {m, a} = await managedAuth();
     const provider = new m.GoogleAuthProvider();
-    let res;
+    let res, switched = false;
     if (a.currentUser && a.currentUser.isAnonymous){
       try {
         res = await m.linkWithPopup(a.currentUser, provider);   // preserves uid + memberships
       } catch (e){
         if (e && (e.code === 'auth/credential-already-in-use' || e.code === 'auth/email-already-in-use')){
-          // this Google account already exists (used on another device) — sign into it
           const cred = m.GoogleAuthProvider.credentialFromError(e);
-          res = await m.signInWithCredential(a, cred);
-          managedUid = res.user.uid; accountEmail = res.user.email || ''; accountAnon = false;
-          await reMemberLocalSpaces();
+          res = await m.signInWithCredential(a, cred); switched = true;
         } else throw e;
       }
     } else {
       res = await m.signInWithPopup(a, provider);
     }
-    managedUid = res.user.uid; accountEmail = res.user.email || ''; accountAnon = !!res.user.isAnonymous;
-    await resumeManagedSyncs();
-    const n = await restoreUserSpaces();   // pull the account's spaces FIRST…
-    await syncUserSpaces();                // …then write back the merged list
-    refreshAccountUI();
-    toast(n ? `Signed in — restored ${n} space${n === 1 ? '' : 's'} ✓`
-            : 'Signed in ✓ — your spaces now sync across your devices');
+    signInToast(await afterSignIn(res, switched));
   } catch (e){
     if (!(e && e.code === 'auth/popup-closed-by-user'))
       toast('Sign-in didn’t complete' + (e && e.message ? ': ' + e.message : ''));
@@ -3541,6 +3592,110 @@ async function signInWithGoogle(){
   if (btn){ btn.disabled = false; }
   refreshAccountUI();
 }
+
+// Email/password. Create = link onto the anonymous account (preserves uid/data);
+// if the email already exists, fall back to signing into it. Sign in = plain.
+function friendlyAuthError(e){
+  const c = e && e.code || '';
+  if (c === 'auth/invalid-email') return 'That email doesn’t look right.';
+  if (c === 'auth/weak-password') return 'Password needs at least 6 characters.';
+  if (c === 'auth/email-already-in-use') return 'That email already has an account — try signing in.';
+  if (c === 'auth/invalid-credential' || c === 'auth/wrong-password') return 'Email or password is incorrect.';
+  if (c === 'auth/user-not-found') return 'No account with that email — create one instead.';
+  if (c === 'auth/too-many-requests') return 'Too many attempts — wait a moment and try again.';
+  return (e && e.message) ? e.message.replace(/^Firebase:\s*/, '') : 'Something went wrong.';
+}
+async function emailAuth(email, pw, isCreate){
+  const {m, a} = await managedAuth();
+  let res, switched = false;
+  if (isCreate){
+    const cred = m.EmailAuthProvider.credential(email, pw);
+    if (a.currentUser && a.currentUser.isAnonymous){
+      try { res = await m.linkWithCredential(a.currentUser, cred); }
+      catch (e){
+        if (e && e.code === 'auth/email-already-in-use'){ res = await m.signInWithEmailAndPassword(a, email, pw); switched = true; }
+        else throw e;
+      }
+    } else {
+      res = await m.createUserWithEmailAndPassword(a, email, pw);
+    }
+  } else {
+    res = await m.signInWithEmailAndPassword(a, email, pw); switched = true;
+  }
+  return signInToast(await afterSignIn(res, switched));
+}
+async function sendPasswordReset(email){
+  const {m, a} = await managedAuth();
+  await m.sendPasswordResetEmail(a, email);
+}
+
+/* ---------- up-front auth gate (v55) ----------
+   First run offers Google / email / continue-without-account BEFORE onboarding,
+   instead of hiding sign-in in Settings. Reused from Settings too (agAfter). */
+let agEmailCreate = true, agAfter = null;
+function startAuthGate(after){
+  agAfter = after || null;
+  document.getElementById('agEmailForm').style.display = 'none';
+  document.getElementById('agChoices').style.display = '';
+  document.getElementById('agEmailErr').textContent = '';
+  document.getElementById('authGate').style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+}
+function closeAuthGate(){
+  document.getElementById('authGate').style.display = 'none';
+  document.body.style.overflow = '';
+  const cb = agAfter; agAfter = null;
+  if (cb) cb(); else startOnboarding();
+}
+function agShowEmail(show){
+  document.getElementById('agChoices').style.display = show ? 'none' : '';
+  document.getElementById('agEmailForm').style.display = show ? '' : 'none';
+  document.getElementById('agEmailErr').textContent = '';
+  if (show){ agSetEmailMode(true); setTimeout(() => document.getElementById('agEmail').focus(), 50); }
+}
+function agSetEmailMode(create){
+  agEmailCreate = create;
+  document.getElementById('agEmailSubmit').textContent = create ? 'Create account' : 'Sign in';
+  document.getElementById('agSwitchText').textContent = create ? 'Already have an account?' : 'New here?';
+  document.getElementById('agSwitchMode').textContent = create ? 'Sign in' : 'Create account';
+  document.getElementById('agForgotWrap').style.display = create ? 'none' : '';
+  document.getElementById('agPw').setAttribute('autocomplete', create ? 'new-password' : 'current-password');
+}
+document.getElementById('agGoogleBtn').addEventListener('click', async () => {
+  const b = document.getElementById('agGoogleBtn');
+  b.disabled = true;
+  await signInWithGoogle();
+  b.disabled = false;
+  if (isSignedIn()) closeAuthGate();
+});
+document.getElementById('agGuestBtn').addEventListener('click', () => closeAuthGate());
+document.getElementById('agEmailToggle').addEventListener('click', () => agShowEmail(true));
+document.getElementById('agEmailBack').addEventListener('click', () => agShowEmail(false));
+document.getElementById('agSwitchMode').addEventListener('click', () => agSetEmailMode(!agEmailCreate));
+document.getElementById('agForgot').addEventListener('click', async () => {
+  const email = document.getElementById('agEmail').value.trim();
+  const err = document.getElementById('agEmailErr');
+  if (!email){ err.textContent = 'Enter your email above first, then tap “Forgot password”.'; return; }
+  try { await sendPasswordReset(email); err.style.color = 'var(--ok)'; err.textContent = 'Reset link sent — check your email.'; }
+  catch (e){ err.style.color = 'var(--danger)'; err.textContent = friendlyAuthError(e); }
+});
+document.getElementById('agEmailForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const email = document.getElementById('agEmail').value.trim();
+  const pw = document.getElementById('agPw').value;
+  const err = document.getElementById('agEmailErr');
+  const submit = document.getElementById('agEmailSubmit');
+  err.style.color = 'var(--danger)'; err.textContent = '';
+  if (pw.length < 6){ err.textContent = 'Password needs at least 6 characters.'; return; }
+  submit.disabled = true; submit.textContent = agEmailCreate ? 'Creating…' : 'Signing in…';
+  try {
+    await emailAuth(email, pw, agEmailCreate);
+    closeAuthGate();
+  } catch (ex){
+    err.textContent = friendlyAuthError(ex);
+  }
+  submit.disabled = false; agSetEmailMode(agEmailCreate);
+});
 
 async function signOutAccount(){
   if (!confirm('Sign out? Your spaces stay safe in your account — sign back in on any device to get them. On this device they’ll pause syncing until you sign in again.')) return;
@@ -3561,15 +3716,21 @@ function refreshAccountUI(){
   if (!show) return;
   const status = document.getElementById('accountStatus');
   const inBtn = document.getElementById('googleSignInBtn');
+  const emBtn = document.getElementById('emailSignInBtn');
   const outBtn = document.getElementById('signOutBtn');
   if (isSignedIn()){
     status.textContent = '✅ Signed in as ' + accountEmail + ' — your spaces sync across your devices.';
-    inBtn.style.display = 'none'; outBtn.style.display = '';
+    inBtn.style.display = 'none'; emBtn.style.display = 'none'; outBtn.style.display = '';
   } else {
-    status.textContent = 'You’re on this device only. Sign in with Google to sync your spaces across devices and keep them if you reinstall — nothing changes for how you use the app.';
-    inBtn.style.display = ''; inBtn.textContent = 'Sign in with Google'; outBtn.style.display = 'none';
+    status.textContent = 'You’re on this device only. Sign in to sync your spaces across devices and keep them if you reinstall — nothing changes about how you use the app.';
+    inBtn.style.display = ''; inBtn.textContent = 'Sign in with Google';
+    emBtn.style.display = ''; outBtn.style.display = 'none';
   }
 }
+document.getElementById('emailSignInBtn') && document.getElementById('emailSignInBtn').addEventListener('click', () => {
+  startAuthGate(() => refreshAccountUI());
+  agShowEmail(true);
+});
 
 async function startSpaceSync(sp){
   if (spaceRt[sp.hid]) return;
@@ -4869,6 +5030,7 @@ document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
   // in z-order, most-modal first
   const closers = [
+    ['authGate', () => closeAuthGate()],
     ['onboarding', () => dismissOnboarding()],
     ['scopeSheet', () => closeScopeSheet()],
     ['setupSheet', () => { document.getElementById('setupSheet').style.display = 'none'; }],
@@ -5055,7 +5217,9 @@ track('app_open');
 // Only greet genuinely new users — someone upgrading (with tasks, ideas, or a
 // space already) shouldn't be interrupted; they can revisit from Settings.
 if (!store.get('onboarded', false) && !todos.length && !ideas.length && !spacesList().length){
-  startOnboarding();
+  // managed builds: choose how to start (Google / email / no account) up front,
+  // then the cohort walkthrough. Self-hosted has no cloud auth → straight in.
+  if (window.MANAGED) startAuthGate(); else startOnboarding();
 }
 
 // Diagnostic: show which browser engine this is running in and whether it's

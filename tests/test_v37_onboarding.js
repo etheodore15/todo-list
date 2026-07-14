@@ -9,6 +9,8 @@ const { chromium } = require('playwright');
 
   const fresh = async () => {
     const ctx = await browser.newContext();
+    // self-hosted (MANAGED=null) → first run goes straight to onboarding (no auth gate)
+    await ctx.route('**/managed-config.js', r => r.fulfill({ contentType: 'application/javascript', body: 'window.MANAGED=null;' }));
     const page = await ctx.newPage();
     page.on('pageerror', e => errors.push(e.message));
     await page.goto('http://localhost:8906/', { waitUntil: 'load' });

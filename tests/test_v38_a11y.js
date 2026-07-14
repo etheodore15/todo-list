@@ -83,7 +83,10 @@ const { chromium } = require('playwright');
   check('a11y: prefers-reduced-motion honoured', /prefers-reduced-motion/.test(css));
 
   // ---------- onboarding dialog keyboard-dismissable ----------
-  const B = await browser.newPage();
+  const bctx = await browser.newContext();
+  // self-hosted (MANAGED=null) → first run is onboarding directly (no auth gate)
+  await bctx.route('**/managed-config.js', r => r.fulfill({ contentType: 'application/javascript', body: 'window.MANAGED=null;' }));
+  const B = await bctx.newPage();
   B.on('pageerror', e => errors.push(e.message));
   await B.goto('http://localhost:8906/', { waitUntil: 'load' });
   await B.waitForTimeout(300);
