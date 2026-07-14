@@ -372,6 +372,14 @@
   .ch-x{background:none; border:none; color:var(--muted); font-size:1rem; cursor:pointer; min-width:40px; min-height:40px;}
   .ch-list{margin-top:6px; font-size:.85rem; color:var(--text);}
   .ch-row{padding:3px 0; line-height:1.4;}
+  /* v50: settings grouped into labelled sections */
+  .set-section{font-size:.75rem; text-transform:uppercase; letter-spacing:.08em; color:var(--muted);
+    margin:22px 4px 8px; padding-bottom:6px; border-bottom:1px solid #262d3d;}
+  .set-section:first-of-type{margin-top:4px;}
+  details.set-block > summary{cursor:pointer; font-weight:600; color:var(--text); list-style:none;}
+  details.set-block > summary::-webkit-details-marker{display:none;}
+  details.set-block > summary::before{content:'▸ '; color:var(--muted);}
+  details.set-block[open] > summary::before{content:'▾ ';}
 
 </style>
 </head>
@@ -435,17 +443,16 @@
 
   <!-- SETTINGS -->
   <section id="view-settings" class="view">
+    <h2 class="set-section">You &amp; accessibility</h2>
+    <div class="set-block">
+      <h3>Quiet visual mode</h3>
+      <p>Softer colours, no pulsing or flashing, no motion — easier on the senses.</p>
+      <button class="btn primary" id="quietBtn">Turn on quiet mode</button>
+    </div>
     <div class="set-block">
       <h3>What I use this for</h3>
       <p id="cohortStatus"></p>
       <button class="btn primary" id="cohortBtn">Choose / update &amp; see my toolkit</button>
-    </div>
-    <div class="set-block" id="analyticsBlock" style="display:none;">
-      <h3>Help improve the app (optional)</h3>
-      <p>Share <b>anonymous</b> usage — which features get used, nothing you type. No task
-         or idea content, names, or amounts are ever sent. Off by default; change any time.</p>
-      <button class="btn" id="analyticsBtn">Turn on anonymous analytics</button>
-      <p id="analyticsStatus"></p>
     </div>
     <div class="set-block">
       <h3>Offline voice recognition (no API key)</h3>
@@ -455,6 +462,8 @@
       <p id="asrStatus"></p>
       <button class="btn ghost" id="modelsWipeBtn">Delete downloaded models</button>
     </div>
+
+    <h2 class="set-section">Sharing &amp; spaces</h2>
     <div class="set-block">
       <h3>Household members (optional)</h3>
       <p>Add names, comma-separated, and tasks mentioning them are tagged automatically —
@@ -514,6 +523,7 @@
       <button class="btn primary" id="digestBtn">Enable daily digest</button>
       <p id="digestStatus"></p>
     </div>
+    <h2 class="set-section">Smart AI</h2>
     <div class="set-block">
       <h3>Smart AI — summaries, break-downs, tone &amp; briefings</h3>
       <p id="aiManagedNote" style="display:none;">✨ Smart AI is <b>on</b> for your account — nothing to set up.
@@ -527,19 +537,23 @@
       <button class="btn primary" id="saveGeminiKeyBtn">Save key</button>
       <p id="geminiKeyStatus"></p>
     </div>
-    <div class="set-block">
-      <h3>Smart summaries — Claude (optional)</h3>
-      <p>Alternatively, paste an <b>Anthropic API key</b> for Claude-quality summaries
+    <details class="set-block">
+      <summary>Alternative: Claude (Anthropic) key</summary>
+      <p style="margin-top:8px;">Alternatively, paste an <b>Anthropic API key</b> for Claude-quality summaries
          (paid, a fraction of a cent per capture). If both keys are set, Gemini is used
          first and Claude is the backup.</p>
       <input id="apiKeyInput" type="password" aria-label="Anthropic API key" placeholder="sk-ant-…" autocomplete="off">
       <button class="btn primary" id="saveKeyBtn">Save key</button>
       <p id="keyStatus"></p>
-    </div>
-    <div class="set-block">
-      <h3>Quiet visual mode</h3>
-      <p>Softer colours, no pulsing or flashing, no motion — easier on the senses.</p>
-      <button class="btn primary" id="quietBtn">Turn on quiet mode</button>
+    </details>
+
+    <h2 class="set-section">Data</h2>
+    <div class="set-block" id="analyticsBlock" style="display:none;">
+      <h3>Help improve the app (optional)</h3>
+      <p>Share <b>anonymous</b> usage — which features get used, nothing you type. No task
+         or idea content, names, or amounts are ever sent. Off by default; change any time.</p>
+      <button class="btn" id="analyticsBtn">Turn on anonymous analytics</button>
+      <p id="analyticsStatus"></p>
     </div>
     <div class="set-block">
       <h3>Daily reset</h3>
@@ -556,7 +570,7 @@
       <input type="file" id="importFile" accept=".json,application/json" style="display:none">
       <button class="btn ghost" id="wipeBtn">Delete all data</button>
     </div>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v49<br><span id="envInfo"></span></p>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v50<br><span id="envInfo"></span></p>
   </section>
 </main>
 
