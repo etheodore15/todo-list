@@ -89,9 +89,9 @@
     cursor:pointer; margin-left:auto;}
   .card .mini-tasks{margin-top:10px; border-top:1px solid #262d3d; padding-top:4px;}
   .mini-task{display:flex; align-items:center; gap:9px; padding:6px 0; font-size:.85rem;}
-  .mini-task .mchk{width:19px; height:19px; min-width:19px; border-radius:6px;
+  .mini-task .mchk{width:24px; height:24px; min-width:24px; border-radius:6px;
     border:2px solid var(--muted); background:none; cursor:pointer; color:transparent;
-    font-size:.6rem; display:flex; align-items:center; justify-content:center; padding:0;}
+    font-size:.7rem; display:flex; align-items:center; justify-content:center; padding:0;}
   .mini-task.done .mchk{background:var(--ok); border-color:var(--ok); color:#0c1117;}
   .mini-task.done .mtxt{color:var(--muted); text-decoration:line-through;}
   .mini-task .mtxt{flex:1; line-height:1.35;}
@@ -176,7 +176,16 @@
     letter-spacing:.5px;}
   .todo .prio-btn.high{color:var(--hi);} .todo .prio-btn.medium{color:var(--med);}
   .todo .prio-btn.low{color:var(--low);}
-  .todo .del{background:none; border:none; color:#4a5368; cursor:pointer; font-size:1rem; padding:2px;}
+  .todo .del{background:none; border:none; color:#4a5368; cursor:pointer; font-size:1rem;}
+  /* v48: ⋯ options menu + ≥40px touch targets for the row's icon buttons */
+  .todo .row-menu{background:none; border:none; color:var(--muted); cursor:pointer;
+    font-size:1.3rem; line-height:1; border-radius:8px;}
+  .todo .row-menu:hover{color:var(--text);}
+  .todo .row-menu, .todo .del, .todo .link-btn{
+    min-width:40px; min-height:40px; padding:2px;
+    display:flex; align-items:center; justify-content:center; margin-top:-6px;}
+  .todo .prio-btn{min-height:34px;}
+  .attr-add{color:var(--muted) !important;}
   .addrow{display:flex; gap:8px; margin-bottom:16px;}
   .addrow input{flex:1; background:var(--card); border:1px solid #2a3245; border-radius:12px;
     color:var(--text); padding:12px 14px; font-size:.95rem; outline:none;}
@@ -538,7 +547,7 @@
       <input type="file" id="importFile" accept=".json,application/json" style="display:none">
       <button class="btn ghost" id="wipeBtn">Delete all data</button>
     </div>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v47<br><span id="envInfo"></span></p>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v48<br><span id="envInfo"></span></p>
   </section>
 </main>
 
@@ -1522,11 +1531,24 @@ Task: """${text}"""`}]}],
   return steps;
 }
 
-// Offline fallback: a compound task splits on its own connectors.
+// Offline fallback. A compound task splits on its own connectors; a single
+// daunting task gets a universal ADHD-friendly starter scaffold — the whole
+// point of "break it down" is to remove the starting wall, so it must NEVER
+// dead-end, even with no AI.
 function localBreakdown(text){
+  const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
   const parts = String(text).split(/,\s+(?:and\s+|then\s+)?|\s+and\s+(?:then\s+)?|\s*;\s*/i)
     .map(s => s.replace(/[.!?]+$/, '').trim()).filter(s => s.length > 2);
-  return parts.length >= 2 ? parts.slice(0, 7).map(s => s.charAt(0).toUpperCase() + s.slice(1)) : null;
+  if (parts.length >= 2) return parts.slice(0, 7).map(cap);
+  const short = String(text).replace(/[.!?]+$/, '').trim();
+  const label = short.length > 30 ? short.slice(0, 28) + '…' : short;
+  return [
+    'Get out only what you need to start',
+    'Set a 2-minute timer and just begin',
+    'Do the first small piece of “' + label + '”',
+    'Do the next small piece',
+    'Stop when the timer ends — tick this off'
+  ];
 }
 
 async function breakDown(td){
@@ -1962,8 +1984,11 @@ saveIdeaBtn.addEventListener('click', async () => {
   updateBadge();
   toast(added
     ? `Added ${added} task${added===1?'':'s'} ✓${scheduled.length ? ` (${scheduled.join(', ')})` : ''}${delegated.length ? ` (→ ${delegated.join('; ')})` : ''}${skipped ? ` (${skipped} already listed)` : ''}`
-    : (skipped ? 'Those tasks are already on your list' : 'Idea saved — no tasks detected'));
-  showView('today');
+    : (skipped ? 'Those tasks are already on your list' : 'Saved to Ideas — no to-dos detected, your note is kept'));
+  // If nothing became a task, don't dump the user on an unchanged Today with the
+  // transcript seemingly lost — take them to Ideas and highlight the saved note.
+  if (added) showView('today');
+  else highlightIdea(idea.id);
 });
 
 /* ---------- capture as a care journal note (v45) ----------
@@ -2402,6 +2427,7 @@ function todoRow(td){
     <div class="txt"><span class="ttext"></span></div>
     ${hasIdea ? '<button class="link-btn" aria-label="Show source idea" title="Show source idea">💡</button>' : ''}
     <button class="prio-btn ${td.priority}">${td.priority.toUpperCase().slice(0,3)}</button>
+    <button class="row-menu" aria-label="Task options — edit, reschedule, repeat, break down, expense" title="Options">⋯</button>
     <button class="del" aria-label="Delete">✕</button>`;
   const txtEl = row.querySelector('.txt');
   txtEl.querySelector('.ttext').textContent = td.text;
@@ -2509,6 +2535,14 @@ function todoRow(td){
     });
     txtEl.appendChild(wrap);
   }
+  // who ADDED it — inline for shared-space tasks someone else created, so
+  // "who did what" is visible without tapping (advertised: every add shows who)
+  if (td.space && td.createdBy && td.createdBy.toLowerCase() !== (myName() || '').toLowerCase()){
+    const ad = document.createElement('div');
+    ad.className = 'attr attr-add';
+    ad.textContent = '➕ ' + td.createdBy + (td.createdAt ? ' · ' + fmtWhen(td.createdAt) : '');
+    txtEl.appendChild(ad);
+  }
   // who ticked it, right on the row
   if (td.done && (td.doneBy || td.doneAt)){
     const at = document.createElement('div');
@@ -2552,8 +2586,9 @@ function todoRow(td){
     });
     row.appendChild(n);
   }
-  // tap the task text for history + the original transcript
-  txtEl.addEventListener('click', () => {
+  // tap the task text (or the ⋯ menu) for history, the transcript, and the
+  // per-task actions (edit / when / repeat / break down / expense)
+  const togglePanel = () => {
     const open = row.querySelector('.transcript');
     if (open){ open.remove(); return; }
     const idea = ideas.find(i => i.id === td.ideaId);
@@ -2590,9 +2625,12 @@ function todoRow(td){
     mkAct('↻ Repeat', editRecur);
     mkAct('🪄 Break down', breakDown);
     mkAct('💵 Expense', openExpense);
+    if (store.get('spaces', []).length) mkAct('👤 Who for', openScopeSheet);
     div.appendChild(acts);
     row.appendChild(div);
-  });
+  };
+  txtEl.addEventListener('click', togglePanel);
+  row.querySelector('.row-menu').addEventListener('click', (e) => { e.stopPropagation(); togglePanel(); });
   if (hasIdea){
     row.querySelector('.link-btn').addEventListener('click', () => highlightIdea(td.ideaId));
   }
@@ -2794,13 +2832,21 @@ async function quickAdd(){
   const date = recur ? nextOccurrence(recur, parseTaskDate(text) || todayStr())
                      : (parseTaskDate(text) || todayStr());
   const energy = detectEnergy(text);
-  todos.push({id: uid(), text, priority: detectPriority(text), tags: detectTags(text), done:false,
+  const tags = detectTags(text);
+  todos.push({id: uid(), text, priority: detectPriority(text), tags, done:false,
     date, recur, time: parseTaskTime(text), energy, minutes: ENERGY_MIN[energy], space: spaceForTask,
     ideaId:null, createdBy: myName() || null, createdAt: Date.now()});
   logEvent('created', todos[todos.length - 1]);
   saveTodos(); inp.value=''; renderTodos();
-  if (recur) toast('Repeats ' + recurLabel(recur).replace('↻ ', '') + ' — next: ' + fmtDay(date));
-  else if (date > todayStr()) toast('Scheduled for ' + fmtDay(date) + ' 📅');
+  // Always confirm, and warn if a live filter would hide the task just added —
+  // otherwise it looks like nothing happened (silent no-op).
+  const hiddenByTag = activeTag && !tags.includes(activeTag);
+  const hiddenByEasy = easyOnly && energy !== 'low';
+  if (recur) toast('Added — repeats ' + recurLabel(recur).replace('↻ ', '') + ', next ' + fmtDay(date));
+  else if (date > todayStr()) toast('Added — scheduled for ' + fmtDay(date) + ' 📅');
+  else if (hiddenByTag) toast('Added — tap “All” to see it (the “' + activeTag + '” filter is on)');
+  else if (hiddenByEasy) toast('Added — turn off the easy-wins filter to see it');
+  else toast('Added ✓');
 }
 document.getElementById('quickAddBtn').addEventListener('click', quickAdd);
 document.getElementById('quickAdd').addEventListener('keydown', e => { if (e.key==='Enter') quickAdd(); });

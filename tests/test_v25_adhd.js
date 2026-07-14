@@ -69,8 +69,10 @@ const { chromium } = require('playwright');
   // ---------- B1: offline fallback splits compound tasks ----------
   const fb = await page.evaluate(() => localBreakdown('empty the bins, water the garden and sweep the deck'));
   check('B1: built-in fallback splits compound task', fb && fb.length === 3 && /sweep/i.test(fb[2]));
+  // v48: a single task no longer dead-ends — it gets a universal starter scaffold
   const fb2 = await page.evaluate(() => localBreakdown('clean the kitchen'));
-  check('B1: built-in fallback declines simple task', fb2 === null);
+  check('B1: built-in fallback gives a starter scaffold for a simple task',
+    Array.isArray(fb2) && fb2.length >= 3 && /just begin|2-minute|first small|get out/i.test(fb2.join(' ')));
 
   // ---------- B2: Just One Thing ----------
   check('B2: focus button visible', await page.locator('#focusBtn').isVisible());
