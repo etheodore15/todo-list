@@ -45,19 +45,22 @@ const { chromium } = require('playwright');
   const nth = await page.evaluate(() => parseTaskDate('book the dentist for the 14th'));
   check('A2: parseTaskDate resolves "for the 14th"', !!nth && /-14$/.test(nth) && nth > day(0));
 
-  // ---------- A2: reschedule via 📅 chip / When action ----------
-  page.once('dialog', d => d.accept('today'));
+  // ---------- A2: reschedule via 📅 chip → date sheet (v56) ----------
   await upcoming.locator('.date-chip').first().click();
+  await page.waitForTimeout(150);
+  await page.locator('#dateQuick .pick-chip[data-d="today"]').click();
   await page.waitForTimeout(200);
   check('A2: rescheduling to today moves it out of Upcoming',
     (await page.locator('.prio-section:not(.upcoming) .ttext').allTextContents()).some(t => /pay rent/.test(t)));
 
-  // ---------- A1: edit text from the detail panel ----------
+  // ---------- A1: edit text from the detail panel → input sheet (v56) ----------
   const milk = page.locator('.todo', { hasText: 'buy milk' });
   await milk.locator('.ttext').click();                      // expand detail
   check('A1: detail panel has action buttons', await milk.locator('.tact').count() >= 3);
-  page.once('dialog', d => d.accept('buy oat milk'));
   await milk.locator('.tact', { hasText: 'Edit' }).click();
+  await page.waitForTimeout(150);
+  await page.fill('#inputField', 'buy oat milk');
+  await page.click('#inputSave');
   await page.waitForTimeout(200);
   check('A1: task text edited',
     (await page.locator('.todo .ttext').allTextContents()).some(t => /buy oat milk/.test(t)));
@@ -129,8 +132,12 @@ const { chromium } = require('playwright');
   // ---------- A3: edit repeat via detail panel ----------
   const oat2 = page.locator('.todo', { hasText: 'buy oat milk' });
   await oat2.locator('.ttext').click();
-  page.once('dialog', d => d.accept('every friday'));
   await oat2.locator('.tact', { hasText: 'Repeat' }).click();
+  await page.waitForTimeout(150);
+  // repeat sheet (v56): Weekly → tick Friday → Save
+  await page.locator('#repeatMode .pick-chip[data-r="weekly"]').click();
+  await page.locator('#repeatDays .pick-day', { hasText: 'Fri' }).click();
+  await page.click('#repeatSave');
   await page.waitForTimeout(200);
   const oatTd = await page.evaluate(() => JSON.parse(localStorage.getItem('todos'))
     .find(t => /oat milk/.test(t.text)));

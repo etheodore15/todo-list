@@ -149,8 +149,10 @@ export function onSnapshot(col, cb){ cb({docChanges: () => []}); return () => {}
   await page.locator('#spaceFilter .fchip', { hasText: 'Co-parenting' }).click();
   const kit = page.locator('.todo', { hasText: 'swimming kit' });
   await kit.locator('.ttext').click();
-  page.once('dialog', d => d.accept('you forgot the kit again, obviously'));
   await kit.locator('.tact', { hasText: 'Edit' }).click();
+  await page.waitForTimeout(150);
+  await page.fill('#inputField', 'you forgot the kit again, obviously');
+  await page.click('#inputSave');
   await page.waitForTimeout(600);
   check('C1c: edit path also gated', await page.locator('#toneSheet').isVisible());
   await page.click('#toneUse');

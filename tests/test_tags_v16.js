@@ -45,8 +45,10 @@ const { chromium } = require('playwright');
 
   // tag editing via tap
   await page.click('nav.tabs button[data-view="today"]');
-  page.once('dialog', d => d.accept('work, urgent'));
   await page.locator('.todo', { hasText: 'Renew the car insurance' }).locator('.ttags').click();
+  await page.waitForTimeout(150);
+  await page.fill('#inputField', 'work, urgent');
+  await page.click('#inputSave');
   await page.waitForTimeout(300);
   const tags = await page.locator('.todo', { hasText: 'Renew the car insurance' }).locator('.ttag').allTextContents();
   check('tag edit applied', tags.includes('work') && tags.includes('urgent'));

@@ -105,8 +105,10 @@ export function onSnapshot(col, cb, errCb){
   // edit
   const bag = A.locator('.todo', { hasText: 'pack the school bag' });
   await bag.locator('.ttext').click();
-  A.once('dialog', d => d.accept('pack the school bag and lunchbox'));
   await bag.locator('.tact', { hasText: 'Edit' }).click();
+  await A.waitForTimeout(150);
+  await A.fill('#inputField', 'pack the school bag and lunchbox');
+  await A.click('#inputSave');
   await A.waitForTimeout(200);
   // tick
   await A.locator('.todo', { hasText: 'lunchbox' }).locator('.chk').click();

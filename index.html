@@ -419,6 +419,33 @@
   details.set-block > summary::before{content:'▸ '; color:var(--muted);}
   details.set-block[open] > summary::before{content:'▾ ';}
 
+  /* v56: motion polish (all auto-disabled under prefers-reduced-motion) */
+  .btn{transition:filter .15s, background .15s, transform .08s;}
+  .btn:active{transform:scale(.975);}
+  .addrow button:active, .fchip:active, .space-act:active, .pick-chip:active,
+  nav.tabs button:active, .row-menu:active, .chk:active{transform:scale(.94);}
+  .view.active{animation:viewIn .22s ease both;}
+  @keyframes viewIn{from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:none;}}
+  .sheet-overlay{animation:ovFade .18s ease both;}
+  @keyframes ovFade{from{opacity:0;} to{opacity:1;}}
+  .sheet{animation:sheetUp .28s cubic-bezier(.2,.85,.25,1) both;}
+  @keyframes sheetUp{from{transform:translateY(26px);} to{transform:translateY(0);}}
+  .todo .chk{transition:background .15s, border-color .15s, transform .12s;}
+  .todo.done .chk{animation:chkPop .26s ease;}
+  @keyframes chkPop{0%{transform:scale(.5);} 55%{transform:scale(1.18);} 100%{transform:scale(1);}}
+  .todo{transition:box-shadow .15s, border-color .15s;}
+  .todo:hover{border-color:#c9cad6;}
+  .card, .set-block{transition:box-shadow .15s;}
+  #micBtn:active{transform:scale(.94);}
+
+  /* v56: reusable pickers (date / repeat) — chips + native controls */
+  .chip-row{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px;}
+  .pick-chip{background:var(--card2); border:1px solid var(--border); border-radius:10px; color:var(--text);
+    padding:9px 13px; font-size:.88rem; cursor:pointer; transition:transform .08s, background .12s;}
+  .pick-chip.active{background:var(--accent); border-color:var(--accent); color:#fff; font-weight:600;}
+  .pick-day{background:var(--card2); border:1px solid var(--border); border-radius:8px; color:var(--text);
+    padding:7px 11px; font-size:.82rem; cursor:pointer;}
+  .pick-day.active{background:var(--accent); border-color:var(--accent); color:#fff; font-weight:700;}
 </style>
 </head>
 <body>
@@ -617,7 +644,7 @@
       <input type="file" id="importFile" accept=".json,application/json" style="display:none">
       <button class="btn ghost" id="wipeBtn">Delete all data</button>
     </div>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v55<br><span id="envInfo"></span></p>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v56<br><span id="envInfo"></span></p>
   </section>
 </main>
 
@@ -758,6 +785,52 @@
     <p class="side-note" id="setupIntro"></p>
     <div id="setupSteps" style="margin:4px 0 8px;"></div>
     <button class="btn primary" id="setupDone">Done — take me in</button>
+  </div>
+</div>
+
+<div id="inputSheet" class="sheet-overlay" role="dialog" aria-modal="true" aria-label="Edit" style="display:none;">
+  <div class="sheet">
+    <h3 id="inputTitle">Edit</h3>
+    <input id="inputField" class="med-inp" autocomplete="off" aria-label="Edit value">
+    <p id="inputHint" class="side-note" style="display:none; margin-top:6px;"></p>
+    <button class="btn primary" id="inputSave" style="margin-top:12px;">Save</button>
+    <button class="btn ghost" id="inputCancel">Cancel</button>
+  </div>
+</div>
+
+<div id="dateSheet" class="sheet-overlay" role="dialog" aria-modal="true" aria-label="When" style="display:none;">
+  <div class="sheet">
+    <h3>📅 When?</h3>
+    <div class="chip-row" id="dateQuick">
+      <button type="button" class="pick-chip" data-d="today">Today</button>
+      <button type="button" class="pick-chip" data-d="tomorrow">Tomorrow</button>
+      <button type="button" class="pick-chip" data-d="weekend">This weekend</button>
+      <button type="button" class="pick-chip" data-d="nextweek">Next week</button>
+      <button type="button" class="pick-chip" data-d="someday">🌙 Someday</button>
+    </div>
+    <label class="med-lab" for="dateInput">Or pick a date</label>
+    <input id="dateInput" class="med-inp" type="date">
+    <button class="btn primary" id="dateSave" style="margin-top:12px;">Save</button>
+    <button class="btn ghost" id="dateCancel">Cancel</button>
+  </div>
+</div>
+
+<div id="repeatSheet" class="sheet-overlay" role="dialog" aria-modal="true" aria-label="Repeat" style="display:none;">
+  <div class="sheet">
+    <h3>↻ Repeat</h3>
+    <div class="chip-row" id="repeatMode">
+      <button type="button" class="pick-chip" data-r="none">Doesn’t repeat</button>
+      <button type="button" class="pick-chip" data-r="daily">Every day</button>
+      <button type="button" class="pick-chip" data-r="weekly">Weekly</button>
+      <button type="button" class="pick-chip" data-r="monthly">Monthly</button>
+    </div>
+    <div id="repeatDays" style="display:none; flex-wrap:wrap; gap:6px; margin:6px 0 2px;"></div>
+    <div id="repeatMonthWrap" style="display:none; margin-top:6px;">
+      <label class="med-lab" for="repeatMonthDay">Day of the month</label>
+      <select id="repeatMonthDay" class="med-inp"></select>
+    </div>
+    <button class="btn primary" id="repeatSave" style="margin-top:12px;">Save</button>
+    <button class="btn ghost" id="repeatCancel">Cancel</button>
   </div>
 </div>
 
@@ -2471,10 +2544,34 @@ function renderTodos(){
 }
 
 /* ---------- task editing (text, date, repeat) ---------- */
+/* ---------- v56: reusable in-app editors (replace native prompt() dialogs) ---------- */
+// Generic single-field input sheet. Returns the trimmed value, or null if cancelled.
+let inputResolve = null;
+function askInput({title, value = '', placeholder = '', hint = '', multiline = false} = {}){
+  const sheet = document.getElementById('inputSheet');
+  const field = document.getElementById('inputField');
+  document.getElementById('inputTitle').textContent = title || 'Edit';
+  field.setAttribute('aria-label', title || 'Edit value');
+  field.value = value; field.placeholder = placeholder;
+  const h = document.getElementById('inputHint');
+  h.textContent = hint; h.style.display = hint ? '' : 'none';
+  sheet.style.display = 'flex';
+  setTimeout(() => { field.focus(); field.select && field.select(); }, 60);
+  return new Promise(res => { inputResolve = res; });
+}
+function closeInput(val){
+  document.getElementById('inputSheet').style.display = 'none';
+  const r = inputResolve; inputResolve = null;
+  if (r) r(val);
+}
+document.getElementById('inputSave').addEventListener('click', () => closeInput(document.getElementById('inputField').value.trim()));
+document.getElementById('inputCancel').addEventListener('click', () => closeInput(null));
+document.getElementById('inputField').addEventListener('keydown', e => { if (e.key === 'Enter'){ e.preventDefault(); closeInput(document.getElementById('inputField').value.trim()); } });
+
 async function editText(td){
-  const v = prompt('Edit task:', td.text);
+  const v = await askInput({title: 'Edit task', value: td.text, placeholder: 'Task text'});
   if (v === null) return;
-  let text = v.trim();
+  let text = v;
   if (!text){ toast('Task text can\'t be empty — use ✕ to delete it.'); return; }
   if (text !== td.text && spaceTypeOf(td.space) === 'coparenting'){
     const gated = await toneGate(text, td.space);
@@ -2487,37 +2584,91 @@ async function editText(td){
   saveTodos(); renderTodos();
   if (document.getElementById('view-ideas').classList.contains('active')) renderIdeas();
 }
-function editDate(td){
-  const v = prompt('When? ("today", "tomorrow", "friday", "the 14th" or YYYY-MM-DD):',
-    td.date > todayStr() ? td.date : 'today');
-  if (v === null) return;
-  const date = resolveDateInput(v);
-  if (!date){ toast('Didn\'t understand that date — try "tomorrow", "friday" or 2026-07-20.'); return; }
+
+// Date picker sheet: quick chips + a native <input type="date">.
+let dateTask = null;
+function applyTaskDate(td, date, someday){
+  if (someday){ td.someday = true; td.carried = 0; saveTodos(); renderTodos(); toast('Parked in Someday 🌙'); return; }
   const prior = td.date;
-  td.date = date;
-  td.someday = false; td.carried = 0;     // a fresh date un-parks it with a clean slate
+  td.date = date; td.someday = false; td.carried = 0;
   if (prior !== date) logEvent('rescheduled', td, 'to ' + date);
   saveTodos(); renderTodos();
   toast(date === todayStr() ? 'Moved to today ✓' : 'Scheduled for ' + fmtDay(date) + ' 📅');
 }
-function editRecur(td){
-  const v = prompt('Repeat? ("every day", "every tuesday", "monthly on the 14th" — empty for no repeat):',
-    td.recur ? recurLabel(td.recur).replace('↻ ', 'every ') : '');
-  if (v === null) return;
-  const s = v.trim();
-  if (!s){
-    td.recur = null;
-    saveTodos(); renderTodos();
-    toast('Repeat removed');
-    return;
-  }
-  const recur = parseRecur(' ' + s + ' ') || parseRecurCode(s);
-  if (!recur){ toast('Didn\'t understand that — try "every day", "every tuesday" or "every month on the 14th".'); return; }
-  td.recur = recur;
-  if (!td.done) td.date = nextOccurrence(recur, td.date > todayStr() ? td.date : todayStr());
-  saveTodos(); renderTodos();
-  toast('Repeats ' + recurLabel(recur).replace('↻ ', '') + ' — next: ' + fmtDay(td.date));
+function editDate(td){
+  dateTask = td;
+  const inp = document.getElementById('dateInput');
+  inp.min = todayStr();
+  inp.value = (td.date && td.date >= todayStr()) ? td.date : todayStr();
+  document.getElementById('dateSheet').style.display = 'flex';
 }
+function nextWeekend(){
+  for (let i = 0; i < 8; i++){ const d = addDays(i); if (new Date(d + 'T00:00:00Z').getUTCDay() === 6) return d; }
+  return addDays(6);
+}
+document.querySelectorAll('#dateQuick .pick-chip').forEach(chip => chip.addEventListener('click', () => {
+  if (!dateTask) return;
+  const k = chip.dataset.d;
+  const map = {today: todayStr(), tomorrow: addDays(1), weekend: nextWeekend(), nextweek: addDays(7)};
+  document.getElementById('dateSheet').style.display = 'none';
+  applyTaskDate(dateTask, map[k], k === 'someday'); dateTask = null;
+}));
+document.getElementById('dateSave').addEventListener('click', () => {
+  if (!dateTask) return;
+  const v = document.getElementById('dateInput').value;
+  document.getElementById('dateSheet').style.display = 'none';
+  if (v) applyTaskDate(dateTask, v, false); dateTask = null;
+});
+document.getElementById('dateCancel').addEventListener('click', () => { document.getElementById('dateSheet').style.display = 'none'; dateTask = null; });
+
+// Repeat sheet: mode chips + weekday picker (weekly) + day-of-month select (monthly).
+let repeatTask = null, repeatMode = 'none';
+(function fillMonthDays(){
+  const sel = document.getElementById('repeatMonthDay');
+  for (let i = 1; i <= 31; i++){ const o = document.createElement('option'); o.value = i; o.textContent = i; sel.appendChild(o); }
+})();
+function repeatShowMode(mode){
+  repeatMode = mode;
+  document.querySelectorAll('#repeatMode .pick-chip').forEach(c => c.classList.toggle('active', c.dataset.r === mode));
+  document.getElementById('repeatDays').style.display = mode === 'weekly' ? 'flex' : 'none';
+  document.getElementById('repeatMonthWrap').style.display = mode === 'monthly' ? '' : 'none';
+}
+function editRecur(td){
+  repeatTask = td;
+  const wk = td.recur && td.recur.type === 'weekly';
+  const days = document.getElementById('repeatDays');
+  days.innerHTML = '';
+  WEEKDAYS.forEach((name, i) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'pick-day' + (wk && td.recur.dow.includes(i) ? ' active' : '');
+    b.dataset.dow = i;
+    b.textContent = name.slice(0, 3).replace(/^./, c => c.toUpperCase());
+    b.addEventListener('click', () => b.classList.toggle('active'));
+    days.appendChild(b);
+  });
+  document.getElementById('repeatMonthDay').value = (td.recur && td.recur.type === 'monthly') ? td.recur.day : (new Date(td.date + 'T00:00:00Z').getUTCDate() || 1);
+  repeatShowMode(td.recur ? td.recur.type : 'none');
+  document.getElementById('repeatSheet').style.display = 'flex';
+}
+document.querySelectorAll('#repeatMode .pick-chip').forEach(c => c.addEventListener('click', () => repeatShowMode(c.dataset.r)));
+document.getElementById('repeatSave').addEventListener('click', () => {
+  const td = repeatTask; if (!td) return;
+  let recur = null;
+  if (repeatMode === 'daily') recur = {type: 'daily'};
+  else if (repeatMode === 'weekly'){
+    const dow = [...document.querySelectorAll('#repeatDays .pick-day.active')].map(b => +b.dataset.dow);
+    if (!dow.length){ toast('Pick at least one day, or choose “Every day”.'); return; }
+    recur = {type: 'weekly', dow: dow.sort()};
+  } else if (repeatMode === 'monthly') recur = {type: 'monthly', day: +document.getElementById('repeatMonthDay').value};
+  document.getElementById('repeatSheet').style.display = 'none';
+  repeatTask = null;
+  td.recur = recur;
+  if (recur && !td.done) td.date = nextOccurrence(recur, td.date > todayStr() ? td.date : todayStr());
+  saveTodos(); renderTodos();
+  toast(recur ? 'Repeats ' + recurLabel(recur).replace('↻ ', '') + ' — next: ' + fmtDay(td.date) : 'Repeat removed');
+});
+document.getElementById('repeatCancel').addEventListener('click', () => { document.getElementById('repeatSheet').style.display = 'none'; repeatTask = null; });
 
 function todoRow(td){
   const row = document.createElement('div');
@@ -2600,9 +2751,10 @@ function todoRow(td){
       tg.appendChild(s);
     }
     // tap tags to edit them (doesn't toggle the transcript)
-    tg.addEventListener('click', (e) => {
+    tg.addEventListener('click', async (e) => {
       e.stopPropagation();
-      const edited = prompt('Edit tags (comma-separated):', (td.tags || []).join(', '));
+      const edited = await askInput({title: 'Edit tags', value: (td.tags || []).join(', '),
+        placeholder: 'e.g. home, urgent', hint: 'Comma-separated, up to 3.'});
       if (edited === null) return;
       td.tags = edited.split(',')
         .map(s => s.toLowerCase().replace(/[^a-z0-9 -]/g,'').trim())
@@ -4747,9 +4899,10 @@ document.getElementById('ledgerCsvBtn').addEventListener('click', () => {
   toast('Ledger exported as CSV ⬇');
 });
 
-function editSpaceMembers(sp){
+async function editSpaceMembers(sp){
   const cur = ((store.get('spaceMembers', {}) || {})[sp.hid] || []).join(', ');
-  const v = prompt(`People in "${sp.name}" (comma-separated). Tasks here can be delegated to them; leave blank to use your global member list.`, cur);
+  const v = await askInput({title: `People in “${sp.name}”`, value: cur, placeholder: 'e.g. Emile, Lulu',
+    hint: 'Comma-separated. Tasks here can be delegated to them.'});
   if (v === null) return;
   const list = v.split(',').map(s => s.toLowerCase().replace(/[^a-z0-9 -]/g, '').trim()).filter(Boolean).slice(0, 12);
   setSpaceMembers(sp.hid, list);
@@ -4850,7 +5003,7 @@ function guideSpaceSetup(sp){
   const done = new Set();
   const steps = [];
   if (!myName()) steps.push({label: '✍️ Add your name', desc: 'So “added by” and “done by” show on tasks.',
-    fn: () => { const v = prompt('Your name (shown on tasks you add or tick):', myName()); if (v && v.trim()){ setMyName(v); toast('Name saved ✓'); return true; } return false; }});
+    fn: async () => { const v = await askInput({title: 'Your name', value: myName(), placeholder: 'Shown on tasks you add or tick'}); if (v){ setMyName(v); toast('Name saved ✓'); return true; } return false; }});
   steps.push({label: '📤 Invite the others', desc: 'Share the join code so everyone syncs.', fn: () => { shareSpaceInvite(sp); return true; }});
   if (sp.type === 'coparenting') steps.push({label: '🗓 Set custody days',
     desc: 'Whose day it is, with a handover heads-up.', fn: () => { openCustody(sp); return true; }});
@@ -4877,9 +5030,9 @@ function guideSpaceSetup(sp){
       const d = document.createElement('span');
       d.textContent = step.desc;
       b.appendChild(t); b.appendChild(d);
-      b.addEventListener('click', () => {
+      b.addEventListener('click', async () => {
         // keep the sheet OPEN; any sub-sheet the step opens stacks on top
-        const ok = step.fn();
+        const ok = await step.fn();
         if (ok !== false) done.add(i);
         render();
       });
@@ -5033,6 +5186,9 @@ document.addEventListener('keydown', (e) => {
     ['authGate', () => closeAuthGate()],
     ['onboarding', () => dismissOnboarding()],
     ['scopeSheet', () => closeScopeSheet()],
+    ['inputSheet', () => closeInput(null)],
+    ['dateSheet', () => { document.getElementById('dateSheet').style.display = 'none'; dateTask = null; }],
+    ['repeatSheet', () => { document.getElementById('repeatSheet').style.display = 'none'; repeatTask = null; }],
     ['setupSheet', () => { document.getElementById('setupSheet').style.display = 'none'; }],
     ['toneSheet', () => closeToneSheet(null)],
     ['expSheet', () => { document.getElementById('expSheet').style.display = 'none'; expTask = null; }],

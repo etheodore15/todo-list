@@ -75,8 +75,9 @@ const { chromium } = require('playwright');
   // bring it back via 📅 When
   await page.locator('#somedayBlock summary').click();
   await page.locator('#somedayList .todo .ttext').click();
-  page.once('dialog', d => d.accept('today'));
   await page.locator('#somedayList .tact', { hasText: 'When' }).click();
+  await page.waitForTimeout(150);
+  await page.locator('#dateQuick .pick-chip[data-d="today"]').click();
   await page.waitForTimeout(200);
   check('B4: 📅 When brings it back to today',
     (await page.locator('#todoList .todo .ttext').allTextContents()).some(t => /fence/.test(t)));
