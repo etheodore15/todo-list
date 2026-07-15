@@ -139,10 +139,11 @@
   .todo .attr{margin-left:36px;}
   .ttag{font-size:.62rem; padding:2px 8px; border-radius:12px; background:var(--card2);
     color:var(--muted); letter-spacing:.3px;}
-  .todo .transcript{flex-basis:100%; color:var(--muted); font-size:.8rem; line-height:1.5;
-    margin-top:9px; padding-top:9px; border-top:1px solid var(--border); font-style:italic;}
+  .todo .transcript{flex-basis:100%; min-width:0; overflow-wrap:break-word; color:var(--muted);
+    font-size:.8rem; line-height:1.5; margin-top:9px; padding-top:9px;
+    border-top:1px solid var(--border); font-style:italic;}
   .todo .transcript .tmeta{font-style:normal; color:var(--muted); margin-bottom:5px; font-size:.76rem;}
-  .todo .tacts{display:flex; gap:8px; margin-top:10px; font-style:normal;}
+  .todo .tacts{display:flex; gap:8px; margin-top:10px; font-style:normal; flex-wrap:wrap;}
   .todo .tact{background:var(--card2); border:none; color:var(--text); font-size:.78rem;
     padding:7px 12px; border-radius:10px; cursor:pointer;}
   .date-chip{background:rgba(255,179,71,.14); color:var(--med);}
@@ -335,8 +336,8 @@
   .ledger-balance{background:var(--card); border:1px solid var(--border); border-radius:12px;
     padding:12px 14px; margin:12px 0; font-size:.9rem; line-height:1.7;}
   .ledger-owes{color:var(--med); font-weight:700;}
-  .hist-head{display:flex; align-items:center; gap:8px;}
-  .hist-head b{flex:1; font-size:1.05rem;}
+  .hist-head{display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
+  .hist-head b{flex:1; min-width:160px; font-size:1.05rem;}
   .hist-head .btn{flex:0 0 auto; width:auto; padding:9px 12px; font-size:.8rem; margin:0;}
   .hist-line{display:flex; gap:10px; padding:9px 2px; border-bottom:1px solid var(--border);
     font-size:.86rem; line-height:1.45; align-items:baseline;}
@@ -666,7 +667,7 @@
       <input type="file" id="importFile" accept=".json,application/json" style="display:none">
       <button class="btn ghost" id="wipeBtn">Delete all data</button>
     </div>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v61<br><span id="envInfo"></span></p>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v62<br><span id="envInfo"></span></p>
   </section>
 </main>
 
