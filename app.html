@@ -661,7 +661,7 @@
       <input type="file" id="importFile" accept=".json,application/json" style="display:none">
       <button class="btn ghost" id="wipeBtn">Delete all data</button>
     </div>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v59<br><span id="envInfo"></span></p>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v60<br><span id="envInfo"></span></p>
   </section>
 </main>
 
@@ -1165,9 +1165,23 @@ function fmtDay(dateStr){
 /* ---------- time of day (C2b) ---------- */
 // "give mum her ramipril at 8am" → "08:00"; null when no time is spoken
 function parseTaskTime(text){
-  const t = String(text).toLowerCase();
-  const m = t.match(/\b(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/) ||
-            t.match(/\bat\s+(\d{1,2})(?::(\d{2}))?\b/);
+  let t = String(text).toLowerCase();
+  // voice transcripts spell hours out: "nine AM", "half past nine", "twelve o'clock"
+  const HOUR_WORDS = {one:1, two:2, three:3, four:4, five:5, six:6, seven:7,
+    eight:8, nine:9, ten:10, eleven:11, twelve:12};
+  t = t.replace(/\b(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\b(?=\s*(?:am|pm|a\.m|p\.m|o'?clock|thirty|fifteen|forty[- ]?five|:))/g,
+    w => HOUR_WORDS[w]);
+  t = t.replace(/\b(?:midday|noon)\b/g, '12 pm').replace(/\bmidnight\b/g, '12 am')
+       .replace(/\ba\.m\.?\b/g, 'am').replace(/\bp\.m\.?\b/g, 'pm')
+       .replace(/\bo'?clock\b/g, '')
+       .replace(/\bhalf past (\d{1,2})\b/g, '$1:30')
+       .replace(/\bquarter past (\d{1,2})\b/g, '$1:15')
+       .replace(/\bquarter to (\d{1,2})\b/g, (m, h) => (parseInt(h,10) === 1 ? 12 : parseInt(h,10)-1) + ':45')
+       .replace(/\b(\d{1,2}) thirty\b/g, '$1:30')
+       .replace(/\b(\d{1,2}) fifteen\b/g, '$1:15')
+       .replace(/\b(\d{1,2}) forty[- ]?five\b/g, '$1:45');
+  const m = t.match(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/) ||
+            t.match(/\b(?:at|by|before|around|until|till|from)\s+(\d{1,2})(?::(\d{2}))?\b/);
   if (!m) return null;
   let h = parseInt(m[1], 10);
   const min = m[2] ? parseInt(m[2], 10) : 0;
@@ -1293,23 +1307,23 @@ function setIconLabel(el, iconName, text){
     el.appendChild(document.createTextNode(' ' + text));
 }
 
-function toast(msg, undoFn){
+function toast(msg, actionFn, actionLabel){
   const el = document.getElementById('toast');
   el.textContent = msg;
-  el.classList.toggle('action', !!undoFn);
-  if (undoFn){
+  el.classList.toggle('action', !!actionFn);
+  if (actionFn){
     const b = document.createElement('button');
     b.className = 'undo';
-    b.textContent = 'Undo';
+    b.textContent = actionLabel || 'Undo';
     b.addEventListener('click', () => {
       el.classList.remove('show');
-      undoFn();
+      actionFn();
     });
     el.appendChild(b);
   }
   el.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.classList.remove('show'), undoFn ? 5000 : 2600);
+  toastTimer = setTimeout(() => el.classList.remove('show'), actionFn ? 5000 : 2600);
 }
 
 /* ---------- tabs ---------- */
@@ -1406,6 +1420,7 @@ function buildIdeaPrompt(text){
 
 Rules:
 - Extract ONLY actions the person actually intends to take, as separate tasks (max 6). Never turn observations, feelings, or background context into tasks — if the idea contains no action, return an empty tasks array and just summarize it. Merge duplicates. Fix obvious speech-transcription errors from context, but keep names as spoken.
+- Task text must KEEP the concrete specifics — place, event name, who it's for ("Drop off at the play centre for the arts-and-crafts event"), never a vaguer paraphrase. Passive intent ("needs to be dropped off") becomes the imperative for whoever does it ("Drop off at…"). When one sentence holds two actions (a drop-off AND a pick-up), make two tasks, each with its own time.
 - "summary" is one clear sentence (max 14 words) capturing the core intent.
 - Judge each task's priority by urgency (time pressure) AND importance (consequences): high = needs action today or blocks other things; medium = this week; low = someday/optional.
 - Tag each task with 1-3 short lowercase tags chosen for USEFUL SORTING: ideally one life-area tag (work, home, family, personal) plus one activity-type tag (calls, shopping, errands, admin, finance, health, car, travel, pets, social, tech). Use single common words, consistent across tasks — never invent near-synonyms of an existing tag. Every task needs at least one tag; use "general" only as a last resort.
@@ -1718,7 +1733,10 @@ document.getElementById('expSave').addEventListener('click', () => {
 });
 
 /* ---------- break it down (B1) ---------- */
-async function geminiBreakdown(text){
+async function geminiBreakdown(text, ctx){
+  const when = [];
+  if (ctx && ctx.date) when.push('due ' + ctx.date);
+  if (ctx && ctx.time) when.push('at ' + fmtTime(ctx.time));
   const data = await geminiGenerate({
     contents: [{role: 'user', parts: [{text:
 `Break this todo task into tiny concrete steps for someone who finds starting hard.
@@ -1727,9 +1745,12 @@ Rules:
 - 3 to 7 steps, in doing order. Each starts with a verb, max 9 words.
 - The FIRST step must be trivially small — doable in under two minutes with zero decisions ("put 5 things in the dishwasher", "open the insurance email").
 - Each later step stays small (under ~10 minutes) and self-contained.
+- Steps must be SPECIFIC to this exact task — reuse its actual places, names, items and times. Never pad with generic filler ("set a timer", "take a break") that could apply to any task.
 - Keep the person's own names and details. No explanations, no numbering.
 
-Task: """${text}"""`}]}],
+Task: """${text}"""` +
+(when.length ? `\nIt happens ${when.join(' ')}.` : '') +
+(ctx && ctx.raw ? `\nThe task came from this spoken note — use its extra specifics (event, place, who, timing):\n"""${String(ctx.raw).slice(0, 700)}"""` : '')}]}],
     generationConfig: {responseMimeType: 'application/json', responseSchema: {
       type: 'OBJECT',
       properties: {steps: {type: 'ARRAY', items: {type: 'STRING'}}},
@@ -1746,13 +1767,30 @@ Task: """${text}"""`}]}],
 // daunting task gets a universal ADHD-friendly starter scaffold — the whole
 // point of "break it down" is to remove the starting wall, so it must NEVER
 // dead-end, even with no AI.
-function localBreakdown(text){
+function localBreakdown(text, td){
   const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
-  const parts = String(text).split(/,\s+(?:and\s+|then\s+)?|\s+and\s+(?:then\s+)?|\s*;\s*/i)
+  // bare "and" only splits when a real action verb follows — "arts and crafts
+  // event" is one thing, "wash up and call the plumber" is two
+  const parts = String(text).split(/,\s+(?:and\s+|then\s+)?|\s+and\s+(?:then\s+)?(?=(?:make|put|pick|drop|go|sign|set|call|ring|phone|text|message|email|buy|order|book|send|write|finish|fix|repair|check|schedule|organis\w*|organiz\w*|plan|research|pay|clean|prepare|review|update|create|build|contact|ask|cancel|renew|submit|take|bring|grab|move|sell|post|visit|register|apply|install|download|print|wash|rinse|brush|floss|start|try|collect|return|deliver|water|feed|walk|arrange|sweep|mop|vacuum|empty|tidy|mow|dust|iron|fold|hang|pack|unpack|charge|refill)\b)|\s*;\s*/i)
     .map(s => s.replace(/[.!?]+$/, '').trim()).filter(s => s.length > 2);
   if (parts.length >= 2) return parts.slice(0, 7).map(cap);
   const short = String(text).replace(/[.!?]+$/, '').trim();
   const label = short.length > 30 ? short.slice(0, 28) + '…' : short;
+  // outings & appointments get steps about the actual logistics, anchored to
+  // the task's own time — not a generic just-start timer
+  const time = (td && td.time) || parseTaskTime(text);
+  const when = time ? fmtTime(time) : null;
+  if (/\b(drop(ped|ping)? off|pick(ed|ing)? up|appointment|event|class|lesson|party|meeting|visit|checkup|check-up)\b/i.test(text)){
+    const dest = (String(text).match(/\b(?:at|to|from)\s+((?:the|a)\s+)?([a-z][a-z' -]{2,32}?)(?=\s+(?:for|at|by|on|before|after)\b|[,.]|$)/i) || [])[2];
+    const place = dest ? dest.trim() : 'the place';
+    return [
+      `Check where ${place === 'the place' ? 'it is' : place + ' is'} and travel time`,
+      'Get bags / what’s needed ready beforehand',
+      when ? `Set a leave-by alarm ahead of ${when}` : 'Set a leave-by alarm',
+      when ? `Head off in time for ${when}` : 'Head off with time to spare',
+      'Confirm the return / pick-up time'
+    ];
+  }
   return [
     'Get out only what you need to start',
     'Set a 2-minute timer and just begin',
@@ -1769,10 +1807,11 @@ async function breakDown(td){
   let steps = null;
   if (ai){
     toast('Breaking it down…');
-    try { steps = await geminiBreakdown(td.text); }
+    const srcIdea = td.ideaId ? ideas.find(i => i.id === td.ideaId) : null;
+    try { steps = await geminiBreakdown(td.text, {date: td.date, time: td.time, raw: srcIdea && srcIdea.raw}); }
     catch (e) { toast('AI unavailable (' + e.message + ') — trying built-in split.'); }
   }
-  if (!steps) steps = localBreakdown(td.text);
+  if (!steps) steps = localBreakdown(td.text, td);
   if (!steps){
     toast(ai ? 'Couldn\'t split this one — try rewording the task.'
  : 'Built-in mode only splits compound tasks — turn on smart AI in Settings for full breakdowns.');
@@ -1976,16 +2015,21 @@ function localSummarize(text){
   // Only clauses that express an intended ACTION become tasks — observations,
   // feelings, and context stay in the idea but produce no todo. Zero tasks is
   // a valid outcome.
-  const ACTION_PHRASES = /\b(needs? to|have to|has to|must|should|remember to|don't forget|going to|gonna|want to|make sure|look into|follow up|set up|pick up|drop off|go to|sign up|book in|sort out|work on|put on)\b/i;
+  // includes past/passive intent forms real speech uses: "she needed to be
+  // dropped off", "had to be picked up by twelve"
+  const ACTION_PHRASES = /\b(need(s|ed)? to|have to|has to|had to|must|should|remember to|don't forget|going to|gonna|want to|make sure|look into|follow up|set up|pick(ed|ing)? up|drop(ped|ping)? off|(be|get) (dropped off|picked up|taken|collected)|go to|sign up|book in|sort out|work on|put on)\b/i;
   const ACTION_VERBS = /\b(call|ring|phone|text|message|email|buy|order|book|send|writ|finish|fix|repair|check|schedul|organis|organiz|plan|research|pay|clean|prepar|review|updat|creat|mak|build|contact|ask|cancel|renew|submit|tak|bring|grab|mov|sell|post|visit|regist|apply|install|download|print|wash|rins|brush|floss|remind|redesign|design|start|try|collect|return|deliver|water|feed|walk|arrang)(e|es|s|ed|ing)?\b/i;
   let picked = sentences.filter(s => ACTION_PHRASES.test(s) || ACTION_VERBS.test(s));
   // Drop clauses narrating something ALREADY DONE ("I already emailed the
   // accountant", "cleaned the kitchen yesterday") so past-tense speech doesn't
   // create open to-dos. Explicit future intent (ACTION_PHRASES) overrides.
   const DONE_MARKER = /\b(already|just (did|finished|got|sorted|emailed|called|sent|paid|booked|cleaned|texted|messaged)|finished|did that|yesterday|last (night|week|month)|earlier|this morning|have (done|finished|sorted|cleaned|paid|sent|booked|called|emailed|texted)|(i|we|i've|we've)['’]?ve? (done|finished|sorted|cleaned|paid|sent|booked|called|emailed|texted))\b/i;
-  picked = picked.filter(s => ACTION_PHRASES.test(s) || !DONE_MARKER.test(s));
+  // only true INTENT wording overrides the done-filter — past-tense action verbs
+  // ("picked up the parcel this morning") don't
+  const INTENT = /\b(need(s|ed)? to|have to|has to|had to|must|should|remember to|don't forget|going to|gonna|want to|make sure|(be|get) (dropped off|picked up|taken|collected))\b/i;
+  picked = picked.filter(s => INTENT.test(s) || !DONE_MARKER.test(s));
   // split compound actions: "...put on my pajamas and brush my teeth and rinse..."
-  const AND_ACTION = /\s+and\s+(?=(?:also\s+|then\s+|maybe\s+)?(?:make sure|put on|pick up|drop off|go to|sign up|set up|call|ring|phone|text|message|email|buy|order|book|send|write|finish|fix|repair|check|schedule|organis\w*|organiz\w*|plan|research|pay|clean|prepare|review|update|create|make|build|contact|ask|cancel|renew|submit|take|bring|grab|move|sell|post|visit|register|apply|install|download|print|wash|rinse|brush|floss|start|try|collect|return|deliver|water|feed|walk|arrange)\b)/i;
+  const AND_ACTION = /\s+and\s+(?=(?:also\s+|then\s+|maybe\s+)?(?:make sure|put on|pick(?:ed|ing)? up|drop(?:ped|ping)? off|(?:had|needed?) to|(?:be|get) (?:dropped off|picked up)|go to|sign up|set up|call|ring|phone|text|message|email|buy|order|book|send|write|finish|fix|repair|check|schedule|organis\w*|organiz\w*|plan|research|pay|clean|prepare|review|update|create|make|build|contact|ask|cancel|renew|submit|take|bring|grab|move|sell|post|visit|register|apply|install|download|print|wash|rinse|brush|floss|start|try|collect|return|deliver|water|feed|walk|arrange)\b)/i;
   picked = picked.flatMap(s => s.split(AND_ACTION));
   const tasks = picked.slice(0,6).map(t => {
     const priority = detectPriority(t);
@@ -1994,9 +2038,14 @@ function localSummarize(text){
     // strip spoken fillers and lead-ins so the task reads as an imperative
     for (let pass = 0; pass < 4; pass++){
       t = t.replace(/^(um+|uh+|okay|ok|so|well|right|actually|basically|anyway|oh|and|also|then|plus)[,\s]+/i,'')
-           .replace(/^(i |we |you )?(really |also |just |probably |definitely )*(think i |want to|would like to|'d like to|was thinking (of|about)?|should also|needs? to|have to|must|should|remember to|don't forget to|don't forget|make sure (that )?(i |we |you )?|maybe someday|maybe|someday|it would be good to|i've got to|i got to|gotta)\s*/i,'')
+           .replace(/^(i |we |you |she |he |they )?(really |also |just |probably |definitely )*(think i |want to|would like to|'d like to|was thinking (of|about)?|should also|need(s|ed)? to|have to|has to|had to|must|should|remember to|don't forget to|don't forget|make sure (that )?(i |we |you )?|maybe someday|maybe|someday|it would be good to|i've got to|i got to|gotta)\s*/i,'')
            .replace(/^to\s+/i,'').trim();
     }
+    // passive intent → imperative: "be dropped off at the play centre" is the
+    // speaker asking someone to DO the drop-off
+    t = t.replace(/^(?:be|being|get|getting)\s+(dropped off|picked up|taken|collected)/i,
+      (m, v) => ({'dropped off': 'Drop off', 'picked up': 'Pick up', 'taken': 'Take',
+                  'collected': 'Collect'}[v.toLowerCase()] || v));
     t = t.replace(/[.!?]+$/,'').trim();
     const assignees = detectAssignees(t);
     const energy = detectEnergy(t);
@@ -2192,8 +2241,10 @@ saveIdeaBtn.addEventListener('click', async () => {
   saveIdeaBtn.disabled = false;
   saveIdeaBtn.textContent = 'Summarize & Add';
   updateBadge();
+  // name the destination space so it's obvious WHERE the tasks were published
+  const destSp = spacesList().find(s => s.hid === newTaskSpace());
   toast(added
- ? `Added ${added} task${added===1?'':'s'} ${scheduled.length ? ` (${scheduled.join(', ')})` : ''}${delegated.length ? ` (→ ${delegated.join('; ')})` : ''}${skipped ? ` (${skipped} already listed)` : ''}`
+ ? `Added ${added} task${added===1?'':'s'}${destSp ? ` to “${destSp.name}”` : ''}${scheduled.length ? ` (${scheduled.join(', ')})` : ''}${delegated.length ? ` (→ ${delegated.join('; ')})` : ''}${skipped ? ` (${skipped} already listed)` : ''}`
  : (skipped ? 'Those tasks are already on your list' : 'Saved to Ideas — no to-dos detected, your note is kept'));
   // If nothing became a task, don't dump the user on an unchanged Today with the
   // transcript seemingly lost — take them to Ideas and highlight the saved note.
@@ -2244,7 +2295,9 @@ document.getElementById('saveNoteBtn').addEventListener('click', () => {
   logEvent('note', {id: 'note-' + idea.id, text: raw.slice(0, 600), space: sp.hid});
   track('feature_used', {feature: 'care_note'});
   liveText.value = ''; baseText = '';
-  toast(`Saved to the ${sp.name} journal `);
+  // show WHERE it went — the journal lives behind "History & briefing", which
+  // first-time users don't know yet
+  toast(`Saved to the ${sp.name} journal`, () => openHistory(sp), 'View');
 });
 
 /* ---------- render ideas ---------- */
@@ -2282,13 +2335,14 @@ function renderIdeas(){
       const b = document.createElement('button');
       b.className = 'chip share-note';
       b.style.cssText = 'border:none; cursor:pointer;' + (shared ? ' color:var(--ok);' : '');
-      b.textContent = shared ? ` in ${sp.name} journal` : ` Share to ${sp.name}`;
+      if (shared) setIconLabel(b, 'check', `in ${sp.name} journal`);
+      else setIconLabel(b, 'share', `Share to ${sp.name}`);
       b.disabled = shared;
       b.addEventListener('click', () => {
         logEvent('note', {id: 'note-' + idea.id, text: idea.raw.slice(0, 600), space: sp.hid});
         idea.sharedTo = [...(idea.sharedTo || []), sp.hid];
         saveIdeas(); renderIdeas();
-        toast(`Shared to the ${sp.name} journal `);
+        toast(`Shared to the ${sp.name} journal`, () => openHistory(sp), 'View');
       });
       card.querySelector('.meta').insertBefore(b, card.querySelector('.del'));
     });
@@ -4311,7 +4365,13 @@ ${sec('Questions for the doctor', b.questions)}
 
 let curBrief = null;
 document.getElementById('histBriefBtn').addEventListener('click', async () => {
-  if (!histSpace) return;
+  if (!histSpace){ toast('Open a care space’s history first.'); return; }
+  // nothing recorded yet → an empty report helps no one; say what to do instead
+  const inp = briefingInput(histSpace);
+  if (!inp.notes.length && !inp.ticked.length && !inp.missed.length && !inp.open.length){
+    toast('Nothing to brief yet — save a care note or tick off a medication first, then the report has something to include.');
+    return;
+  }
   const btn = document.getElementById('histBriefBtn');
   btn.disabled = true; setIconLabel(btn, 'stethoscope', 'Preparing…');
   let b = null;
