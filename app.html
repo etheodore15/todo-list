@@ -131,7 +131,12 @@
   .todo .link-btn{background:none; border:none; font-size:.95rem; cursor:pointer; padding:2px;}
   .todo{flex-wrap:wrap;}
   .todo .txt{cursor:pointer;}
-  .todo .ttags{display:flex; gap:5px; margin-top:5px; flex-wrap:wrap;}
+  /* tags, steps and attributions sit at ROW level with the full card width —
+     they used to live inside .txt, which shares its line with four buttons,
+     squeezing them to ~40% width on phones (every chip/step wrapped) */
+  .todo .ttags{display:flex; gap:5px; margin-top:2px; flex-wrap:wrap; flex-basis:100%; margin-left:36px;}
+  .todo .subtasks{flex-basis:100%; margin-left:36px;}
+  .todo .attr{margin-left:36px;}
   .ttag{font-size:.62rem; padding:2px 8px; border-radius:12px; background:var(--card2);
     color:var(--muted); letter-spacing:.3px;}
   .todo .transcript{flex-basis:100%; color:var(--muted); font-size:.8rem; line-height:1.5;
@@ -661,7 +666,7 @@
       <input type="file" id="importFile" accept=".json,application/json" style="display:none">
       <button class="btn ghost" id="wipeBtn">Delete all data</button>
     </div>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v60<br><span id="envInfo"></span></p>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v61<br><span id="envInfo"></span></p>
   </section>
 </main>
 
@@ -1427,7 +1432,7 @@ Rules:
 - Today is ${todayStr()} (${new Date().toLocaleDateString('en', {weekday: 'long', timeZone: 'UTC'})}). If the idea explicitly says WHEN a task should happen ("tomorrow", "on Friday", "on the 14th"), set that task's "date" to the resolved YYYY-MM-DD (never in the past). Otherwise leave "date" empty.
 - If the idea says a task REPEATS ("every Tuesday", "meds every morning", "rent on the 1st of every month"), set "recur" to "daily", "weekly:mon,tue,…", or "monthly:14" accordingly. Otherwise leave "recur" empty.
 - Rate each task's "energy" — the effort/executive function it demands: low = quick and near-mindless (a call, an order), medium = some focus, high = long or demanding. Estimate "minutes" it realistically takes (5-240).
-- If the idea says a TIME OF DAY ("meds at 8am", "pick up at 3:30pm"), set that task's "time" to the 24h HH:MM. Otherwise leave "time" empty.` +
+- If the idea says a TIME OF DAY ("meds at 8am", "pick up at 3:30pm"), set that task's "time" to the 24h HH:MM. When the hour has no am/pm ("picked up 12 or after", "dinner at 6"), infer the sensible one from context — a pick-up after a 9 am drop-off is 12:00, dinner is 18:00. Otherwise leave "time" empty.` +
   (known.length ? `
 - The user's existing tags, most used first: ${known.join(', ')}. STRONGLY prefer reusing these exact tags whenever they fit; only introduce a new tag when none of them applies.` : '') +
   (store.get('members', []).length ? `
@@ -1780,7 +1785,17 @@ function localBreakdown(text, td){
   // the task's own time — not a generic just-start timer
   const time = (td && td.time) || parseTaskTime(text);
   const when = time ? fmtTime(time) : null;
-  if (/\b(drop(ped|ping)? off|pick(ed|ing)? up|appointment|event|class|lesson|party|meeting|visit|checkup|check-up)\b/i.test(text)){
+  // getting-ready tasks ("Ivy needs to get dressed for Pixie Playtime Palace")
+  if (/\b(get(ting)? dressed|get ready|be ready|getting ready)\b/i.test(text)){
+    const ev = (String(text).match(/\b(?:for|before)\s+((?:the|a)\s+)?([a-z][a-z' -]{2,40}?)(?=\s+(?:at|by|on)\b|[,.]|$)/i) || [])[2];
+    return [
+      ev ? `Lay out the clothes for ${ev.trim()}` : 'Lay out the clothes',
+      'Get washed and dressed',
+      'Pack anything that needs to go along',
+      when ? `Be ready to leave before ${when}` : 'Be ready with time to spare'
+    ];
+  }
+  if (/\b(drop(ped|ping)? off|dropoff|drop-off|pick(ed|ing)? up|pickup|pick-up|appointment|event|class|lesson|party|meeting|visit|checkup|check-up)\b/i.test(text)){
     const dest = (String(text).match(/\b(?:at|to|from)\s+((?:the|a)\s+)?([a-z][a-z' -]{2,32}?)(?=\s+(?:for|at|by|on|before|after)\b|[,.]|$)/i) || [])[2];
     const place = dest ? dest.trim() : 'the place';
     return [
@@ -2857,7 +2872,7 @@ function todoRow(td){
       if (!td.tags.length) td.tags = ['general'];
       saveTodos(); renderTodos();
     });
-    txtEl.appendChild(tg);
+    row.appendChild(tg);
   }
   // tiny steps from "break it down"
   if ((td.subtasks || []).length){
@@ -2881,7 +2896,7 @@ function todoRow(td){
       });
       wrap.appendChild(r);
     });
-    txtEl.appendChild(wrap);
+    row.appendChild(wrap);
   }
   // who ADDED it — inline for shared-space tasks someone else created, so
   // "who did what" is visible without tapping (advertised: every add shows who)
@@ -2889,14 +2904,14 @@ function todoRow(td){
     const ad = document.createElement('div');
     ad.className = 'attr attr-add';
     setIconLabel(ad, 'plus', td.createdBy + (td.createdAt ? ' · ' + fmtWhen(td.createdAt) : ''));
-    txtEl.appendChild(ad);
+    row.appendChild(ad);
   }
   // who ticked it, right on the row
   if (td.done && (td.doneBy || td.doneAt)){
     const at = document.createElement('div');
     at.className = 'attr';
     setIconLabel(at, 'check', (td.doneBy ? td.doneBy + ' · ' : '') + fmtWhen(td.doneAt));
-    txtEl.appendChild(at);
+    row.appendChild(at);
   }
   // no-shame carry-over: after 5 quiet days, gently ask instead of going red
   if (!td.done && !td.someday && (td.carried || 0) >= 5){
