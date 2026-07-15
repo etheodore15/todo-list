@@ -85,10 +85,7 @@ p{margin:0;}
 .demo .arrow::before,.demo .arrow::after{content:""; height:1px; flex:1; background:var(--line);}
 .tasks{display:flex; flex-direction:column; gap:9px;}
 .task{display:flex; align-items:center; gap:12px; background:var(--surface); border:1px solid var(--border);
-  border-radius:13px; padding:11px 13px; box-shadow:var(--shadow-sm); opacity:0; transform:translateY(8px);
-  animation:rise .5s cubic-bezier(.2,.8,.2,1) forwards;}
-.task:nth-child(1){animation-delay:.15s;} .task:nth-child(2){animation-delay:.32s;} .task:nth-child(3){animation-delay:.49s;}
-@keyframes rise{to{opacity:1; transform:none;}}
+  border-radius:13px; padding:11px 13px; box-shadow:var(--shadow-sm);}
 .task .box{width:22px; height:22px; border-radius:7px; border:2px solid var(--accent); flex:0 0 auto;}
 .task .t{flex:1; font-size:.94rem; font-weight:500;}
 .task .chips{display:flex; gap:6px; align-items:center;}
@@ -171,5 +168,73 @@ footer a:hover{color:var(--text);}
 
 @media (prefers-reduced-motion: reduce){
   *,*::before,*::after{animation:none !important; transition:none !important;}
-  .task{opacity:1; transform:none;}
 }
+
+/* ---------- looping demo animations ----------
+   Stages only hide their steps once JS adds .run — so no-JS and
+   reduced-motion visitors see the complete, static final state. */
+.run .dstep{opacity:0; transform:translateY(9px); transition:opacity .38s ease, transform .38s ease;}
+.run .dstep.on{opacity:1; transform:none;}
+.demo .said{min-height:7.6em;}
+@media (max-width:560px){ .demo .said{min-height:10.2em;} }
+
+/* flow vignettes (create a space / speak it in / reminders) */
+.vign-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:20px; margin-top:44px;}
+@media (max-width:900px){ .vign-grid{grid-template-columns:1fr;} }
+.vign{background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:20px 20px 22px;
+  box-shadow:var(--shadow-sm); display:flex; flex-direction:column;}
+.vign h3{font-size:1.05rem; display:flex; align-items:center; gap:8px;}
+.vign h3 .ic{color:var(--accent); flex:0 0 auto;}
+.vign .vcap{color:var(--muted); font-size:.86rem; line-height:1.5; margin-top:5px;}
+.vign .stage{margin-top:16px; display:flex; flex-direction:column; gap:10px; flex:1;}
+.mini{background:var(--tint); border:1px solid var(--border); border-radius:14px; padding:13px 14px;}
+.mini .mlabel{font-family:var(--mono); font-size:.64rem; letter-spacing:.12em; text-transform:uppercase;
+  color:var(--accent); display:flex; gap:6px; align-items:center; margin-bottom:9px;}
+.mini.ok{border-color:rgba(20,158,97,.45);}
+.mini.ok .mlabel{color:var(--ok); margin-bottom:7px;}
+.mchips{display:flex; gap:6px; flex-wrap:wrap;}
+.mchip{display:inline-flex; align-items:center; gap:6px; font-size:.78rem; padding:6px 10px; border-radius:9px;
+  border:1.5px solid var(--border); background:var(--surface); color:var(--text); transition:border-color .3s, background .3s, color .3s;}
+.mchip.picked{border-color:var(--accent); background:var(--accent-soft); color:var(--accent); font-weight:600;}
+.minput{margin-top:10px; background:var(--surface); border:1.5px solid var(--border); border-radius:9px;
+  padding:8px 11px; font-family:var(--mono); font-size:.85rem; min-height:1.4em;}
+.mbtn{margin-top:9px; width:100%; border:none; border-radius:9px; background:var(--accent); color:#fff;
+  font:600 .84rem var(--font); padding:9px; cursor:default; transition:transform .18s, background .18s;}
+.mbtn.pressed{transform:scale(.96); background:var(--accent-dark);}
+.mbtn.released{transform:none; background:var(--accent);}
+.mcode{font-family:var(--mono); font-size:.76rem; background:var(--surface); border:1px dashed var(--border);
+  padding:7px 10px; border-radius:8px; letter-spacing:.05em;}
+.mtoast{align-self:center; background:#191a1f; color:#fff; font-size:.79rem; padding:9px 14px; border-radius:99px;
+  display:inline-flex; gap:8px; align-items:center; box-shadow:var(--shadow); margin-top:2px;}
+.vmicrow{display:flex; align-items:center; gap:12px;}
+.vmic{width:44px; height:44px; border-radius:50%; background:var(--accent); color:#fff; display:grid;
+  place-items:center; font-size:1.1rem; position:relative; flex:0 0 auto;}
+.vmic.rec:not(.stop)::after{content:""; position:absolute; inset:-4px; border-radius:50%;
+  border:2px solid var(--accent); animation:vring 1.25s ease-out infinite;}
+@keyframes vring{0%{transform:scale(.82); opacity:.75;} 100%{transform:scale(1.55); opacity:0;}}
+.vwave{display:flex; gap:3px; align-items:center; height:26px;}
+.vwave i{width:4px; height:6px; border-radius:2px; background:var(--accent); opacity:.35;}
+.vmic.rec:not(.stop) ~ .vwave i{animation:vwave 1s ease-in-out infinite; opacity:.9;}
+.vmic.rec:not(.stop) ~ .vwave i:nth-child(2){animation-delay:.13s;}
+.vmic.rec:not(.stop) ~ .vwave i:nth-child(3){animation-delay:.26s;}
+.vmic.rec:not(.stop) ~ .vwave i:nth-child(4){animation-delay:.39s;}
+.vmic.rec:not(.stop) ~ .vwave i:nth-child(5){animation-delay:.52s;}
+@keyframes vwave{0%,100%{height:6px;} 50%{height:22px;}}
+.vsaid{margin-top:11px; font-family:var(--mono); font-size:.83rem; line-height:1.6; min-height:3.4em;}
+.vbox{width:22px; height:22px; border-radius:7px; border:2px solid var(--accent); position:relative;
+  flex:0 0 auto; transition:background .25s, border-color .25s;}
+.vtick{position:absolute; inset:0; display:grid; place-items:center; color:var(--ok); font-size:.72rem;}
+.vbox:has(.vtick.on), .stage:not(.run) .vbox:has(.vtick){background:var(--ok); border-color:var(--ok);}
+.vbox:has(.vtick.on) .vtick, .stage:not(.run) .vbox .vtick{color:#fff;}
+.vattr{font-size:.78rem; color:var(--ok); display:flex; gap:7px; align-items:center;}
+.vnotif{display:flex; gap:11px; align-items:center; background:var(--surface); border:1px solid var(--border);
+  border-left:3px solid var(--accent); border-radius:12px; padding:11px 13px; box-shadow:var(--shadow-sm);}
+.vnotif .nico{width:34px; height:34px; border-radius:9px; background:var(--accent-soft); color:var(--accent);
+  display:grid; place-items:center; flex:0 0 auto;}
+.vnotif > div{flex:1; min-width:0;}
+.vnotif b{display:block; font-size:.85rem;}
+.vnotif > div > span{display:block; font-size:.75rem; color:var(--muted); margin-top:1px;}
+.vmiss{display:flex; gap:9px; align-items:center; font-size:.8rem; font-weight:600; color:#9a5c00;
+  background:rgba(178,106,0,.1); border:1px solid rgba(178,106,0,.3); border-radius:11px; padding:10px 12px;}
+@media (prefers-color-scheme: dark){ .vmiss{color:#ffc46b; background:rgba(255,180,80,.09); border-color:rgba(255,180,80,.3);} }
+:root[data-theme="dark"] .vmiss{color:#ffc46b; background:rgba(255,180,80,.09); border-color:rgba(255,180,80,.3);}

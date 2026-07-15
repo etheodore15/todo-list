@@ -38,19 +38,18 @@
       </div>
       <p class="micro">Installable web app · works offline · nothing to download from a store</p>
     </div>
-    <div class="demo" aria-label="Example: a spoken note becoming three structured tasks">
+    <div class="demo" data-cycle="9500" aria-label="Example: a spoken note becoming three structured tasks">
       <div class="said">
         <span class="lbl"><span class="ic ic-mic" aria-hidden="true"></span> What you say</span>
-        “um so I need to book the dentist tomorrow, pick up Mum's prescription today,
-        and the school forms are due friday”<span class="caret"></span>
+        “<span class="type" id="heroType" data-t="400" data-sp="110">um so I need to book the dentist tomorrow, pick up Mum's prescription today, and the school forms are due friday</span>”<span class="caret"></span>
       </div>
-      <div class="arrow">Idea&nbsp;→&nbsp;Todo sorts it</div>
+      <div class="arrow dstep" data-t="3400">Idea&nbsp;→&nbsp;Todo sorts it</div>
       <div class="tasks">
-        <div class="task"><span class="box"></span><span class="t">Book the dentist</span>
+        <div class="task dstep" data-t="3900"><span class="box"></span><span class="t">Book the dentist</span>
           <span class="chips"><span class="pill date">TOMORROW</span><span class="pill hi">HIGH</span></span></div>
-        <div class="task"><span class="box"></span><span class="t">Pick up Mum's prescription</span>
+        <div class="task dstep" data-t="4250"><span class="box"></span><span class="t">Pick up Mum's prescription</span>
           <span class="chips"><span class="pill med"><span class="ic ic-pill" aria-hidden="true"></span> CARE</span><span class="pill date">TODAY</span></span></div>
-        <div class="task"><span class="box"></span><span class="t">School forms</span>
+        <div class="task dstep" data-t="4600"><span class="box"></span><span class="t">School forms</span>
           <span class="chips"><span class="pill date">FRI</span></span></div>
       </div>
     </div>
@@ -74,6 +73,82 @@
       <div class="step"><div class="num">STEP 03</div><h3>Share &amp; delegate</h3>
         <p>Drop it into a shared space — a household, a co-parenting pair, a care team — and it
           syncs in real time to everyone who needs it, with a record of who did what.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="action">
+  <div class="wrap">
+    <div class="sec-head">
+      <p class="eyebrow">See it in action</p>
+      <h2 style="margin-top:12px;">Watch the flow, end to end.</h2>
+      <p>Three little loops from real life: set up a shared space, speak a task in, and let
+        reminders keep an honest record.</p>
+    </div>
+    <div class="vign-grid">
+
+      <div class="vign">
+        <h3><span class="ic ic-users" aria-hidden="true"></span> Create a space</h3>
+        <p class="vcap">Pick who it's for, name it, and share one code — the others just paste it.</p>
+        <div class="stage" data-cycle="10500">
+          <div class="mini dstep" data-t="200">
+            <div class="mlabel"><span class="ic ic-plus" aria-hidden="true"></span> New space</div>
+            <div class="mchips">
+              <span class="mchip dstep" data-t="500"><span class="ic ic-users" aria-hidden="true"></span> Family</span>
+              <span class="mchip dstep" data-t="650"><span class="ic ic-handshake" aria-hidden="true"></span> Co-parenting</span>
+              <span class="mchip dstep" data-t="800" data-fx="picked:1700"><span class="ic ic-heart" aria-hidden="true"></span> Care team</span>
+            </div>
+            <div class="minput dstep" data-t="2100"><span class="type" data-t="2500" data-sp="95" data-mode="char">Mum's care</span><span class="caret"></span></div>
+            <button type="button" class="mbtn dstep" data-t="2100" data-fx="pressed:4000 released:4260" tabindex="-1">Create space</button>
+          </div>
+          <div class="mini ok dstep" data-t="4700">
+            <div class="mlabel"><span class="ic ic-check" aria-hidden="true"></span> “Mum's care” is ready</div>
+            <div class="mcode">Invite code · ITODO2-8F3K</div>
+          </div>
+          <div class="mtoast dstep" data-t="6600"><span class="ic ic-user-plus" aria-hidden="true"></span> Sam joined “Mum's care”</div>
+        </div>
+      </div>
+
+      <div class="vign">
+        <h3><span class="ic ic-mic" aria-hidden="true"></span> Speak it in</h3>
+        <p class="vcap">Say it once. It lands as a task with the date and time already set.</p>
+        <div class="stage" data-cycle="10000">
+          <div class="mini dstep" data-t="200">
+            <div class="vmicrow">
+              <span class="vmic dstep" data-t="400" data-fx="rec:700 stop:4300"><span class="ic ic-mic" aria-hidden="true"></span></span>
+              <span class="vwave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
+            </div>
+            <div class="vsaid">“<span class="type" data-t="900" data-sp="60" data-mode="char">grab Mum's prescription before four today</span>”<span class="caret"></span></div>
+          </div>
+          <div class="task dstep" data-t="5000">
+            <span class="vbox"><span class="vtick dstep" data-t="6800"><span class="ic ic-check" aria-hidden="true"></span></span></span>
+            <span class="t">Grab Mum's prescription</span>
+            <span class="chips"><span class="pill date">TODAY 4 PM</span></span>
+          </div>
+          <div class="vattr dstep" data-t="7600"><span class="ic ic-check" aria-hidden="true"></span> Ticked off — synced to everyone in “Mum's care”</div>
+        </div>
+      </div>
+
+      <div class="vign">
+        <h3><span class="ic ic-bell" aria-hidden="true"></span> Reminders that keep the record</h3>
+        <p class="vcap">Every tick is a record. A miss is flagged for the next person on.</p>
+        <div class="stage" data-cycle="11500">
+          <div class="vnotif dstep" data-t="400">
+            <span class="nico"><span class="ic ic-bell" aria-hidden="true"></span></span>
+            <div><b>Morning meds · 8:00</b><span>Metformin 500&nbsp;mg — with food</span></div>
+            <span class="vbox"><span class="vtick dstep" data-t="2000"><span class="ic ic-check" aria-hidden="true"></span></span></span>
+          </div>
+          <div class="vattr dstep" data-t="2700"><span class="ic ic-check" aria-hidden="true"></span> Recorded — Alex · 8:02</div>
+          <div class="vnotif dstep" data-t="4600">
+            <span class="nico"><span class="ic ic-bell" aria-hidden="true"></span></span>
+            <div><b>Evening meds · 20:00</b><span>Metformin 500&nbsp;mg</span></div>
+            <span class="vbox"></span>
+          </div>
+          <div class="vmiss dstep" data-t="6800"><span class="ic ic-alert" aria-hidden="true"></span> 1 missed dose — flagged for the next carer</div>
+          <div class="vattr dstep" data-t="8300"><span class="ic ic-heart" aria-hidden="true"></span> Sam sees it in the shift handoff</div>
+        </div>
+      </div>
+
     </div>
   </div>
 </section>
@@ -184,6 +259,48 @@
     <span class="mono">capture · structure · share</span>
   </div>
 </footer>
+
+<script>
+/* Looping demo animations. The markup contains the FINAL state, so with
+   JavaScript off — or prefers-reduced-motion on — the page simply shows the
+   finished example. When running, each stage clears and replays on a cycle:
+   [data-t]    → element fades in at that ms
+   .type       → its text is typed out from data-t (data-sp ms per word,
+                 or per character with data-mode="char")
+   [data-fx]   → "class:ms" pairs added at those times (chip pick, button press,
+                 mic recording) */
+(function(){
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  document.querySelectorAll('[data-cycle]').forEach(stage => {
+    const steps = [...stage.querySelectorAll('[data-t]')];
+    const typers = [...stage.querySelectorAll('.type')];
+    const fx = [...stage.querySelectorAll('[data-fx]')];
+    typers.forEach(el => { el.dataset.full = el.textContent; });
+    stage.classList.add('run');
+    let timers = [];
+    const play = () => {
+      timers.forEach(clearTimeout); timers = [];
+      steps.forEach(el => el.classList.remove('on'));
+      fx.forEach(el => el.dataset.fx.split(' ').forEach(p => el.classList.remove(p.split(':')[0])));
+      typers.forEach(el => { el.textContent = ''; });
+      steps.forEach(el => timers.push(setTimeout(() => el.classList.add('on'), +el.dataset.t)));
+      typers.forEach(el => {
+        const parts = el.dataset.mode === 'char' ? [...el.dataset.full] : el.dataset.full.split(' ');
+        const t0 = +(el.dataset.t || 0), sp = +(el.dataset.sp || 100), word = el.dataset.mode !== 'char';
+        parts.forEach((p, i) => timers.push(setTimeout(() => {
+          el.textContent += (word && i ? ' ' : '') + p;
+        }, t0 + i * sp)));
+      });
+      fx.forEach(el => el.dataset.fx.split(' ').forEach(pair => {
+        const [cls, ms] = pair.split(':');
+        timers.push(setTimeout(() => el.classList.add(cls), +ms));
+      }));
+    };
+    play();
+    setInterval(play, +stage.dataset.cycle);
+  });
+})();
+</script>
 
 </body>
 </html>

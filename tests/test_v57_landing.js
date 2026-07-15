@@ -27,6 +27,33 @@ const { chromium } = require('playwright');
   check('v57: landing stylesheet is the shared marketing sheet',
     await page.locator('link[href="landing.css"]').count() === 1);
 
+  // ---------- animated demos (hero transcription + 3 flow vignettes) ----------
+  check('anim: hero + three vignettes have animation stages',
+    await page.locator('[data-cycle]').count() === 4);
+  await page.waitForTimeout(1600);   // mid-cycle: typing underway, tasks not in yet
+  const midLen = ((await page.locator('#heroType').textContent()) || '').length;
+  const midTasks = await page.locator('.demo .task.on').count();
+  await page.waitForTimeout(4200);   // late-cycle: typing done, tasks cascaded in
+  const endLen = ((await page.locator('#heroType').textContent()) || '').length;
+  const endTasks = await page.locator('.demo .task.on').count();
+  check('anim: hero transcript types out over time', midLen > 5 && endLen > midLen && endLen > 100);
+  check('anim: tasks appear only after the transcription', midTasks === 0 && endTasks === 3);
+  await page.waitForTimeout(1600);   // ~7.4s in: invite code (4.7s) + missed banner (6.8s) shown
+  check('anim: space-creation vignette reaches its invite code',
+    await page.locator('.mini.ok.on .mcode').count() === 1);
+  check('anim: reminder vignette flags the missed dose',
+    await page.locator('.vmiss.on').count() === 1);
+
+  // reduced motion → static final state, no animation runner
+  const rctx = await browser.newContext({ reducedMotion: 'reduce' });
+  const rp = await rctx.newPage();
+  await rp.goto('http://localhost:8906/index.html', { waitUntil: 'load' });
+  await rp.waitForTimeout(400);
+  check('anim: reduced-motion shows the full static demo',
+    ((await rp.locator('#heroType').textContent()) || '').length > 100 &&
+    (await rp.locator('.run').count()) === 0);
+  await rctx.close();
+
   // ---------- investor sub-page ----------
   await page.goto('http://localhost:8906/investors.html', { waitUntil: 'load' });
   const inv = (await page.locator('body').textContent()) || '';
