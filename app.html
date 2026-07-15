@@ -476,13 +476,13 @@
   <!-- CAPTURE -->
   <section id="view-capture" class="view active">
     <div class="mic-wrap">
-      <button id="micBtn" aria-label="Record idea">🎤</button>
+      <button id="micBtn" aria-label="Record idea"><span class="ic ic-mic" aria-hidden="true"></span></button>
       <div class="mic-hint" id="micHint" role="status" aria-live="polite">Tap the mic and speak your idea.<br>Or type below.</div>
     </div>
     <textarea id="liveText" aria-label="Your idea — speak or type" placeholder="Your transcribed idea appears here… you can also just type."></textarea>
     <div class="cap-actions">
       <button class="btn ghost" id="clearBtn">Clear</button>
-      <button class="btn primary" id="saveNoteBtn" style="display:none;">📝 Save note</button>
+      <button class="btn primary" id="saveNoteBtn" style="display:none;"><span class="ic ic-note" aria-hidden="true"></span> Save note</button>
       <button class="btn primary" id="saveIdeaBtn">Summarize &amp; Add</button>
     </div>
   </section>
@@ -504,7 +504,7 @@
     <div id="custodyBanner" style="display:none;"></div>
     <div id="spaceBar" style="display:none;"></div>
     <div id="adhdStrip" style="display:none;"></div>
-    <button class="btn ghost" id="focusBtn" style="display:none; width:100%; margin-bottom:12px;">🎯 Just one thing</button>
+    <button class="btn ghost" id="focusBtn" style="display:none; width:100%; margin-bottom:12px;"><span class="ic ic-target" aria-hidden="true"></span> Just one thing</button>
     <div class="addrow">
       <input id="quickAdd" aria-label="Quick add a task" placeholder="Quick add a task…" enterkeyhint="done">
       <button id="quickAddBtn" aria-label="Add task">＋</button>
@@ -512,15 +512,15 @@
     <div id="tagFilter"></div>
     <div id="todoList"></div>
     <details id="somedayBlock" class="side-block" style="display:none;">
-      <summary>🌙 Someday</summary>
-      <p class="side-note">Parked with no date and no pressure. Tap a task → 📅 When to bring one back.</p>
+      <summary><span class="ic ic-moon" aria-hidden="true"></span> Someday</summary>
+      <p class="side-note">Parked with no date and no pressure. Tap a task → <span class="ic ic-calendar" aria-hidden="true"></span> When to bring one back.</p>
       <div id="somedayList"></div>
     </details>
     <details id="winsBlock" class="side-block" style="display:none;">
-      <summary>🏆 Wins</summary>
+      <summary><span class="ic ic-trophy" aria-hidden="true"></span> Wins</summary>
       <div id="winsList"></div>
     </details>
-    <button class="btn ghost" id="shareBtn" style="display:none; width:100%; margin-top:6px;">📤 Share this list</button>
+    <button class="btn ghost" id="shareBtn" style="display:none; width:100%; margin-top:6px;"><span class="ic ic-share" aria-hidden="true"></span> Share this list</button>
   </section>
 
   <!-- SETTINGS -->
@@ -575,7 +575,7 @@
       <p id="myNameStatus"></p>
       <div id="syncActive" style="display:none;">
         <div id="spacesList"></div>
-        <button class="btn ghost" id="addSpaceBtn">➕ Join or create another space</button>
+        <button class="btn ghost" id="addSpaceBtn"><span class="ic ic-plus" aria-hidden="true"></span> Join or create another space</button>
       </div>
       <div id="syncSetup">
         <input id="inviteInput" aria-label="Invite code to join a space" placeholder="Paste an invite code to join…" autocomplete="off">
@@ -587,7 +587,7 @@
             2. Build → <b>Firestore Database</b> → Create database (production mode).<br>
             3. In the <b>Rules</b> tab, paste the rules from
                <a href="https://github.com/etheodore15/todo-list#family-sync" target="_blank" style="color:var(--accent)">the README</a> and Publish.<br>
-            4. Project settings (⚙) → Your apps → Web (&lt;/&gt;) → Register app → copy the
+            4. Project settings (<span class="ic ic-settings" aria-hidden="true"></span>) → Your apps → Web (&lt;/&gt;) → Register app → copy the
                <b>firebaseConfig</b> snippet.<br>
             5. Paste it below, name the space, and tap Create.<br>
             <span style="color:var(--muted)">Adding a second space (e.g. "Mum's care") can reuse the same
@@ -596,9 +596,9 @@
             style="width:100%; min-height:90px; background:var(--bg); border:1px solid var(--border); border-radius:10px; color:var(--text); padding:10px; font-size:.8rem; margin-top:6px;"></textarea>
           <input id="spaceNameInput" aria-label="Space name" placeholder="Space name (e.g. Home, Mum's care)" autocomplete="off">
           <select id="spaceTypeSel" aria-label="Space type">
-            <option value="family">👥 Family / household</option>
-            <option value="coparenting">🤝 Co-parenting</option>
-            <option value="care">💙 Care team</option>
+            <option value="family"><span class="ic ic-users" aria-hidden="true"></span> Family / household</option>
+            <option value="coparenting"><span class="ic ic-handshake" aria-hidden="true"></span> Co-parenting</option>
+            <option value="care"><span class="ic ic-heart" aria-hidden="true"></span> Care team</option>
           </select>
           <button class="btn primary" id="createHhBtn" style="margin-top:8px;">Create space</button>
           <button class="btn primary" id="createManagedBtn" style="margin-top:8px; display:none;">Create space</button>
@@ -617,7 +617,7 @@
     <h2 class="set-section">Smart AI</h2>
     <div class="set-block">
       <h3>Smart AI — summaries, break-downs, tone &amp; briefings</h3>
-      <p id="aiManagedNote" style="display:none;">✨ Smart AI is <b>on</b> for your account — nothing to set up.
+      <p id="aiManagedNote" style="display:none;"><span class="ic ic-sparkles" aria-hidden="true"></span> Smart AI is <b>on</b> for your account — nothing to set up.
          Summaries, "break it down", tone checks, and doctor briefings all work out of the box, with a
          fair daily limit. Power users can still paste their own key below to bypass the limit.</p>
       <p id="aiKeyNote">Paste a free <b>Google Gemini API key</b> and summaries, priorities, and tags are
@@ -661,22 +661,22 @@
       <input type="file" id="importFile" accept=".json,application/json" style="display:none">
       <button class="btn ghost" id="wipeBtn">Delete all data</button>
     </div>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v58<br><span id="envInfo"></span></p>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v59<br><span id="envInfo"></span></p>
   </section>
 </main>
 
 <nav class="tabs" aria-label="Main navigation">
-  <button data-view="capture" class="active" aria-current="page"><span class="ico" aria-hidden="true">🎤</span>Capture</button>
-  <button data-view="ideas"><span class="ico" aria-hidden="true">💡</span>Ideas</button>
-  <button data-view="today"><span class="ico" aria-hidden="true">✅</span>Today<span id="todayBadge"></span></button>
-  <button data-view="settings"><span class="ico" aria-hidden="true">⚙️</span>Settings</button>
+  <button data-view="capture" class="active" aria-current="page"><span class="ico" aria-hidden="true"><span class="ic ic-mic" aria-hidden="true"></span></span>Capture</button>
+  <button data-view="ideas"><span class="ico" aria-hidden="true"><span class="ic ic-bulb" aria-hidden="true"></span></span>Ideas</button>
+  <button data-view="today"><span class="ico" aria-hidden="true"><span class="ic ic-check" aria-hidden="true"></span></span>Today<span id="todayBadge"></span></button>
+  <button data-view="settings"><span class="ico" aria-hidden="true"><span class="ic ic-settings" aria-hidden="true"></span></span>Settings</button>
 </nav>
 
 <div id="scopeSheet" class="sheet-overlay" role="dialog" aria-modal="true" aria-label="Who is this task for" style="display:none;">
   <div class="sheet">
     <h3>Who is this task for?</h3>
-    <button class="btn ghost" id="scopePrivate">🔒 Private — only me, on this device</button>
-    <button class="btn ghost" id="scopeFamily">👥 Family — everyone in the household</button>
+    <button class="btn ghost" id="scopePrivate"><span class="ic ic-lock" aria-hidden="true"></span> Private — only me, on this device</button>
+    <button class="btn ghost" id="scopeFamily"><span class="ic ic-users" aria-hidden="true"></span> Family — everyone in the household</button>
     <div id="scopeSpaces"></div>
     <div id="scopeMembers" style="margin:4px 0 10px;"></div>
     <button class="btn primary" id="scopeAssign">Assign to selected</button>
@@ -691,8 +691,8 @@
     <p class="ob-sub">Turn a voice note into a clear, shareable to-do list. Choose how to start —
        you can add or change this any time in Settings.</p>
     <div id="agChoices">
-      <button class="btn primary ag-btn" id="agGoogleBtn"><span aria-hidden="true">🇬</span> Continue with Google</button>
-      <button class="btn ghost ag-btn" id="agEmailToggle">✉️ Continue with email</button>
+      <button class="btn primary ag-btn" id="agGoogleBtn"><span aria-hidden="true"></span> Continue with Google</button>
+      <button class="btn ghost ag-btn" id="agEmailToggle"><span class="ic ic-mail" aria-hidden="true"></span> Continue with email</button>
       <button class="btn ghost ag-btn" id="agGuestBtn">Continue without an account</button>
       <p class="ag-note">No account? “Without an account” keeps everything on this device — you can sign
          in later to sync across devices.</p>
@@ -751,10 +751,10 @@
 
 <div id="profileSheet" class="sheet-overlay" role="dialog" aria-modal="true" aria-label="Care recipient profile" style="display:none;">
   <div class="sheet">
-    <h3>💙 Care recipient profile</h3>
+    <h3><span class="ic ic-heart" aria-hidden="true"></span> Care recipient profile</h3>
     <p class="side-note">Shared with everyone in this care space and included in the doctor-visit briefing.</p>
     <div id="profileFields" style="max-height:44vh; overflow-y:auto;"></div>
-    <button class="btn ghost" id="profileMedsBtn" style="margin-top:10px; width:100%;">💊 Medications &amp; routines →</button>
+    <button class="btn ghost" id="profileMedsBtn" style="margin-top:10px; width:100%;"><span class="ic ic-pill" aria-hidden="true"></span> Medications &amp; routines →</button>
     <button class="btn primary" id="profileSave" style="margin-top:8px;">Save profile</button>
     <button class="btn ghost" id="profileCancel">Cancel</button>
   </div>
@@ -762,17 +762,17 @@
 
 <div id="medListSheet" class="sheet-overlay" role="dialog" aria-modal="true" aria-label="Medications and routines" style="display:none;">
   <div class="sheet">
-    <h3>💊 Medications &amp; routines</h3>
+    <h3><span class="ic ic-pill" aria-hidden="true"></span> Medications &amp; routines</h3>
     <p class="side-note">Timed, repeating tasks for the person you care for. Each tick is a record; a missed one is flagged for the next carer.</p>
     <div id="medList" style="max-height:46vh; overflow-y:auto; margin:6px 0 8px;"></div>
-    <button class="btn primary" id="medAddBtn" style="width:100%;">➕ Add a medication or routine</button>
+    <button class="btn primary" id="medAddBtn" style="width:100%;"><span class="ic ic-plus" aria-hidden="true"></span> Add a medication or routine</button>
     <button class="btn ghost" id="medListClose">Done</button>
   </div>
 </div>
 
 <div id="medSheet" class="sheet-overlay" role="dialog" aria-modal="true" aria-label="Add a medication or routine" style="display:none;">
   <div class="sheet">
-    <h3 id="medFormTitle">💊 Add a medication or routine</h3>
+    <h3 id="medFormTitle"><span class="ic ic-pill" aria-hidden="true"></span> Add a medication or routine</h3>
     <label class="med-lab" for="medName">Medicine or routine</label>
     <input id="medName" class="med-inp" placeholder="e.g. Metformin 500mg, or “Morning wash”" autocomplete="off">
     <label class="med-lab" for="medDose">Dose / details <span style="color:var(--muted)">(optional)</span></label>
@@ -793,7 +793,7 @@
 
 <div id="custodySheet" class="sheet-overlay" role="dialog" aria-modal="true" aria-label="Custody days" style="display:none;">
   <div class="sheet">
-    <h3>🗓 Which days do you have the kids?</h3>
+    <h3><span class="ic ic-calendar" aria-hidden="true"></span> Which days do you have the kids?</h3>
     <p class="side-note">Tick the weekdays the children are with you. The other parent has the rest. Both of you see the same schedule.</p>
     <div id="custodyDays" style="margin:6px 0 8px;"></div>
     <label class="scope-member" style="margin-bottom:8px;">
@@ -807,7 +807,7 @@
 
 <div id="setupSheet" class="sheet-overlay" role="dialog" aria-modal="true" aria-label="Finish setting up your space" style="display:none;">
   <div class="sheet">
-    <h3 id="setupTitle">Space created ✓</h3>
+    <h3 id="setupTitle">Space created <span class="ic ic-check" aria-hidden="true"></span></h3>
     <p class="side-note" id="setupIntro"></p>
     <div id="setupSteps" style="margin:4px 0 8px;"></div>
     <button class="btn primary" id="setupDone">Done — take me in</button>
@@ -826,13 +826,13 @@
 
 <div id="dateSheet" class="sheet-overlay" role="dialog" aria-modal="true" aria-label="When" style="display:none;">
   <div class="sheet">
-    <h3>📅 When?</h3>
+    <h3><span class="ic ic-calendar" aria-hidden="true"></span> When?</h3>
     <div class="chip-row" id="dateQuick">
       <button type="button" class="pick-chip" data-d="today">Today</button>
       <button type="button" class="pick-chip" data-d="tomorrow">Tomorrow</button>
       <button type="button" class="pick-chip" data-d="weekend">This weekend</button>
       <button type="button" class="pick-chip" data-d="nextweek">Next week</button>
-      <button type="button" class="pick-chip" data-d="someday">🌙 Someday</button>
+      <button type="button" class="pick-chip" data-d="someday"><span class="ic ic-moon" aria-hidden="true"></span> Someday</button>
     </div>
     <label class="med-lab" for="dateInput">Or pick a date</label>
     <input id="dateInput" class="med-inp" type="date">
@@ -862,12 +862,12 @@
 
 <div id="expSheet" class="sheet-overlay" role="dialog" aria-modal="true" aria-label="Log an expense" style="display:none;">
   <div class="sheet">
-    <h3>💵 Log an expense</h3>
+    <h3><span class="ic ic-dollar" aria-hidden="true"></span> Log an expense</h3>
     <p class="side-note" id="expTaskName"></p>
     <input id="expAmount" type="number" inputmode="decimal" min="0" step="0.01" aria-label="Expense amount" placeholder="Amount, e.g. 42.50"
       style="width:100%; background:var(--bg); border:1px solid var(--border); border-radius:10px; color:var(--text); padding:12px; font-size:1rem; margin-bottom:10px;">
     <label class="btn ghost" style="display:block; text-align:center; margin-bottom:8px;">
-      📷 Add receipt photo <span id="expPhotoState" style="color:var(--ok)"></span>
+      <span class="ic ic-camera" aria-hidden="true"></span> Add receipt photo <span id="expPhotoState" style="color:var(--ok)"></span>
       <input id="expPhoto" type="file" accept="image/*" capture="environment" style="display:none;">
     </label>
     <button class="btn primary" id="expSave">Save expense</button>
@@ -877,7 +877,7 @@
 
 <div id="toneSheet" class="sheet-overlay" role="dialog" aria-modal="true" aria-label="How will this land" style="display:none;">
   <div class="sheet">
-    <h3>🕊 How will this land?</h3>
+    <h3><span class="ic ic-feather" aria-hidden="true"></span> How will this land?</h3>
     <p class="side-note" id="toneReason"></p>
     <p class="tone-block"><b>Yours:</b><br><span id="toneOriginal"></span></p>
     <p class="tone-block tone-suggested"><b>Suggested:</b><br><span id="toneRewrite"></span></p>
@@ -890,8 +890,8 @@
 <div id="ledgerOverlay" role="dialog" aria-modal="true" aria-label="Expense ledger" style="display:none;">
   <div class="hist-head">
     <b id="ledgerTitle">Ledger</b>
-    <button class="btn ghost" id="ledgerCsvBtn">⬇ CSV</button>
-    <button class="fo-close" id="ledgerClose" aria-label="Close" style="position:static;">✕</button>
+    <button class="btn ghost" id="ledgerCsvBtn"><span class="ic ic-download" aria-hidden="true"></span> CSV</button>
+    <button class="fo-close" id="ledgerClose" aria-label="Close" style="position:static;"><span class="ic ic-x" aria-hidden="true"></span></button>
   </div>
   <div id="ledgerTotals"></div>
   <div id="ledgerList"></div>
@@ -900,10 +900,10 @@
 <div id="histOverlay" role="dialog" aria-modal="true" aria-label="Space history" style="display:none;">
   <div class="hist-head">
     <b id="histTitle">History</b>
-    <button class="btn ghost" id="histBriefBtn" style="display:none;">🩺 Doctor briefing</button>
-    <button class="btn ghost" id="histCsvBtn">⬇ CSV</button>
-    <button class="btn ghost" id="histPrintBtn">🖨 Print / PDF</button>
-    <button class="fo-close" id="histClose" aria-label="Close" style="position:static;">✕</button>
+    <button class="btn ghost" id="histBriefBtn" style="display:none;"><span class="ic ic-stethoscope" aria-hidden="true"></span> Doctor briefing</button>
+    <button class="btn ghost" id="histCsvBtn"><span class="ic ic-download" aria-hidden="true"></span> CSV</button>
+    <button class="btn ghost" id="histPrintBtn"><span class="ic ic-printer" aria-hidden="true"></span> Print / PDF</button>
+    <button class="fo-close" id="histClose" aria-label="Close" style="position:static;"><span class="ic ic-x" aria-hidden="true"></span></button>
   </div>
   <p class="side-note" style="margin:8px 2px;">Append-only record — entries can't be edited or removed,
     and deleting a task leaves a delete entry. Everyone in the space sees the same history.</p>
@@ -914,19 +914,19 @@
   <div class="sheet" style="max-width:640px; max-height:88vh; display:flex; flex-direction:column;">
     <div id="briefBody" style="overflow-y:auto; background:#fff; color:#111; border-radius:10px; padding:16px 18px; margin-bottom:10px;"></div>
     <div style="display:flex; gap:8px;">
-      <button class="btn primary" id="briefPrint" style="flex:1;">🖨 Print / Save PDF</button>
+      <button class="btn primary" id="briefPrint" style="flex:1;"><span class="ic ic-printer" aria-hidden="true"></span> Print / Save PDF</button>
       <button class="btn ghost" id="briefClose">Close</button>
     </div>
   </div>
 </div>
 
 <div id="focusOverlay" role="dialog" aria-modal="true" aria-label="Just one thing" style="display:none;">
-  <button class="fo-close" id="focusClose" aria-label="Close">✕</button>
+  <button class="fo-close" id="focusClose" aria-label="Close"><span class="ic ic-x" aria-hidden="true"></span></button>
   <div class="fo-label">Just this one thing</div>
   <div class="fo-task" id="focusTask"></div>
   <div class="fo-tags" id="focusTags"></div>
   <div class="fo-steps" id="focusSteps"></div>
-  <button class="fo-done" id="focusDone">✓ Done</button>
+  <button class="fo-done" id="focusDone"><span class="ic ic-check" aria-hidden="true"></span> Done</button>
   <button class="fo-skip" id="focusSkip">Not this one → show me another</button>
 </div>
 
@@ -956,44 +956,44 @@ const myName = () => store.get('myName', '');
    for the operator (cohort tracking) and drives a tailored explainer of which
    features help them. Multi-select — real users cross audiences. */
 const COHORTS = [
-  {id: 'adhd', ico: '🧠', title: 'Focus & ADHD',
+  {id: 'adhd', ico: 'brain', title: 'Focus & ADHD',
    desc: 'I get overwhelmed, forget things, or find starting hard.',
    features: [
-     ['🎤 Voice brain-dump', 'Talk out everything on your mind; the app sorts it into tasks.'],
-     ['🪄 Break it down', 'Turn a daunting task into tiny, obvious first steps.'],
-     ['🎯 Just one thing', 'A full-screen single task so a long list can’t overwhelm you.'],
-     ['🔋 Energy & easy wins', 'Match tasks to the energy you actually have right now.'],
+     ['<span class="ic ic-mic" aria-hidden="true"></span> Voice brain-dump', 'Talk out everything on your mind; the app sorts it into tasks.'],
+     ['<span class="ic ic-wand" aria-hidden="true"></span> Break it down', 'Turn a daunting task into tiny, obvious first steps.'],
+     ['<span class="ic ic-target" aria-hidden="true"></span> Just one thing', 'A full-screen single task so a long list can’t overwhelm you.'],
+     ['<span class="ic ic-battery" aria-hidden="true"></span> Energy & easy wins', 'Match tasks to the energy you actually have right now.'],
      ['No-shame carry-over', 'Nothing goes red or nags — unfinished tasks just wait, kindly.'],
-     ['🏆 Wins', 'See what you finished; the streak counts any activity, never punishes.']
+     ['<span class="ic ic-trophy" aria-hidden="true"></span> Wins', 'See what you finished; the streak counts any activity, never punishes.']
    ],
    actions: [{label: 'Turn on quiet visual mode', fn: () => { store.set('quietMode', true); if (typeof applyQuiet === 'function') applyQuiet(); }}]},
-  {id: 'coparenting', ico: '🤝', title: 'Co-parenting',
+  {id: 'coparenting', ico: 'handshake', title: 'Co-parenting',
    desc: 'I share parenting and need clear, provable coordination.',
    features: [
-     ['🤝 A shared co-parenting space', 'One list both parents see, with who-did-what and when.'],
-     ['📜 Append-only history + export', 'A record neither parent can rewrite; export as PDF/CSV.'],
-     ['🕊 Tone check', 'Flags hostile wording before it reaches the other parent and offers a calm rewrite.'],
-     ['💵 Expenses & ledger', 'Log costs with receipts; see who owes whom.'],
-     ['🗓 Custody days', 'Whose day it is, with a handover-tomorrow heads-up.']
+     ['<span class="ic ic-handshake" aria-hidden="true"></span> A shared co-parenting space', 'One list both parents see, with who-did-what and when.'],
+     ['<span class="ic ic-scroll" aria-hidden="true"></span> Append-only history + export', 'A record neither parent can rewrite; export as PDF/CSV.'],
+     ['<span class="ic ic-feather" aria-hidden="true"></span> Tone check', 'Flags hostile wording before it reaches the other parent and offers a calm rewrite.'],
+     ['<span class="ic ic-dollar" aria-hidden="true"></span> Expenses & ledger', 'Log costs with receipts; see who owes whom.'],
+     ['<span class="ic ic-calendar" aria-hidden="true"></span> Custody days', 'Whose day it is, with a handover-tomorrow heads-up.']
    ],
    actions: [{label: 'Create a co-parenting space', fn: () => openSpaceCreate('coparenting')}]},
-  {id: 'caregiving', ico: '💙', title: 'Caring for someone',
+  {id: 'caregiving', ico: 'heart', title: 'Caring for someone',
    desc: 'I help coordinate care for a parent, relative, or friend.',
    features: [
-     ['💙 A care-team space + profile', 'Everyone caring shares one picture of the person.'],
-     ['💊 Routines & meds', 'Timed repeating tasks; every tick is a record, misses are flagged.'],
-     ['📝 Care journal', 'Voice-capture observations and share them to the team.'],
-     ['🩺 Doctor briefing', 'Turn weeks of notes into a one-page brief for the GP.'],
+     ['<span class="ic ic-heart" aria-hidden="true"></span> A care-team space + profile', 'Everyone caring shares one picture of the person.'],
+     ['<span class="ic ic-pill" aria-hidden="true"></span> Routines & meds', 'Timed repeating tasks; every tick is a record, misses are flagged.'],
+     ['<span class="ic ic-note" aria-hidden="true"></span> Care journal', 'Voice-capture observations and share them to the team.'],
+     ['<span class="ic ic-stethoscope" aria-hidden="true"></span> Doctor briefing', 'Turn weeks of notes into a one-page brief for the GP.'],
      ['Shift handoff', 'See exactly what happened since you were last on.']
    ],
    actions: [{label: 'Create a care-team space', fn: () => openSpaceCreate('care')}]},
-  {id: 'family', ico: '👪', title: 'Household & family',
+  {id: 'family', ico: 'family', title: 'Household & family',
    desc: 'We juggle a busy household and want to share the load.',
    features: [
-     ['👥 A shared family list', 'New tasks and ticks appear on everyone’s phone in real time.'],
+     ['<span class="ic ic-users" aria-hidden="true"></span> A shared family list', 'New tasks and ticks appear on everyone’s phone in real time.'],
      ['Delegate tasks', 'Assign to a person; they see just what’s theirs.'],
      ['Who did what', 'Every add and tick shows who and when.'],
-     ['🔔 Daily digest', 'A once-a-day summary of what’s open and what the family did.']
+     ['<span class="ic ic-bell" aria-hidden="true"></span> Daily digest', 'A once-a-day summary of what’s open and what the family did.']
    ],
    actions: [{label: 'Create a family space', fn: () => openSpaceCreate('family')}]}
 ];
@@ -1108,16 +1108,16 @@ function canReassign(td){
   const me = myName().toLowerCase();
   return !!me && ((td.createdBy || '').toLowerCase() === me || a.includes(me));
 }
+// returns {icon, text}; icon is an ic-* name or null (render via setIconLabel)
 function scopeLabel(td){
-  if (td.scope === 'private') return '🔒 private';
+  if (td.scope === 'private') return {icon: 'lock', text: 'private'};
   const a = td.assignees || [];
   const spaces = store.get('spaces', []);
-  if (spaces.length && (td.space || null) === null) return '🔒 private';
+  if (spaces.length && (td.space || null) === null) return {icon: 'lock', text: 'private'};
   const sp = spaces.find(s => s.hid === td.space);
   if (sp && spaces.length > 1)
-    return ({family:'👥',coparenting:'🤝',care:'💙'}[sp.type] || '👥') + ' ' + sp.name +
-      (a.length ? ' → ' + a.join(', ') : '');
-  return a.length ? '→ ' + a.join(', ') : '👥 family';
+    return {icon: SPACE_ICON[sp.type] || 'users', text: sp.name + (a.length ? ' → ' + a.join(', ') : '')};
+  return a.length ? {icon: null, text: '→ ' + a.join(', ')} : {icon: 'users', text: 'family'};
 }
 
 const todayStr = () => new Date().toISOString().slice(0,10);
@@ -1280,6 +1280,19 @@ function rollover(){
 
 /* ---------- toast ---------- */
 let toastTimer;
+// Set an element's content to a monoline icon followed by plain text. The text
+// is added as a text node (never innerHTML), so user-supplied names/amounts
+// can't inject markup. Replaces the old emoji-prefix label idiom.
+function setIconLabel(el, iconName, text){
+  el.textContent = '';
+  const ic = document.createElement('span');
+  ic.className = 'ic ic-' + iconName;
+  ic.setAttribute('aria-hidden', 'true');
+  el.appendChild(ic);
+  if (text !== undefined && text !== null && text !== '')
+    el.appendChild(document.createTextNode(' ' + text));
+}
+
 function toast(msg, undoFn){
   const el = document.getElementById('toast');
   el.textContent = msg;
@@ -1670,8 +1683,7 @@ document.getElementById('expPhoto').addEventListener('change', async (e) => {
   if (!f) return;
   document.getElementById('expPhotoState').textContent = '… compressing';
   expThumb = await compressImage(f);
-  document.getElementById('expPhotoState').textContent =
-    expThumb ? '✓ attached (' + Math.round(expThumb.length / 1024) + ' KB)' : "✗ couldn't compress enough";
+  document.getElementById('expPhotoState').textContent = expThumb ? ' attached (' + Math.round(expThumb.length / 1024) + ' KB)' : " couldn't compress enough";
 });
 document.getElementById('expCancel').addEventListener('click', () => {
   document.getElementById('expSheet').style.display = 'none'; expTask = null;
@@ -1699,10 +1711,10 @@ document.getElementById('expSave').addEventListener('click', () => {
   saveTodos(); renderTodos();
   document.getElementById('expSheet').style.display = 'none'; expTask = null;
   // be honest: a personal-task expense is NOT in any shared ledger
-  toast(inSpace ? 'Expense logged to the ledger: $' + amount.toFixed(2) + ' 💵'
-    : (spacesList().length
-        ? 'Saved $' + amount.toFixed(2) + ' on this task — it\'s personal, so it\'s not in a shared ledger. Tap the task\'s scope chip to move it to a space.'
-        : 'Saved $' + amount.toFixed(2) + '. Join a space to track expenses in a shared ledger.'));
+  toast(inSpace ? 'Expense logged to the ledger: $' + amount.toFixed(2) + ' '
+ : (spacesList().length
+ ? 'Saved $' + amount.toFixed(2) + ' on this task — it\'s personal, so it\'s not in a shared ledger. Tap the task\'s scope chip to move it to a space.'
+ : 'Saved $' + amount.toFixed(2) + '. Join a space to track expenses in a shared ledger.'));
 });
 
 /* ---------- break it down (B1) ---------- */
@@ -1763,13 +1775,13 @@ async function breakDown(td){
   if (!steps) steps = localBreakdown(td.text);
   if (!steps){
     toast(ai ? 'Couldn\'t split this one — try rewording the task.'
-             : 'Built-in mode only splits compound tasks — turn on smart AI in Settings for full breakdowns.');
+ : 'Built-in mode only splits compound tasks — turn on smart AI in Settings for full breakdowns.');
     return;
   }
   td.subtasks = steps.map(s => ({text: s, done: false}));
   saveTodos(); renderTodos();
   track('feature_used', {feature: 'break_down'});
-  toast('Broken into ' + steps.length + ' small steps ✓');
+  toast('Broken into ' + steps.length + ' small steps ');
 }
 
 /* ---------- speech recognition ---------- */
@@ -1858,7 +1870,7 @@ function startRec(){
 function stopRec(){
   recording = false;
   micBtn.classList.remove('recording');
-  micBtn.textContent = '🎤';
+  setIconLabel(micBtn, 'mic');
   micHint.innerHTML = 'Tap the mic and speak your idea.<br>Or type below.';
   if (rec) try{ rec.stop(); }catch(_){}
 }
@@ -1887,7 +1899,7 @@ async function startRecLocal(){
 async function stopRecLocal(){
   recording = false;
   micBtn.classList.remove('recording');
-  micBtn.textContent = '🎤';
+  setIconLabel(micBtn, 'mic');
   if (!mediaRec) return;
   const rec2 = mediaRec; mediaRec = null;
   const stopped = new Promise(res => { rec2.onstop = res; });
@@ -2057,7 +2069,6 @@ function detectAssignees(text){
 
 /* ---------- energy + duration (B3/B6) ---------- */
 const ENERGY_MIN = {low: 10, medium: 25, high: 45};   // default minutes per effort level
-const ENERGY_ICON = {low: '🔋', medium: '🔋🔋', high: '🔋🔋🔋'};
 
 function detectEnergy(text){
   const t = ' ' + String(text).toLowerCase() + ' ';
@@ -2182,8 +2193,8 @@ saveIdeaBtn.addEventListener('click', async () => {
   saveIdeaBtn.textContent = 'Summarize & Add';
   updateBadge();
   toast(added
-    ? `Added ${added} task${added===1?'':'s'} ✓${scheduled.length ? ` (${scheduled.join(', ')})` : ''}${delegated.length ? ` (→ ${delegated.join('; ')})` : ''}${skipped ? ` (${skipped} already listed)` : ''}`
-    : (skipped ? 'Those tasks are already on your list' : 'Saved to Ideas — no to-dos detected, your note is kept'));
+ ? `Added ${added} task${added===1?'':'s'} ${scheduled.length ? ` (${scheduled.join(', ')})` : ''}${delegated.length ? ` (→ ${delegated.join('; ')})` : ''}${skipped ? ` (${skipped} already listed)` : ''}`
+ : (skipped ? 'Those tasks are already on your list' : 'Saved to Ideas — no to-dos detected, your note is kept'));
   // If nothing became a task, don't dump the user on an unchanged Today with the
   // transcript seemingly lost — take them to Ideas and highlight the saved note.
   if (added) showView('today');
@@ -2209,7 +2220,7 @@ function refreshCaptureMode(){
   const lt = document.getElementById('liveText');
   if (sp){
     noteBtn.style.display = '';
-    noteBtn.textContent = `📝 Save to ${sp.name} journal`;
+    setIconLabel(noteBtn, 'note', `Save to ${sp.name} journal`);
     ideaBtn.classList.remove('primary'); ideaBtn.classList.add('ghost');
     ideaBtn.textContent = '…or pull out tasks';
     lt.setAttribute('placeholder', 'Speak or type an observation about the person you care for…');
@@ -2233,14 +2244,14 @@ document.getElementById('saveNoteBtn').addEventListener('click', () => {
   logEvent('note', {id: 'note-' + idea.id, text: raw.slice(0, 600), space: sp.hid});
   track('feature_used', {feature: 'care_note'});
   liveText.value = ''; baseText = '';
-  toast(`Saved to the ${sp.name} journal 📝`);
+  toast(`Saved to the ${sp.name} journal `);
 });
 
 /* ---------- render ideas ---------- */
 function renderIdeas(){
   const el = document.getElementById('ideasList');
   if (!ideas.length){
-    el.innerHTML = '<div class="empty">💡<br><br>No ideas yet.<br>Capture one with the mic and it will appear here with its summary.</div>';
+    el.innerHTML = '<div class="empty"><span class="ic ic-bulb" aria-hidden="true"></span><br><br>No ideas yet.<br>Capture one with the mic and it will appear here with its summary.</div>';
     return;
   }
   el.innerHTML = '';
@@ -2257,9 +2268,9 @@ function renderIdeas(){
       <div class="meta">
         <span class="chip"><span class="dot ${idea.priority}"></span> ${idea.priority}</span>
         <span class="chip">${d.toLocaleDateString(undefined,{day:'numeric',month:'short'})} ${d.toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'})}</span>
-        ${linked.length ? `<span class="chip">✅ ${doneCount}/${linked.length}</span>` : ''}
-        ${idea.engine ? `<span class="chip">${idea.engine === 'built-in' ? '⚙' : '✨'} ${idea.engine}</span>` : ''}
-        <button class="del" aria-label="Delete idea">🗑</button>
+        ${linked.length ? `<span class="chip"><span class="ic ic-check" aria-hidden="true"></span> ${doneCount}/${linked.length}</span>` : ''}
+        ${idea.engine ? `<span class="chip"><span class="ic ic-${idea.engine === 'built-in' ? 'settings' : 'sparkles'}" aria-hidden="true"></span> ${idea.engine}</span>` : ''}
+        <button class="del" aria-label="Delete idea"><span class="ic ic-trash" aria-hidden="true"></span></button>
       </div>`;
     card.querySelector('.summary').textContent = idea.summary;
     const rawEl = card.querySelector('.raw');
@@ -2271,13 +2282,13 @@ function renderIdeas(){
       const b = document.createElement('button');
       b.className = 'chip share-note';
       b.style.cssText = 'border:none; cursor:pointer;' + (shared ? ' color:var(--ok);' : '');
-      b.textContent = shared ? `✓ in ${sp.name} journal` : `📝 Share to ${sp.name}`;
+      b.textContent = shared ? ` in ${sp.name} journal` : ` Share to ${sp.name}`;
       b.disabled = shared;
       b.addEventListener('click', () => {
         logEvent('note', {id: 'note-' + idea.id, text: idea.raw.slice(0, 600), space: sp.hid});
         idea.sharedTo = [...(idea.sharedTo || []), sp.hid];
         saveIdeas(); renderIdeas();
-        toast(`Shared to the ${sp.name} journal 📝`);
+        toast(`Shared to the ${sp.name} journal `);
       });
       card.querySelector('.meta').insertBefore(b, card.querySelector('.del'));
     });
@@ -2285,9 +2296,9 @@ function renderIdeas(){
       const at = ideas.findIndex(x => x.id === idea.id);
       ideas = ideas.filter(x => x.id !== idea.id); saveIdeas(); renderIdeas();
       toast('Idea deleted', () => {
-        ideas.splice(Math.min(at, ideas.length), 0, idea);
-        saveIdeas(); renderIdeas();
-      });
+ ideas.splice(Math.min(at, ideas.length), 0, idea);
+ saveIdeas(); renderIdeas();
+ });
     });
     if (linked.length){
       const wrap = document.createElement('div');
@@ -2295,7 +2306,7 @@ function renderIdeas(){
       linked.forEach(td => {
         const row = document.createElement('div');
         row.className = 'mini-task' + (td.done ? ' done' : '');
-        row.innerHTML = `<button class="mchk" aria-label="Toggle done">✓</button>
+        row.innerHTML = `<button class="mchk" aria-label="Toggle done"><span class="ic ic-check" aria-hidden="true"></span></button>
           <span class="mtxt"></span><span class="dot ${td.priority}"></span>`;
         row.querySelector('.mtxt').textContent = td.text;
         row.querySelector('.mchk').addEventListener('click', () => {
@@ -2329,7 +2340,7 @@ const PRIOS = [
 function todayTodos(){ return todos.filter(t => t.date === todayStr() && !t.someday); }
 
 let activeTag = null;
-let easyOnly = false;      // 🔋 easy-wins filter: only low-energy tasks
+let easyOnly = false;      // easy-wins filter: only low-energy tasks
 let activeSpace = 'all';   // 'all' | 'personal' | space hid
 
 function inActiveSpace(td){
@@ -2354,16 +2365,16 @@ function renderSpaceFilter(){
     bar.style.display = 'none'; return;   // one space, nothing personal — no switcher needed
   }
   bar.style.display = 'flex';
-  const mk = (label, val) => {
+  const mk = (label, val, icon) => {
     const b = document.createElement('button');
     b.className = 'fchip' + (activeSpace === val ? ' active' : '');
-    b.textContent = label;
+    if (icon) setIconLabel(b, icon, label); else b.textContent = label;
     b.addEventListener('click', () => { activeSpace = val; renderTodos(); });
     bar.appendChild(b);
   };
   mk('All', 'all');
-  spaces.forEach(sp => mk(`${SPACE_ICON[sp.type] || '👥'} ${sp.name}`, sp.hid));
-  mk('🔒 Personal', 'personal');
+  spaces.forEach(sp => mk(sp.name, sp.hid, SPACE_ICON[sp.type] || 'users'));
+  mk('Personal', 'personal', 'lock');
 }
 
 function renderTagFilter(list){
@@ -2391,7 +2402,7 @@ function renderEasyChip(list){
   if (!lows && !easyOnly) return;
   const b = document.createElement('button');
   b.className = 'fchip easy' + (easyOnly ? ' active' : '');
-  b.textContent = `🔋 easy wins (${lows})`;
+  setIconLabel(b, 'battery', `easy wins (${lows})`);
   b.title = 'Only quick, low-effort tasks';
   b.addEventListener('click', () => { easyOnly = !easyOnly; renderTodos(); });
   bar.appendChild(b);
@@ -2409,24 +2420,25 @@ function activeSpaceObj(){
 
 // v43: the highest-value features per space type, surfaced ON Today instead of
 // hiding in the Settings space-row. Handlers are the existing ones — reused.
+// [icon-name, label, handler] per space type
 const SPACE_ACTIONS = {
   coparenting: [
-    ['🗓 Custody', sp => openCustody(sp)],
-    ['💵 Ledger', sp => openLedger(sp)],
-    ['📜 History', sp => openHistory(sp)],
-    ['📤 Invite', sp => shareSpaceInvite(sp)]
+    ['calendar', 'Custody', sp => openCustody(sp)],
+    ['dollar', 'Ledger', sp => openLedger(sp)],
+    ['scroll', 'History', sp => openHistory(sp)],
+    ['share', 'Invite', sp => shareSpaceInvite(sp)]
   ],
   care: [
-    ['💙 Profile', sp => openProfile(sp)],
-    ['💊 Meds', sp => openMeds(sp)],
-    ['📝 Care note', () => { showView('capture'); toast('Speak or type an observation, then tap “Save to journal”.'); }],
-    ['📜 History & briefing', sp => openHistory(sp)],
-    ['📤 Invite', sp => shareSpaceInvite(sp)]
+    ['heart', 'Profile', sp => openProfile(sp)],
+    ['pill', 'Meds', sp => openMeds(sp)],
+    ['note', 'Care note', () => { showView('capture'); toast('Speak or type an observation, then tap “Save to journal”.'); }],
+    ['scroll', 'History & briefing', sp => openHistory(sp)],
+    ['share', 'Invite', sp => shareSpaceInvite(sp)]
   ],
   family: [
-    ['👥 People', sp => editSpaceMembers(sp)],
-    ['📜 History', sp => openHistory(sp)],
-    ['📤 Invite', sp => shareSpaceInvite(sp)]
+    ['users', 'People', sp => editSpaceMembers(sp)],
+    ['scroll', 'History', sp => openHistory(sp)],
+    ['share', 'Invite', sp => shareSpaceInvite(sp)]
   ]
 };
 function renderSpaceBar(){
@@ -2438,10 +2450,10 @@ function renderSpaceBar(){
   host.innerHTML = '';
   const bar = document.createElement('div');
   bar.className = 'space-bar';
-  acts.forEach(([label, fn]) => {
+  acts.forEach(([icon, label, fn]) => {
     const b = document.createElement('button');
     b.className = 'btn ghost space-act';
-    b.textContent = label;
+    setIconLabel(b, icon, label);
     b.addEventListener('click', () => fn(sp));
     bar.appendChild(b);
   });
@@ -2454,7 +2466,8 @@ function renderSpaceHeader(){
   const t = document.getElementById('hdrTitle');
   if (!t) return;
   const sp = activeSpaceObj();
-  t.textContent = sp ? ((SPACE_ICON[sp.type] || '👥') + ' ' + sp.name) : 'Idea → Todo';
+  if (sp) setIconLabel(t, SPACE_ICON[sp.type] || 'users', sp.name);
+  else t.textContent = 'Idea → Todo';
 }
 
 // v43: keep the ADHD toolkit reachable after the onboarding modal closes — a
@@ -2464,11 +2477,12 @@ function firstOpenTask(){
       (!t.date || t.date <= todayStr()))
     .sort((a, b) => PRIOS.findIndex(p => p.key === a.priority) - PRIOS.findIndex(p => p.key === b.priority))[0] || null;
 }
+// [icon-name, label, handler]
 const ADHD_TOOLS = [
-  ['🎯 Just one thing', () => openFocus()],
-  ['🪄 Break down a task', () => { const t = firstOpenTask(); if (t) breakDown(t); else toast('Add a task first, then I’ll break it into steps.'); }],
-  ['🔋 Easy wins', () => { easyOnly = !easyOnly; renderTodos(); }],
-  ['🌿 Quiet mode', () => { store.set('quietMode', !store.get('quietMode', false)); applyQuiet(); toast(store.get('quietMode', false) ? 'Quiet mode on 🌿' : 'Quiet mode off'); }]
+  ['target', 'Just one thing', () => openFocus()],
+  ['wand', 'Break down a task', () => { const t = firstOpenTask(); if (t) breakDown(t); else toast('Add a task first, then I’ll break it into steps.'); }],
+  ['battery', 'Easy wins', () => { easyOnly = !easyOnly; renderTodos(); }],
+  ['leaf', 'Quiet mode', () => { store.set('quietMode', !store.get('quietMode', false)); applyQuiet(); toast(store.get('quietMode', false) ? 'Quiet mode on' : 'Quiet mode off'); }]
 ];
 function renderAdhdStrip(){
   const host = document.getElementById('adhdStrip');
@@ -2481,18 +2495,18 @@ function renderAdhdStrip(){
   wrap.className = 'adhd-strip';
   const head = document.createElement('div');
   head.className = 'adhd-strip-head';
-  head.innerHTML = '<span>🧠 Your focus toolkit</span>';
+  head.innerHTML = '<span><span class="ic ic-brain" aria-hidden="true"></span> Your focus toolkit</span>';
   const x = document.createElement('button');
-  x.className = 'adhd-strip-x'; x.setAttribute('aria-label', 'Hide focus toolkit'); x.textContent = '✕';
+  x.className = 'adhd-strip-x'; x.setAttribute('aria-label', 'Hide focus toolkit'); setIconLabel(x, 'x');
   x.addEventListener('click', () => { store.set('adhdStripHidden', true); renderAdhdStrip(); });
   head.appendChild(x);
   wrap.appendChild(head);
   const row = document.createElement('div');
   row.className = 'adhd-strip-row';
-  ADHD_TOOLS.forEach(([label, fn]) => {
+  ADHD_TOOLS.forEach(([icon, label, fn]) => {
     const b = document.createElement('button');
     b.className = 'btn ghost space-act';
-    b.textContent = label;
+    setIconLabel(b, icon, label);
     b.addEventListener('click', fn);
     row.appendChild(b);
   });
@@ -2544,7 +2558,7 @@ function renderTodos(){
   renderSomeday();
 
   if (!list.length && !upcoming.length){
-    el.innerHTML = '<div class="empty">✅<br><br>Nothing on the list yet.<br>Capture an idea or quick-add a task above.</div>';
+    el.innerHTML = '<div class="empty"><span class="ic ic-check" aria-hidden="true"></span><br><br>Nothing on the list yet.<br>Capture an idea or quick-add a task above.</div>';
     updateBadge(); return;
   }
 
@@ -2562,7 +2576,7 @@ function renderTodos(){
   if (upcoming.length){
     const sec = document.createElement('div');
     sec.className = 'prio-section upcoming';
-    sec.innerHTML = `<h2 style="color:var(--muted)">📅 Upcoming</h2>`;
+    sec.innerHTML = `<h2 style="color:var(--muted)"><span class="ic ic-calendar" aria-hidden="true"></span> Upcoming</h2>`;
     upcoming.forEach(td => sec.appendChild(todoRow(td)));
     el.appendChild(sec);
   }
@@ -2598,7 +2612,7 @@ async function editText(td){
   const v = await askInput({title: 'Edit task', value: td.text, placeholder: 'Task text'});
   if (v === null) return;
   let text = v;
-  if (!text){ toast('Task text can\'t be empty — use ✕ to delete it.'); return; }
+  if (!text){ toast('Task text can\'t be empty — use to delete it.'); return; }
   if (text !== td.text && spaceTypeOf(td.space) === 'coparenting'){
     const gated = await toneGate(text, td.space);
     if (gated === null) return;
@@ -2614,12 +2628,12 @@ async function editText(td){
 // Date picker sheet: quick chips + a native <input type="date">.
 let dateTask = null;
 function applyTaskDate(td, date, someday){
-  if (someday){ td.someday = true; td.carried = 0; saveTodos(); renderTodos(); toast('Parked in Someday 🌙'); return; }
+  if (someday){ td.someday = true; td.carried = 0; saveTodos(); renderTodos(); toast('Parked in Someday '); return; }
   const prior = td.date;
   td.date = date; td.someday = false; td.carried = 0;
   if (prior !== date) logEvent('rescheduled', td, 'to ' + date);
   saveTodos(); renderTodos();
-  toast(date === todayStr() ? 'Moved to today ✓' : 'Scheduled for ' + fmtDay(date) + ' 📅');
+  toast(date === todayStr() ? 'Moved to today ' : 'Scheduled for ' + fmtDay(date) + ' ');
 }
 function editDate(td){
   dateTask = td;
@@ -2701,12 +2715,12 @@ function todoRow(td){
   row.className = 'todo' + (td.done ? ' done' : '');
   const hasIdea = td.ideaId && ideas.some(i => i.id === td.ideaId);
   row.innerHTML = `
-    <button class="chk" aria-label="Toggle done">✓</button>
+    <button class="chk" aria-label="Toggle done"><span class="ic ic-check" aria-hidden="true"></span></button>
     <div class="txt"><span class="ttext"></span></div>
-    ${hasIdea ? '<button class="link-btn" aria-label="Show source idea" title="Show source idea">💡</button>' : ''}
+    ${hasIdea ? '<button class="link-btn" aria-label="Show source idea" title="Show source idea"><span class="ic ic-bulb" aria-hidden="true"></span></button>' : ''}
     <button class="prio-btn ${td.priority}">${({high:'HIGH',medium:'MED',low:'LOW'})[td.priority] || td.priority.toUpperCase()}</button>
     <button class="row-menu" aria-label="Task options — edit, reschedule, repeat, break down, expense" title="Options">⋯</button>
-    <button class="del" aria-label="Delete">✕</button>`;
+    <button class="del" aria-label="Delete"><span class="ic ic-x" aria-hidden="true"></span></button>`;
   const txtEl = row.querySelector('.txt');
   txtEl.querySelector('.ttext').textContent = td.text;
   {
@@ -2716,7 +2730,8 @@ function todoRow(td){
     if (store.get('spaces', []).length || td.scope === 'private' || (td.assignees || []).length){
       const sc = document.createElement('span');
       sc.className = 'ttag scope-chip';
-      sc.textContent = scopeLabel(td);
+      const scl = scopeLabel(td);
+      if (scl.icon) setIconLabel(sc, scl.icon, scl.text); else sc.textContent = scl.text;
       sc.title = 'Tap to change who this task is for';
       sc.addEventListener('click', (e) => { e.stopPropagation(); openScopeSheet(td); });
       tg.appendChild(sc);
@@ -2724,7 +2739,7 @@ function todoRow(td){
     if (td.date > todayStr() && !td.someday){
       const dc = document.createElement('span');
       dc.className = 'ttag date-chip';
-      dc.textContent = '📅 ' + fmtDay(td.date);
+      setIconLabel(dc, 'calendar', fmtDay(td.date));
       dc.title = 'Tap to reschedule';
       dc.addEventListener('click', (e) => { e.stopPropagation(); editDate(td); });
       tg.appendChild(dc);
@@ -2732,13 +2747,13 @@ function todoRow(td){
     if (td.time){
       const tc = document.createElement('span');
       tc.className = 'ttag time-chip';
-      tc.textContent = '🕗 ' + fmtTime(td.time);
+      setIconLabel(tc, 'clock', fmtTime(td.time));
       tg.appendChild(tc);
     }
     if (td.amount){
       const ac = document.createElement('span');
       ac.className = 'ttag amount-chip';
-      ac.textContent = '💵 $' + td.amount.toFixed(2);
+      setIconLabel(ac, 'dollar', '$' + td.amount.toFixed(2));
       ac.title = 'Tap to edit the expense';
       ac.addEventListener('click', (e) => { e.stopPropagation(); openExpense(td); });
       tg.appendChild(ac);
@@ -2747,8 +2762,8 @@ function todoRow(td){
       const ec = document.createElement('span');
       ec.className = 'ttag energy-chip';
       const en = td.energy || 'medium';
-      ec.textContent = ENERGY_ICON[en] + ' ~' + fmtMins(td.minutes || ENERGY_MIN[en]);
-      ec.title = 'Effort: ' + en + ' — tap to change';
+      setIconLabel(ec, 'battery', '~' + fmtMins(td.minutes || ENERGY_MIN[en]));
+      ec.title = 'Effort:' + en + ' — tap to change';
       ec.addEventListener('click', (e) => {
         e.stopPropagation();
         const order = ['low','medium','high'];
@@ -2797,16 +2812,16 @@ function todoRow(td){
     td.subtasks.forEach(st => {
       const r = document.createElement('div');
       r.className = 'mini-task' + (st.done ? ' done' : '');
-      r.innerHTML = `<button class="mchk" aria-label="Toggle step">✓</button><span class="mtxt"></span>`;
+      r.innerHTML = `<button class="mchk" aria-label="Toggle step"><span class="ic ic-check" aria-hidden="true"></span></button><span class="mtxt"></span>`;
       r.querySelector('.mtxt').textContent = st.text;
       r.querySelector('.mchk').addEventListener('click', (e) => {
         e.stopPropagation();
         st.done = !st.done;
         if (st.done && td.subtasks.every(s => s.done) && !td.done){
           setDone(td, true);
-          toast('All steps done — task ticked off 🎉', () => {
-            setDone(td, false); st.done = false; saveTodos(); renderTodos();
-          });
+          toast('All steps done — task ticked off ', () => {
+ setDone(td, false); st.done = false; saveTodos(); renderTodos();
+ });
         }
         saveTodos(); renderTodos();
       });
@@ -2819,14 +2834,14 @@ function todoRow(td){
   if (td.space && td.createdBy && td.createdBy.toLowerCase() !== (myName() || '').toLowerCase()){
     const ad = document.createElement('div');
     ad.className = 'attr attr-add';
-    ad.textContent = '➕ ' + td.createdBy + (td.createdAt ? ' · ' + fmtWhen(td.createdAt) : '');
+    setIconLabel(ad, 'plus', td.createdBy + (td.createdAt ? ' · ' + fmtWhen(td.createdAt) : ''));
     txtEl.appendChild(ad);
   }
   // who ticked it, right on the row
   if (td.done && (td.doneBy || td.doneAt)){
     const at = document.createElement('div');
     at.className = 'attr';
-    at.textContent = '✓ ' + (td.doneBy ? td.doneBy + ' · ' : '') + fmtWhen(td.doneAt);
+    setIconLabel(at, 'check', (td.doneBy ? td.doneBy + ' · ' : '') + fmtWhen(td.doneAt));
     txtEl.appendChild(at);
   }
   // no-shame carry-over: after 5 quiet days, gently ask instead of going red
@@ -2844,24 +2859,24 @@ function todoRow(td){
     };
     mkN('Yes — today', () => {
       td.carried = 0; saveTodos(); renderTodos();
-      toast('Staying on today ✓');
+      toast('Staying on today ');
     });
     mkN('Someday', () => {
       td.someday = true; td.carried = 0;
       logEvent('parked', td);
       saveTodos(); renderTodos();
-      toast('Parked in Someday — no pressure 🌙');
+      toast('Parked in Someday — no pressure ');
     });
     mkN('Let it go', () => {
       const at = todos.findIndex(x => x.id === td.id);
       todos = todos.filter(x => x.id !== td.id);
       logEvent('deleted', td);
       saveTodos(); renderTodos();
-      toast('Let go ✓ — that\'s allowed', () => {
-        todos.splice(Math.min(at, todos.length), 0, td);
-        logEvent('restored', td);
-        saveTodos(); renderTodos();
-      });
+      toast('Let go — that\'s allowed', () => {
+ todos.splice(Math.min(at, todos.length), 0, td);
+ logEvent('restored', td);
+ saveTodos(); renderTodos();
+ });
     });
     row.appendChild(n);
   }
@@ -2875,9 +2890,9 @@ function todoRow(td){
     div.className = 'transcript';
     const lines = [];
     if (td.createdBy || td.createdAt)
-      lines.push('➕ Added' + (td.createdBy ? ' by ' + td.createdBy : '') + (td.createdAt ? ' · ' + fmtWhen(td.createdAt, true) : ''));
+      lines.push('Added' + (td.createdBy ? ' by ' + td.createdBy : '') + (td.createdAt ? ' · ' + fmtWhen(td.createdAt, true) : ''));
     if (td.done && (td.doneBy || td.doneAt))
-      lines.push('✓ Ticked off' + (td.doneBy ? ' by ' + td.doneBy : '') + (td.doneAt ? ' · ' + fmtWhen(td.doneAt, true) : ''));
+      lines.push('Ticked off' + (td.doneBy ? ' by ' + td.doneBy : '') + (td.doneAt ? ' · ' + fmtWhen(td.doneAt, true) : ''));
     if (lines.length){
       const meta = document.createElement('div');
       meta.className = 'tmeta';
@@ -2893,18 +2908,18 @@ function todoRow(td){
                         : 'Added manually — no voice transcript.')));
     const acts = document.createElement('div');
     acts.className = 'tacts';
-    const mkAct = (label, fn) => {
+    const mkAct = (icon, label, fn) => {
       const b = document.createElement('button');
-      b.className = 'tact'; b.textContent = label;
+      b.className = 'tact'; setIconLabel(b, icon, label);
       b.addEventListener('click', (e) => { e.stopPropagation(); fn(td); });
       acts.appendChild(b);
     };
-    mkAct('✏️ Edit', editText);
-    mkAct('📅 When', editDate);
-    mkAct('↻ Repeat', editRecur);
-    mkAct('🪄 Break down', breakDown);
-    mkAct('💵 Expense', openExpense);
-    if (store.get('spaces', []).length) mkAct('👤 Who for', openScopeSheet);
+    mkAct('edit', 'Edit', editText);
+    mkAct('calendar', 'When', editDate);
+    mkAct('refresh', 'Repeat', editRecur);
+    mkAct('wand', 'Break down', breakDown);
+    mkAct('dollar', 'Expense', openExpense);
+    if (store.get('spaces', []).length) mkAct('user', 'Who for', openScopeSheet);
     div.appendChild(acts);
     row.appendChild(div);
   };
@@ -2915,7 +2930,7 @@ function todoRow(td){
   }
   row.querySelector('.chk').addEventListener('click', () => {
     setDone(td, !td.done); saveTodos(); renderTodos();
-    if (td.done) toast('Done ✓', () => { setDone(td, false); saveTodos(); renderTodos(); });
+    if (td.done) toast('Done ', () => { setDone(td, false); saveTodos(); renderTodos(); });
   });
   row.querySelector('.prio-btn').addEventListener('click', () => {
     const order = ['high','medium','low'];
@@ -2928,10 +2943,10 @@ function todoRow(td){
     logEvent('deleted', removed);
     saveTodos(); renderTodos();
     toast('Task deleted', () => {
-      todos.splice(Math.min(at, todos.length), 0, removed);
-      logEvent('restored', removed);
-      saveTodos(); renderTodos(); updateBadge();
-    });
+ todos.splice(Math.min(at, todos.length), 0, removed);
+ logEvent('restored', removed);
+ saveTodos(); renderTodos(); updateBadge();
+ });
   });
   return row;
 }
@@ -2941,7 +2956,7 @@ function renderSomeday(){
   const block = document.getElementById('somedayBlock');
   const list = todos.filter(t => t.someday && !t.done && visibleToMe(t) && inActiveSpace(t));
   block.style.display = list.length ? '' : 'none';
-  block.querySelector('summary').textContent = `🌙 Someday (${list.length})`;
+  setIconLabel(block.querySelector('summary'), 'moon', `Someday (${list.length})`);
   const el = document.getElementById('somedayList');
   el.innerHTML = '';
   list.forEach(td => el.appendChild(todoRow(td)));
@@ -2959,20 +2974,19 @@ function renderWins(){
   // streak counts any activity and never breaks loudly — a quiet day just pauses it
   let streak = 0, from = (log[todayStr()] || 0) > 0 ? 0 : -1;
   while (log[addDays(from - streak)] > 0) streak++;
-  block.querySelector('summary').textContent =
-    `🏆 Wins · ${log[todayStr()] || 0} today, ${week} this week`;
+  setIconLabel(block.querySelector('summary'), 'trophy', `Wins · ${log[todayStr()] || 0} today, ${week} this week`);
   const el = document.getElementById('winsList');
   el.innerHTML = '';
   if (streak >= 2){
     const s = document.createElement('div');
     s.className = 'win-streak';
-    s.textContent = `🔥 You've ticked something off ${streak} days running.`;
+    setIconLabel(s, 'flame', `You've ticked something off ${streak} days running.`);
     el.appendChild(s);
   }
   doneToday.sort((a, b) => b.doneAt - a.doneAt).slice(0, 12).forEach(td => {
     const l = document.createElement('div');
     l.className = 'win-line';
-    l.innerHTML = '✓ <span class="wtxt"></span><span class="when"></span>';
+    l.innerHTML = '<span class="ic ic-check" aria-hidden="true"></span> <span class="wtxt"></span><span class="when"></span>';
     l.querySelector('.wtxt').textContent = td.text;
     l.querySelector('.when').textContent = fmtWhen(td.doneAt);
     el.appendChild(l);
@@ -3007,7 +3021,7 @@ document.getElementById('shareBtn').addEventListener('click', async () => {
     throw new Error('no share');
   } catch (err) {
     if (err.name === 'AbortError') return;      // user cancelled the share sheet
-    try { await navigator.clipboard.writeText(text); toast('Copied to clipboard 📋'); }
+    try { await navigator.clipboard.writeText(text); toast('Copied to clipboard '); }
     catch (_) { toast('Sharing not available in this browser.'); }
   }
 });
@@ -3052,7 +3066,7 @@ function renderFocus(){
   if (next){
     const r = document.createElement('div');
     r.className = 'mini-task';
-    r.innerHTML = `<button class="mchk" aria-label="Toggle step">✓</button><span class="mtxt"></span>`;
+    r.innerHTML = `<button class="mchk" aria-label="Toggle step"><span class="ic ic-check" aria-hidden="true"></span></button><span class="mtxt"></span>`;
     r.querySelector('.mtxt').textContent = 'Start here: ' + next.text;
     r.querySelector('.mchk').addEventListener('click', () => {
       next.done = true;
@@ -3071,14 +3085,14 @@ function focusTickCurrent(){
   saveTodos(); updateBadge();
   focusPool.splice(focusIdx, 1);
   if (!focusPool.length){
-    document.getElementById('focusTask').textContent = 'That was the last one 🎉';
+    document.getElementById('focusTask').textContent = 'That was the last one ';
     document.getElementById('focusTags').innerHTML = '';
     document.getElementById('focusSteps').innerHTML = '';
     setTimeout(closeFocus, 1400);
     return;
   }
   focusIdx = focusIdx % focusPool.length;
-  toast('Done ✓ — next one up');
+  toast('Done — next one up');
   renderFocus();
 }
 document.getElementById('toneUse').addEventListener('click', (e) => closeToneSheet(e.target.dataset.rewrite));
@@ -3122,10 +3136,10 @@ async function quickAdd(){
   const hiddenByTag = activeTag && !tags.includes(activeTag);
   const hiddenByEasy = easyOnly && energy !== 'low';
   if (recur) toast('Added — repeats ' + recurLabel(recur).replace('↻ ', '') + ', next ' + fmtDay(date));
-  else if (date > todayStr()) toast('Added — scheduled for ' + fmtDay(date) + ' 📅');
+  else if (date > todayStr()) toast('Added — scheduled for ' + fmtDay(date) + ' ');
   else if (hiddenByTag) toast('Added — tap “All” to see it (the “' + activeTag + '” filter is on)');
   else if (hiddenByEasy) toast('Added — turn off the easy-wins filter to see it');
-  else toast('Added ✓');
+  else toast('Added ');
 }
 document.getElementById('quickAddBtn').addEventListener('click', quickAdd);
 document.getElementById('quickAdd').addEventListener('keydown', e => { if (e.key==='Enter') quickAdd(); });
@@ -3139,7 +3153,7 @@ function setupModelButton(kind, btnId, statusId, storeKey, loadMsg, enabledLabel
     btn.textContent = on ? enabledLabel : disabledLabel;
     btn.classList.toggle('primary', !on);
     btn.classList.toggle('ghost', on);
-    if (on && !status.textContent) status.textContent = '✅ Enabled — model is cached on this device.';
+    if (on && !status.textContent) setIconLabel(status, 'check', 'Enabled — model is cached on this device.');
   };
   refresh();
   btn.addEventListener('click', async () => {
@@ -3159,7 +3173,7 @@ function setupModelButton(kind, btnId, statusId, storeKey, loadMsg, enabledLabel
       if (pct >= 100){
         if (phase === 'download'){
           phase = 'prepare';
-          status.textContent = 'Download complete ✓ — preparing the model… the first time can take a few minutes. Keep the app open.';
+          status.textContent = 'Download complete — preparing the model… the first time can take a few minutes. Keep the app open.';
         }
       } else {
         status.textContent = `Downloading… ${pct}% — keep the app open and the screen on.`;
@@ -3172,11 +3186,11 @@ function setupModelButton(kind, btnId, statusId, storeKey, loadMsg, enabledLabel
       if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
       const {device} = await aiCall('load-' + kind);
       store.set(storeKey, true);
-      status.textContent = `✅ Ready — running on-device (${device === 'webgpu' ? 'GPU accelerated' : 'CPU mode'}).`;
-      toast(kind === 'asr' ? 'Offline voice recognition enabled ✓' : 'On-device summaries enabled ✓');
+      setIconLabel(status, 'check', `Ready — running on-device (${device === 'webgpu' ? 'GPU accelerated' : 'CPU mode'}).`);
+      toast(kind === 'asr' ? 'Offline voice recognition enabled ' : 'On-device summaries enabled ');
     } catch (err) {
-      status.textContent = '❌ Could not load the model: ' + err.message +
-        ' — tap the button to retry (already-downloaded parts resume from cache).';
+      setIconLabel(status, 'x', 'Could not load the model: ' + err.message +
+ ' — tap the button to retry (already-downloaded parts resume from cache).');
       // reset the worker so a retry starts from a clean state
       if (aiWorker){ aiWorker.terminate(); aiWorker = null; }
     }
@@ -3212,7 +3226,7 @@ refreshMyName();
 document.getElementById('saveMyNameBtn').addEventListener('click', () => {
   store.set('myName', myNameInput.value.trim().slice(0, 24));
   refreshMyName();
-  toast(store.get('myName', '') ? 'Name saved ✓' : 'Name cleared');
+  toast(store.get('myName', '') ? 'Name saved ' : 'Name cleared');
   if (typeof updateSwConfig === 'function') updateSwConfig();
 });
 
@@ -3222,7 +3236,7 @@ const membersStatus = document.getElementById('membersStatus');
 function refreshMembers(){
   const m = store.get('members', []);
   membersInput.value = m.join(', ');
-  membersStatus.textContent = m.length ? `✅ Tagging tasks for: ${m.join(', ')}.` : '';
+  membersStatus.textContent = m.length ? ` Tagging tasks for: ${m.join(', ')}.` : '';
 }
 refreshMembers();
 document.getElementById('saveMembersBtn').addEventListener('click', () => {
@@ -3231,7 +3245,7 @@ document.getElementById('saveMembersBtn').addEventListener('click', () => {
     .filter(Boolean).slice(0, 8);
   store.set('members', members);
   refreshMembers();
-  toast(members.length ? 'Household members saved ✓' : 'Members cleared');
+  toast(members.length ? 'Household members saved ' : 'Members cleared');
 });
 
 /* ---------- settings: backup ---------- */
@@ -3266,7 +3280,7 @@ document.getElementById('importFile').addEventListener('change', async (e) => {
     saveIdeas(); saveTodos();
     if (Array.isArray(data.members)) store.set('members', data.members);
     refreshMembers(); renderIdeas(); renderTodos(); updateBadge();
-    toast('Backup imported ✓');
+    toast('Backup imported ');
   } catch (err) {
     toast('Import failed: ' + err.message);
   }
@@ -3282,8 +3296,8 @@ function refreshGemStatus(){
   const managedAi = !!aiProxyUrl();
   document.getElementById('aiManagedNote').style.display = managedAi ? '' : 'none';
   document.getElementById('aiKeyNote').style.display = managedAi ? 'none' : '';
-  gemStatus.textContent = k ? `✅ Your own key is active${m ? ' (' + m + ')' : ''}.`
-    : (managedAi ? '' : '');
+  gemStatus.textContent = k ? ` Your own key is active${m ? ' (' + m + ')' : ''}.`
+ : (managedAi ? '' : '');
 }
 refreshGemStatus();
 document.getElementById('saveGeminiKeyBtn').addEventListener('click', async () => {
@@ -3301,11 +3315,11 @@ document.getElementById('saveGeminiKeyBtn').addEventListener('click', async () =
       body: JSON.stringify({contents: [{role: 'user', parts: [{text: 'Reply with exactly: OK'}]}]})
     });
     if (!res.ok) throw new Error('API ' + res.status + (await apiErrMsg(res)));
-    gemStatus.textContent = `✅ Key works — using ${model}.`;
-    toast('Gemini summaries enabled ✓');
+    setIconLabel(gemStatus, 'check', `Key works — using ${model}.`);
+    toast('Gemini summaries enabled ');
   } catch (err) {
-    gemStatus.textContent = '❌ Key test failed: ' + err.message +
-      ' — summaries fall back to built-in until this is fixed.';
+    setIconLabel(gemStatus, 'x', 'Key test failed: ' + err.message +
+ ' — summaries fall back to built-in until this is fixed.');
   }
 });
 
@@ -3313,7 +3327,7 @@ document.getElementById('saveGeminiKeyBtn').addEventListener('click', async () =
 const keyInput = document.getElementById('apiKeyInput');
 const keyStatus = document.getElementById('keyStatus');
 function refreshKeyStatus(){
-  keyStatus.textContent = store.get('apiKey','') ? '✅ Claude summaries enabled.' : 'Using offline summaries.';
+  keyStatus.textContent = store.get('apiKey','') ? ' Claude summaries enabled.' : 'Using offline summaries.';
 }
 refreshKeyStatus();
 document.getElementById('saveKeyBtn').addEventListener('click', () => {
@@ -3335,7 +3349,7 @@ applyQuiet();
 quietBtn.addEventListener('click', () => {
   store.set('quietMode', !store.get('quietMode', false));
   applyQuiet();
-  toast(store.get('quietMode', false) ? 'Quiet mode on 🌿' : 'Quiet mode off');
+  toast(store.get('quietMode', false) ? 'Quiet mode on ' : 'Quiet mode off');
 });
 
 document.getElementById('clearDoneBtn').addEventListener('click', () => {
@@ -3359,9 +3373,9 @@ function noteFamilyActivity(td){
   if (!td || !visibleToMe(td)) return;
   const me = myName().toLowerCase();
   if ((td.createdAt || 0) > prevSeenAt && td.createdBy && td.createdBy.toLowerCase() !== me)
-    awayItems.push(`➕ ${td.createdBy} added “${td.text}”`);
+    awayItems.push(`${td.createdBy} added “${td.text}”`);
   if (td.done && (td.doneAt || 0) > prevSeenAt && td.doneBy && td.doneBy.toLowerCase() !== me)
-    awayItems.push(`✓ ${td.doneBy} ticked off “${td.text}”`);
+    awayItems.push(`${td.doneBy} ticked off “${td.text}”`);
   renderAwayBanner();
 }
 let awayDismissed = false;
@@ -3372,7 +3386,7 @@ function renderAwayBanner(){
   if (awayDismissed || !awayItems.length || (sp && sp.type === 'care')){ el.style.display = 'none'; return; }
   el.innerHTML = '';
   const close = document.createElement('button');
-  close.className = 'close'; close.textContent = '✕';
+  close.className = 'close'; setIconLabel(close, 'x');
   close.addEventListener('click', () => { awayDismissed = true; renderAwayBanner(); });
   el.appendChild(close);
   const strong = document.createElement('b');
@@ -3403,10 +3417,10 @@ function renderCareHandoff(){
     .sort((a, b) => a.ts - b.ts);
   const lineFor = (e) => {
     const clip = (s) => { s = String(s || ''); return s.length > 80 ? s.slice(0, 78) + '…' : s; };
-    if (e.kind === 'note')    return '📝 ' + (e.who || 'A carer') + ' noted: “' + clip(e.text) + '”';
-    if (e.kind === 'missed')  return '⚠️ ' + clip(e.text) + ' — not recorded' + (e.detail ? ' (' + e.detail + ')' : '');
-    if (e.kind === 'ticked')  return '✓ ' + (e.who || 'Someone') + ' did “' + clip(e.text) + '”';
-    if (e.kind === 'created') return '➕ ' + (e.who || 'Someone') + ' added “' + clip(e.text) + '”';
+    if (e.kind === 'note')    return '' + (e.who || 'A carer') + ' noted: “' + clip(e.text) + '”';
+    if (e.kind === 'missed')  return '' + clip(e.text) + ' — not recorded' + (e.detail ? ' (' + e.detail + ')' : '');
+    if (e.kind === 'ticked')  return '' + (e.who || 'Someone') + ' did “' + clip(e.text) + '”';
+    if (e.kind === 'created') return '' + (e.who || 'Someone') + ' added “' + clip(e.text) + '”';
     return clip(e.text);
   };
   // don't echo the carer's own ticks/adds back to them; keep notes + missed always
@@ -3420,10 +3434,10 @@ function renderCareHandoff(){
   const head = document.createElement('div');
   head.className = 'ch-head';
   const b = document.createElement('b');
-  b.textContent = '💙 Since your last visit';
+  setIconLabel(b, 'heart', 'Since your last visit');
   head.appendChild(b);
   const x = document.createElement('button');
-  x.className = 'ch-x'; x.setAttribute('aria-label', 'Dismiss'); x.textContent = '✕';
+  x.className = 'ch-x'; x.setAttribute('aria-label', 'Dismiss'); setIconLabel(x, 'x');
   x.addEventListener('click', () => { careHandoffDismissed = true; renderCareHandoff(); });
   head.appendChild(x);
   wrap.appendChild(head);
@@ -3454,15 +3468,15 @@ function openScopeSheet(td){
     spaces.forEach(sp => {
       const b = document.createElement('button');
       b.className = 'btn ghost';
-      b.textContent = `${SPACE_ICON[sp.type] || '👥'} ${sp.name}` +
-        (td.space === sp.hid ? ' — current space' : ' — move it here');
+      setIconLabel(b, SPACE_ICON[sp.type] || 'users', sp.name +
+        (td.space === sp.hid ? ' — current space' : ' — move it here'));
       b.addEventListener('click', () => {
         const from = td.space;
         td.space = sp.hid; td.scope = null;
         if (from !== sp.hid) logEvent('moved', td, 'to "' + sp.name + '"');
         if (td.amount) syncReceipt(td);   // bring any expense into the new space's ledger
         saveTodos(); renderTodos(); updateBadge();
-        toast(`In "${sp.name}" now ✓` + (td.amount ? ' — its $' + td.amount.toFixed(2) + ' expense is in the ledger' : ''));
+        toast(`In "${sp.name}" now ` + (td.amount ? ' — its $' + td.amount.toFixed(2) + ' expense is in the ledger' : ''));
         closeScopeSheet();
       });
       spWrap.appendChild(b);
@@ -3498,9 +3512,9 @@ function applyScope(scope, assignees){
   else if (scopeTask.space == null) scopeTask.space = store.get('defaultSpace', null);
   if (scopeTask.amount && scopeTask.space) syncReceipt(scopeTask);   // expense follows into the ledger
   saveTodos(); renderTodos(); updateBadge();
-  toast(scope === 'private' ? 'Task is now private to this device 🔒'
-      : (assignees && assignees.length ? 'Assigned to ' + assignees.join(', ') + ' ✓'
-                                       : 'Shared with the whole family ✓'));
+  toast(scope === 'private' ? 'Task is now private to this device '
+ : (assignees && assignees.length ? 'Assigned to ' + assignees.join(', ') + ' '
+ : 'Shared with the whole family '));
   closeScopeSheet();
 }
 document.getElementById('scopePrivate').addEventListener('click', () => applyScope('private'));
@@ -3525,7 +3539,8 @@ document.getElementById('scopeSheet').addEventListener('click', (e) => {
 let fbFs = null, fbInitApp = null, applyingRemote = false;
 const spaceRt = {};    // hid → {db, unsub, lastPush: {id → serialized core}}
 
-const SPACE_ICON = {family: '👥', coparenting: '🤝', care: '💙'};
+// icon-set names per space type (rendered via setIconLabel / ic-* classes)
+const SPACE_ICON = {family: 'users', coparenting: 'handshake', care: 'heart'};
 const spacesList = () => store.get('spaces', []);
 const spaceName = (hid) => { const sp = spacesList().find(s => s.hid === hid); return sp ? sp.name : null; };
 
@@ -3605,10 +3620,10 @@ function flushPendingEvents(sp){
   store.set('pendingEv', rest);
 }
 
-const EVENT_LABEL = {created: '➕ added', edited: '✏️ edited', ticked: '✓ ticked off',
-  unticked: '↩ un-ticked', deleted: '🗑 deleted', restored: '↩ restored',
-  rescheduled: '📅 rescheduled', parked: '🌙 parked for someday', moved: '📦 moved',
-  missed: '⚠️ missed', note: '📝 noted', expense: '💵 logged an expense on'};
+const EVENT_LABEL = {created: 'added', edited: 'edited', ticked: 'ticked off',
+  unticked: 'un-ticked', deleted: 'deleted', restored: 'restored',
+  rescheduled: 'rescheduled', parked: 'parked for someday', moved: 'moved',
+  missed: 'missed', note: 'noted', expense: 'logged an expense on'};
 
 // joining/creating the FIRST space adopts existing shareable tasks into it,
 // matching the old "everything local syncs up" behaviour
@@ -3739,8 +3754,8 @@ async function afterSignIn(res, wasSwitched){
   return n;
 }
 function signInToast(n){
-  toast(n ? `Signed in — restored ${n} space${n === 1 ? '' : 's'} ✓`
-          : 'Signed in ✓ — your spaces now sync across your devices');
+  toast(n ? `Signed in — restored ${n} space${n === 1 ? '' : 's'} `
+ : 'Signed in — your spaces now sync across your devices');
 }
 
 async function signInWithGoogle(){
@@ -3897,7 +3912,7 @@ function refreshAccountUI(){
   const emBtn = document.getElementById('emailSignInBtn');
   const outBtn = document.getElementById('signOutBtn');
   if (isSignedIn()){
-    status.textContent = '✅ Signed in as ' + accountEmail + ' — your spaces sync across your devices.';
+    setIconLabel(status, 'check', 'Signed in as ' + accountEmail + ' — your spaces sync across your devices.');
     inBtn.style.display = 'none'; emBtn.style.display = 'none'; outBtn.style.display = '';
   } else {
     status.textContent = 'You’re on this device only. Sign in to sync your spaces across devices and keep them if you reinstall — nothing changes about how you use the app.';
@@ -3967,17 +3982,17 @@ async function startSpaceSync(sp){
     renderTodos(); updateBadge();
     if (document.getElementById('view-ideas').classList.contains('active')) renderIdeas();
     const n = spacesList().length;
-    syncMsg(`✅ ${n === 1 ? 'Sync active' : n + ' spaces syncing'} — changes appear on every device.`);
+    syncMsg(` ${n === 1 ? 'Sync active' : n + ' spaces syncing'} — changes appear on every device.`);
   }, err => {
-    syncMsg('❌ Sync error (' + sp.name + '): ' + err.message +
-      (String(err.message).match(/permission/i) ? ' — check the Firestore rules step in the README.' : ''));
+    syncMsg(' Sync error (' + sp.name + '): ' + err.message +
+ (String(err.message).match(/permission/i) ? ' — check the Firestore rules step in the README.' : ''));
   });
 }
 
 async function startSync(){
   for (const sp of spacesList()){
     try { await startSpaceSync(sp); }
-    catch (err) { syncMsg('❌ ' + sp.name + ': ' + err.message); }
+    catch (err) { syncMsg(' ' + sp.name + ': ' + err.message); }
   }
 }
 
@@ -3996,7 +4011,7 @@ function syncPush(){
         rt.lastPush[td.id] = core;
         fbFs.setDoc(fbFs.doc(rt.db, 'households', sp.hid, 'items', td.id),
           {...todoCore(td), updated: td.updated}, {merge: true})
-          .catch(err => syncMsg('❌ Sync error: ' + err.message));
+          .catch(err => syncMsg(' Sync error: ' + err.message));
       }
     });
     // anything we pushed before but no longer belongs here (deleted, moved
@@ -4088,7 +4103,7 @@ async function shareSpaceInvite(sp){
     throw new Error('no share');
   } catch (err) {
     if (err.name === 'AbortError') return;
-    try { await navigator.clipboard.writeText(text); toast('Invite copied to clipboard 📋'); }
+    try { await navigator.clipboard.writeText(text); toast('Invite copied to clipboard '); }
     catch (_) { prompt('Copy this invite code:', code); }
   }
 }
@@ -4107,7 +4122,7 @@ async function openHistory(sp){
   histEvents = [];
   const add = (ev) => { if (ev && ev.id && !seen.has(ev.id)){ seen.add(ev.id); histEvents.push(ev); } };
   store.get('events', []).filter(e => e.space === sp.hid).forEach(add);
-  document.getElementById('histTitle').textContent = `${SPACE_ICON[sp.type] || '👥'} ${sp.name} — history`;
+  setIconLabel(document.getElementById('histTitle'), SPACE_ICON[sp.type] || 'users', sp.name + ' — history');
   document.getElementById('histBriefBtn').style.display = sp.type === 'care' ? '' : 'none';
   document.getElementById('histList').innerHTML = '<p class="side-note">Loading…</p>';
   document.getElementById('histOverlay').style.display = 'block';
@@ -4253,7 +4268,7 @@ function localBriefing(sp){
   return {
     overview,
     observations: inp.notes,
-    routines: [...inp.ticked, ...inp.missed.map(x => '⚠️ MISSED — ' + x)],
+    routines: [...inp.ticked, ...inp.missed.map(x => 'MISSED — ' + x)],
     concerns: inp.missed.length
       ? [`${inp.missed.length} routine/medication task(s) were recorded as missed in this period.`] : [],
     questions: []
@@ -4298,7 +4313,7 @@ let curBrief = null;
 document.getElementById('histBriefBtn').addEventListener('click', async () => {
   if (!histSpace) return;
   const btn = document.getElementById('histBriefBtn');
-  btn.disabled = true; btn.textContent = '🩺 Preparing…';
+  btn.disabled = true; setIconLabel(btn, 'stethoscope', 'Preparing…');
   let b = null;
   if (aiEnabled()){
     try { b = await geminiBriefing(histSpace); track('feature_used', {feature: 'briefing'}); }
@@ -4308,7 +4323,7 @@ document.getElementById('histBriefBtn').addEventListener('click', async () => {
   curBrief = {sp: histSpace, b};
   document.getElementById('briefBody').innerHTML = briefingInner(histSpace, b);
   document.getElementById('briefOverlay').style.display = 'flex';
-  btn.disabled = false; btn.textContent = '🩺 Doctor briefing';
+  btn.disabled = false; setIconLabel(btn, 'stethoscope', 'Doctor briefing');
 });
 document.getElementById('briefClose').addEventListener('click', () => {
   document.getElementById('briefOverlay').style.display = 'none';
@@ -4332,7 +4347,7 @@ document.getElementById('histCsvBtn').addEventListener('click', () => {
   a.download = `idea-todo-history-${histSpace.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${todayStr()}.csv`;
   a.click();
   URL.revokeObjectURL(a.href);
-  toast('History exported as CSV ⬇');
+  toast('History exported as CSV ');
 });
 document.getElementById('histPrintBtn').addEventListener('click', () => {
   if (!histSpace) return;
@@ -4342,7 +4357,7 @@ document.getElementById('histPrintBtn').addEventListener('click', () => {
   const rows = [...histEvents].sort((a, b) => a.ts - b.ts).map(ev => {
     const d = new Date(ev.ts);
     return `<tr><td>${d.toLocaleDateString()} ${d.toLocaleTimeString()}</td><td>${esc(ev.who || '')}</td>` +
-      `<td>${esc((EVENT_LABEL[ev.kind] || ev.kind).replace(/^[^\s]+\s/, ''))}</td><td>${esc(ev.text)}</td><td>${esc(ev.detail || '')}</td></tr>`;
+      `<td>${esc(EVENT_LABEL[ev.kind] || ev.kind)}</td><td>${esc(ev.text)}</td><td>${esc(ev.detail || '')}</td></tr>`;
   }).join('');
   w.document.write(`<!DOCTYPE html><html><head><title>${esc(histSpace.name)} — task history</title>
 <style>body{font-family:Georgia,serif; margin:32px; color:#111;}
@@ -4428,10 +4443,10 @@ function renderMissedBanner(){
   const head = document.createElement('div');
   head.className = 'missed-head';
   const b = document.createElement('b');
-  b.textContent = `⚠️ ${evs.length} missed ${evs.length === 1 ? 'dose / routine' : 'doses / routines'}`;
+  setIconLabel(b, 'alert', `${evs.length} missed ${evs.length === 1 ? 'dose / routine' : 'doses / routines'}`);
   head.appendChild(b);
   const x = document.createElement('button');
-  x.className = 'missed-x'; x.setAttribute('aria-label', 'Dismiss missed alerts'); x.textContent = '✕';
+  x.className = 'missed-x'; x.setAttribute('aria-label', 'Dismiss missed alerts'); setIconLabel(x, 'x');
   x.addEventListener('click', () => {
     const m = store.get('missedAck', {});
     cares.forEach(s => { m[s.hid] = Date.now(); });
@@ -4477,10 +4492,10 @@ function renderCustodyBanner(){
     // Not configured yet: advertise the feature AND give the entry point, rather
     // than hiding it (you couldn't discover custody from Today otherwise).
     if (!getCustody(sp.hid)){
-      line.innerHTML = `<b>${SPACE_ICON[sp.type]} ${sp.name}:</b> `;
+      line.innerHTML = `<b><span class="ic ic-${SPACE_ICON[sp.type] || 'users'}" aria-hidden="true"></span> ${sp.name}:</b> `;
       const a = document.createElement('button');
       a.className = 'custody-set';
-      a.textContent = '🗓 Set custody days to see whose day it is →';
+      setIconLabel(a, 'calendar', 'Set custody days to see whose day it is →');
       a.addEventListener('click', () => openCustody(sp));
       line.appendChild(a);
       host.appendChild(line);
@@ -4490,8 +4505,8 @@ function renderCustodyBanner(){
     const tomo = custodyLabel(sp.hid, addDays(1));
     if (!today) return;
     const handover = tomo && tomo !== today;
-    line.innerHTML = `<b>${SPACE_ICON[sp.type]} ${sp.name}:</b> Today is <b>${today}</b>` +
-      (handover ? ` · 🔄 handover tomorrow (then ${tomo})` : '');
+    line.innerHTML = `<b><span class="ic ic-${SPACE_ICON[sp.type] || 'users'}" aria-hidden="true"></span> ${sp.name}:</b> Today is <b>${today}</b>` +
+      (handover ? ` · <span class="ic ic-refresh" aria-hidden="true"></span> handover tomorrow (then ${tomo})` : '');
     host.appendChild(line);
   });
   host.style.display = host.children.length ? '' : 'none';
@@ -4516,7 +4531,7 @@ async function saveCustody(sp, days, alternate){
   if (rt && rt.db) fbFs.setDoc(fbFs.doc(rt.db, 'households', sp.hid), {custody: c}, {merge: true}).catch(() => {});
   renderTodos();
   track('feature_used', {feature: 'custody'});
-  toast('Custody schedule saved ✓');
+  toast('Custody schedule saved ');
 }
 
 function openCustody(sp){
@@ -4582,7 +4597,7 @@ function renderProfileCards(){
     card.className = 'profile-card';
     const head = document.createElement('div');
     head.className = 'profile-head';
-    head.innerHTML = `<b>💙 ${p.name || sp.name}</b>` +
+    head.innerHTML = `<b><span class="ic ic-heart" aria-hidden="true"></span> ${p.name || sp.name}</b>` +
       (p.age ? `<span class="profile-age">${p.age}</span>` : '');
     const edit = document.createElement('button');
     edit.className = 'profile-edit'; edit.textContent = 'Edit';
@@ -4633,7 +4648,7 @@ document.getElementById('profileSave').addEventListener('click', () => {
   document.getElementById('profileSheet').style.display = 'none';
   renderTodos();
   track('feature_used', {feature: 'care_profile'});
-  toast('Care profile saved ✓');
+  toast('Care profile saved ');
 });
 document.getElementById('profileCancel').addEventListener('click', () => {
   document.getElementById('profileSheet').style.display = 'none';
@@ -4670,7 +4685,7 @@ function openMeds(sp){
     wh.textContent = medWhen(td) + (td.med && td.med.dose ? ' · ' + td.med.dose : '');
     body.appendChild(nm); body.appendChild(wh);
     row.appendChild(body);
-    const ed = document.createElement('span'); ed.textContent = '✏️'; ed.setAttribute('aria-hidden', 'true');
+    const ed = document.createElement('span'); setIconLabel(ed, 'edit'); ed.setAttribute('aria-hidden', 'true');
     row.appendChild(ed);
     row.addEventListener('click', () => openMedForm(sp, td));
     host.appendChild(row);
@@ -4711,7 +4726,7 @@ function openMedForm(sp, td){
   const sheet = document.getElementById('medSheet');
   sheet.dataset.hid = sp.hid;
   sheet.dataset.id = td ? td.id : '';
-  document.getElementById('medFormTitle').textContent = td ? '💊 Edit' : '💊 Add a medication or routine';
+  document.getElementById('medFormTitle').textContent = td ? ' Edit' : ' Add a medication or routine';
   document.getElementById('medName').value = (td && td.med && td.med.name) || (td && td.text) || '';
   document.getElementById('medDose').value = (td && td.med && td.med.dose) || '';
   document.getElementById('medTime').value = (td && td.time) || '';
@@ -4759,7 +4774,7 @@ document.getElementById('medSave').addEventListener('click', () => {
   openMeds(sp);          // back to the list, now updated
   renderTodos();
   track('feature_used', {feature: 'meds'});
-  toast(editId ? 'Updated ✓' : 'Added — it’ll appear on Today at its time ✓');
+  toast(editId ? 'Updated ' : 'Added — it’ll appear on Today at its time ');
 });
 document.getElementById('medDelete').addEventListener('click', () => {
   const sheet = document.getElementById('medSheet');
@@ -4786,7 +4801,7 @@ let ledgerRcs = [], ledgerSpace = null;
 async function openLedger(sp){
   ledgerSpace = sp;
   ledgerRcs = [];
-  document.getElementById('ledgerTitle').textContent = `💵 ${sp.name} — ledger`;
+  setIconLabel(document.getElementById('ledgerTitle'), 'dollar', `${sp.name} — ledger`);
   document.getElementById('ledgerList').innerHTML = '<p class="side-note">Loading…</p>';
   document.getElementById('ledgerTotals').innerHTML = '';
   document.getElementById('ledgerOverlay').style.display = 'block';
@@ -4859,7 +4874,7 @@ function renderLedger(){
   const totals = document.getElementById('ledgerTotals');
   list.innerHTML = ''; totals.innerHTML = '';
   if (!ledgerRcs.length){
-    list.innerHTML = '<p class="side-note">No expenses yet — open a task → 💵 Expense to log the first one.</p>';
+    list.innerHTML = '<p class="side-note">No expenses yet — open a task → <span class="ic ic-dollar" aria-hidden="true"></span> Expense to log the first one.</p>';
     return;
   }
   const {total, balances, owes} = ledgerBalances(ledgerRcs, ledgerSpace && ledgerSpace.hid);
@@ -4922,7 +4937,7 @@ document.getElementById('ledgerCsvBtn').addEventListener('click', () => {
   a.download = `idea-todo-ledger-${ledgerSpace.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${todayStr()}.csv`;
   a.click();
   URL.revokeObjectURL(a.href);
-  toast('Ledger exported as CSV ⬇');
+  toast('Ledger exported as CSV ');
 });
 
 async function editSpaceMembers(sp){
@@ -4946,7 +4961,7 @@ function renderSpacesList(){
     row.className = 'space-row';
     const label = document.createElement('div');
     label.className = 'space-label';
-    label.textContent = `${SPACE_ICON[sp.type] || '👥'} ${sp.name}`;
+    setIconLabel(label, SPACE_ICON[sp.type] || 'users', sp.name);
     row.appendChild(label);
     const share = document.createElement('button');
     share.className = 'btn primary';
@@ -4956,30 +4971,30 @@ function renderSpacesList(){
     row.appendChild(share);
     const hist = document.createElement('button');
     hist.className = 'btn ghost hist-btn';
-    hist.textContent = '📜 History & export';
+    setIconLabel(hist, 'scroll', 'History & export');
     hist.addEventListener('click', () => openHistory(sp));
     row.appendChild(hist);
     const mem = document.createElement('button');
     mem.className = 'btn ghost members-btn';
-    mem.textContent = '👤 Members';
+    setIconLabel(mem, 'user', 'Members');
     mem.addEventListener('click', () => editSpaceMembers(sp));
     row.appendChild(mem);
     const led = document.createElement('button');
     led.className = 'btn ghost ledger-btn';
-    led.textContent = '💵 Ledger';
+    setIconLabel(led, 'dollar', 'Ledger');
     led.addEventListener('click', () => openLedger(sp));
     row.appendChild(led);
     if (sp.type === 'coparenting'){
       const cust = document.createElement('button');
       cust.className = 'btn ghost custody-btn';
-      cust.textContent = '🗓 Custody days';
+      setIconLabel(cust, 'calendar', 'Custody days');
       cust.addEventListener('click', () => openCustody(sp));
       row.appendChild(cust);
     }
     if (sp.type === 'care'){
       const prof = document.createElement('button');
       prof.className = 'btn ghost profile-btn';
-      prof.textContent = '💙 Care profile';
+      setIconLabel(prof, 'heart', 'Care profile');
       prof.addEventListener('click', () => openProfile(sp));
       row.appendChild(prof);
     }
@@ -5028,31 +5043,31 @@ function guideSpaceSetup(sp){
   if (!sp){ return; }
   const done = new Set();
   const steps = [];
-  if (!myName()) steps.push({label: '✍️ Add your name', desc: 'So “added by” and “done by” show on tasks.',
-    fn: async () => { const v = await askInput({title: 'Your name', value: myName(), placeholder: 'Shown on tasks you add or tick'}); if (v){ setMyName(v); toast('Name saved ✓'); return true; } return false; }});
-  steps.push({label: '📤 Invite the others', desc: 'Share the join code so everyone syncs.', fn: () => { shareSpaceInvite(sp); return true; }});
-  if (sp.type === 'coparenting') steps.push({label: '🗓 Set custody days',
+  if (!myName()) steps.push({label: 'Add your name', desc: 'So “added by” and “done by” show on tasks.',
+    fn: async () => { const v = await askInput({title: 'Your name', value: myName(), placeholder: 'Shown on tasks you add or tick'}); if (v){ setMyName(v); toast('Name saved '); return true; } return false; }});
+  steps.push({label: 'Invite the others', desc: 'Share the join code so everyone syncs.', fn: () => { shareSpaceInvite(sp); return true; }});
+  if (sp.type === 'coparenting') steps.push({label: 'Set custody days',
     desc: 'Whose day it is, with a handover heads-up.', fn: () => { openCustody(sp); return true; }});
   if (sp.type === 'care'){
-    steps.push({label: '💙 Fill the care profile', desc: 'One shared picture of the person.', fn: () => { openProfile(sp); return true; }});
-    steps.push({label: '💊 Add a medication or routine', desc: 'A timed, repeating task — every tick is a record.',
+    steps.push({label: 'Fill the care profile', desc: 'One shared picture of the person.', fn: () => { openProfile(sp); return true; }});
+    steps.push({label: 'Add a medication or routine', desc: 'A timed, repeating task — every tick is a record.',
       fn: () => { openMeds(sp); return true; }});
   }
-  if (sp.type === 'family') steps.push({label: '👥 Add people to delegate to',
+  if (sp.type === 'family') steps.push({label: 'Add people to delegate to',
     desc: 'Assign tasks to who they’re for.', fn: () => { editSpaceMembers(sp); return true; }});
-  document.getElementById('setupTitle').textContent = `${SPACE_ICON[sp.type] || '👥'} “${sp.name}” is ready`;
+  setIconLabel(document.getElementById('setupTitle'), SPACE_ICON[sp.type] || 'users', '“' + sp.name + '” is ready');
   document.getElementById('setupIntro').textContent = 'A couple of quick things to make it work for you:';
   const host = document.getElementById('setupSteps');
   const render = () => {
     host.innerHTML = '';
     const doneBtn = document.getElementById('setupDone');
-    if (doneBtn) doneBtn.textContent = done.size >= steps.length ? 'All set — take me in ✓'
-      : done.size ? 'Done for now' : 'Done — take me in';
+    if (doneBtn) doneBtn.textContent = done.size >= steps.length ? 'All set — take me in '
+ : done.size ? 'Done for now' : 'Done — take me in';
     steps.forEach((step, i) => {
       const b = document.createElement('button');
       b.className = 'setup-step' + (done.has(i) ? ' done' : '');
       const t = document.createElement('b');
-      t.textContent = (done.has(i) ? '✓ ' : '') + step.label;
+      if (done.has(i)) setIconLabel(t, 'check', step.label); else t.textContent = step.label;
       const d = document.createElement('span');
       d.textContent = step.desc;
       b.appendChild(t); b.appendChild(d);
@@ -5085,7 +5100,7 @@ document.getElementById('createHhBtn').addEventListener('click', async () => {
     document.getElementById('spaceNameInput').value = '';
     guideSpaceSetup(sp);
   } catch (err) {
-    syncMsg('❌ ' + err.message);
+    syncMsg(' ' + err.message);
   }
 });
 
@@ -5100,9 +5115,9 @@ document.getElementById('joinBtn').addEventListener('click', async () => {
         {members: {[managedUid]: myName() || 'member'}}, {merge: true});
     }
     if (await addSpace({hid: inv.hid, name: inv.name, type: inv.type, cfg: inv.cfg, managed: !!inv.managed}))
-      toast(`Joined "${inv.name}" ✓`);
+      toast(`Joined "${inv.name}" `);
   } catch (err) {
-    syncMsg('❌ ' + err.message);
+    syncMsg(' ' + err.message);
   }
 });
 
@@ -5119,7 +5134,7 @@ document.getElementById('createManagedBtn').addEventListener('click', async () =
     document.getElementById('spaceNameInput').value = '';
     guideSpaceSetup(sp);
   } catch (err) {
-    syncMsg('❌ ' + err.message);
+    syncMsg(' ' + err.message);
   }
 });
 
@@ -5130,7 +5145,7 @@ if (window.MANAGED){
   document.getElementById('fbConfigInput').style.display = 'none';
   document.getElementById('createHhBtn').style.display = 'none';
   document.getElementById('createManagedBtn').style.display = '';
-  document.querySelector('#syncSetup details summary').textContent = '➕ Create a new space';
+  setIconLabel(document.querySelector('#syncSetup details summary'), 'plus', 'Create a new space');
 }
 
 document.getElementById('addSpaceBtn').addEventListener('click', () => {
@@ -5145,7 +5160,7 @@ rollover();
 syncLegacyMirror();
 refreshSyncUI();
 refreshAccountUI();
-if (spacesList().length) startSync().catch(err => syncMsg('❌ ' + err.message));
+if (spacesList().length) startSync().catch(err => syncMsg(' ' + err.message));
 
 /* ---------- daily digest (needs installed PWA + periodic background sync) ---------- */
 async function updateSwConfig(){
@@ -5173,34 +5188,34 @@ updateSwConfig();
 document.addEventListener('visibilitychange', () => { if (document.hidden) updateSwConfig(); });
 
 const digestStatus = document.getElementById('digestStatus');
-if (store.get('digestOn', false)) digestStatus.textContent = '✅ Daily digest enabled.';
+if (store.get('digestOn', false)) setIconLabel(digestStatus, 'check', 'Daily digest enabled.');
 document.getElementById('digestBtn').addEventListener('click', async () => {
   if (!spacesList().length){
     digestStatus.textContent = 'Join or create a space first — the digest reads the shared list.';
     return;
   }
   if (!('Notification' in window)){
-    digestStatus.textContent = '❌ This browser has no notification support.';
+    setIconLabel(digestStatus, 'x', 'This browser has no notification support.');
     return;
   }
   const perm = await Notification.requestPermission();
   if (perm !== 'granted'){
-    digestStatus.textContent = '❌ Notifications are blocked — allow them in site settings and retry.';
+    setIconLabel(digestStatus, 'x', 'Notifications are blocked — allow them in site settings and retry.');
     return;
   }
   try {
     const reg = await navigator.serviceWorker.ready;
     if (!('periodicSync' in reg)){
-      digestStatus.textContent = '⚠️ Background digests need the installed app in Chrome — the in-app Family activity banner still works.';
+      setIconLabel(digestStatus, 'alert', 'Background digests need the installed app in Chrome — the in-app Family activity banner still works.');
       return;
     }
     await reg.periodicSync.register('daily-digest', {minInterval: 12 * 60 * 60 * 1000});
     await updateSwConfig();
     store.set('digestOn', true);
-    digestStatus.textContent = '✅ Daily digest enabled.';
-    toast('Daily digest on ✓');
+    setIconLabel(digestStatus, 'check', 'Daily digest enabled.');
+    toast('Daily digest on ');
   } catch (err) {
-    digestStatus.textContent = '⚠️ Could not enable: ' + err.message;
+    setIconLabel(digestStatus, 'alert', 'Could not enable: ' + err.message);
   }
 });
 
@@ -5266,9 +5281,9 @@ function renderObChips(){
     b.className = 'ob-chip';
     b.type = 'button';
     b.setAttribute('aria-pressed', obSelected.has(c.id) ? 'true' : 'false');
-    b.innerHTML = `<span class="obc-ico" aria-hidden="true">${c.ico}</span>` +
+    b.innerHTML = `<span class="obc-ico ic ic-${c.ico}" aria-hidden="true"></span>` +
       `<span><span class="obc-t">${c.title}</span><span class="obc-d">${c.desc}</span></span>` +
-      `<span class="obc-check" aria-hidden="true">✓</span>`;
+      `<span class="obc-check" aria-hidden="true"><span class="ic ic-check" aria-hidden="true"></span></span>`;
     b.addEventListener('click', () => {
       if (obSelected.has(c.id)) obSelected.delete(c.id); else obSelected.add(c.id);
       b.setAttribute('aria-pressed', obSelected.has(c.id) ? 'true' : 'false');
@@ -5290,7 +5305,7 @@ function renderToolkit(){
   (chosen.length ? chosen : [COHORTS[0], COHORTS[3]]).forEach(c => {
     const g = document.createElement('div');
     g.className = 'ob-tk-group';
-    g.innerHTML = `<h3><span aria-hidden="true">${c.ico}</span> ${c.title}</h3>`;
+    g.innerHTML = `<h3><span class="ic ic-${c.ico}" aria-hidden="true"></span> ${c.title}</h3>`;
     c.features.forEach(([t, d]) => {
       const it = document.createElement('div');
       it.className = 'ob-tk-item';
@@ -5338,7 +5353,7 @@ function firstTaskCoach(){
   store.set('firstTaskCoachSeen', true);
   showView('capture');
   const hint = document.getElementById('micHint');
-  if (hint) hint.innerHTML = '👋 You\'re all set. <b>Tap the mic</b> and say what\'s on your mind —<br>' +
+  if (hint) hint.innerHTML = '<span class="ic ic-sparkles" aria-hidden="true"></span> You\'re all set. <b>Tap the mic</b> and say what\'s on your mind —<br>' +
     'e.g. “book the dentist tomorrow and pick up the prescription today”.';
   const mic = document.getElementById('micBtn');
   if (mic){ mic.classList.add('mic-nudge'); setTimeout(() => mic.classList.remove('mic-nudge'), 4200); }
@@ -5366,11 +5381,11 @@ function startOnboarding(reopen){
 // dropping them cold on the capture screen. Maps each chosen cohort to the
 // space type that fits it.
 const OB_SPACE_FOR = {
-  coparenting: {type: 'coparenting', ico: '🤝', t: 'Co-parenting space',
+  coparenting: {type: 'coparenting', ico: 'handshake', t: 'Co-parenting space',
     d: 'One clear, provable list both parents see.', name: 'Co-parenting'},
-  caregiving:  {type: 'care', ico: '💙', t: 'Care-team space',
+  caregiving:  {type: 'care', ico: 'heart', t: 'Care-team space',
     d: 'A shared profile, meds and journal for the person you care for.', name: 'Care team'},
-  family:      {type: 'family', ico: '👪', t: 'Family space',
+  family:      {type: 'family', ico: 'family', t: 'Family space',
     d: 'One list that syncs to everyone at home.', name: 'Family'}
 };
 function renderObSpaces(){
@@ -5389,7 +5404,7 @@ function renderObSpaces(){
     const b = document.createElement('button');
     b.className = 'ob-space';
     b.type = 'button';
-    b.innerHTML = `<span class="obs-ico" aria-hidden="true">${s.ico}</span>` +
+    b.innerHTML = `<span class="obs-ico ic ic-${s.ico}" aria-hidden="true"></span>` +
       `<span><span class="obs-t">Create a ${s.t.toLowerCase()}</span>` +
       `<span class="obs-d">${s.d}</span></span><span class="obs-go" aria-hidden="true">→</span>`;
     b.addEventListener('click', () => createFirstSpace(s));
@@ -5414,7 +5429,7 @@ async function createFirstSpace(s){
       if (!await addSpace(sp)) return;
       finishOnboarding();
       guideSpaceSetup(sp);
-    } catch (err){ toast('❌ ' + (err.message || 'Could not create the space')); }
+    } catch (err){ toast(' ' + (err.message || 'Could not create the space')); }
   } else {
     finishOnboarding();
     openSpaceCreate(s.type);
@@ -5456,7 +5471,7 @@ function refreshAnalytics(){
   btn.textContent = on ? 'Turn off anonymous analytics' : 'Turn on anonymous analytics';
   btn.classList.toggle('primary', !on);
   document.getElementById('analyticsStatus').textContent = on
-    ? '✅ On — thank you. Anonymous only; nothing you type is sent.' : '';
+ ? ' On — thank you. Anonymous only; nothing you type is sent.' : '';
 }
 document.getElementById('analyticsBtn').addEventListener('click', () => {
   const on = !analyticsConsent();
@@ -5471,7 +5486,7 @@ function refreshCohortSetting(){
   const el = document.getElementById('cohortStatus');
   if (!el) return;
   const chosen = COHORTS.filter(c => cohorts().includes(c.id));
-  el.textContent = chosen.length ? 'You use this for: ' + chosen.map(c => c.ico + ' ' + c.title).join(', ') + '.'
+  el.textContent = chosen.length ? 'You use this for: ' + chosen.map(c => c.title).join(', ') + '.'
     : 'Not set — tap to tell us what you use this for.';
 }
 
@@ -5499,8 +5514,7 @@ if (!store.get('onboarded', false) && !todos.length && !ideas.length && !spacesL
     : /chrome|crios/i.test(ua) ? 'Chrome'
     : /safari/i.test(ua) ? 'Safari' : 'unknown browser';
   const standalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
-  document.getElementById('envInfo').textContent =
-    `Running in ${browser} — ${standalone ? 'installed app ✓' : 'browser tab (not installed)'}`;
+  document.getElementById('envInfo').textContent = `Running in ${browser} — ${standalone ? 'installed app ' : 'browser tab (not installed)'}`;
 })();
 
 // Firefox on Android has no Web Speech API and no WebGPU — warn instead of
@@ -5508,7 +5522,7 @@ if (!store.get('onboarded', false) && !todos.length && !ideas.length && !spacesL
 if (/firefox/i.test(navigator.userAgent)){
   const warn = document.createElement('div');
   warn.className = 'browser-warn';
-  warn.innerHTML = '⚠️ You\'re viewing this in <b>Firefox</b>, which doesn\'t support voice input or on-device AI. ' +
+  warn.innerHTML = '<span class="ic ic-alert" aria-hidden="true"></span> You\'re viewing this in <b>Firefox</b>, which doesn\'t support voice input or on-device AI. ' +
     'For the full app: open this page in <b>Chrome</b>, then menu (⋮) → <b>Add to Home screen</b> → <b>Install</b>.';
   document.getElementById('view-capture').prepend(warn);
 }

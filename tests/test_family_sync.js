@@ -142,7 +142,7 @@ export function onSnapshot(col, cb, errCb){
   // ATTRIBUTION: A sees who ticked (Lulu) on the row
   const attrA = await A.locator('.todo.done .attr').textContent();
   console.log('row attribution on A:', JSON.stringify(attrA));
-  check('A: row shows who ticked and when', /✓ Lulu · /.test(attrA));
+  check('A: row shows who ticked and when', /Lulu · /.test(attrA));
 
   // ATTRIBUTION: expansion on A shows creator (Emile) and ticker (Lulu)
   await A.locator('.todo.done .ttext').click();

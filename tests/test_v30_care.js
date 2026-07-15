@@ -120,7 +120,7 @@ export function onSnapshot(col, cb){
 
   // time parsing + chip
   await page.click('nav.tabs button[data-view="today"]');
-  check('C2b: time chip rendered', /🕗 8am/.test(await page.locator('.time-chip').first().textContent()));
+  check('C2b: time chip rendered', /8am/.test(await page.locator('.time-chip').first().textContent()));
   const parsed = await page.evaluate(() => [parseTaskTime('pick up at 3:30pm'), parseTaskTime('meds at 8am'), parseTaskTime('buy 2 milk')]);
   check('C2b: parseTaskTime handles pm/am/none',
     parsed[0] === '15:30' && parsed[1] === '08:00' && parsed[2] === null);

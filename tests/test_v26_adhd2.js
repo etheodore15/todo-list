@@ -32,12 +32,12 @@ const { chromium } = require('playwright');
   check('B3: migration backfills energy',
     stored.find(t => t.id === 'e1').energy === 'low' && stored.find(t => t.id === 'e2').energy === 'high');
   const dentist = page.locator('.todo', { hasText: 'Call the dentist' });
-  check('B3: energy chip rendered', /🔋 ~10m/.test(await dentist.locator('.energy-chip').textContent()));
+  check('B3: energy chip rendered', /~10m/.test(await dentist.locator('.energy-chip').textContent()));
   // cycling low → medium
   await dentist.locator('.energy-chip').click();
   await page.waitForTimeout(150);
   check('B3: tapping cycles the effort level',
-    /🔋🔋 ~25m/.test(await page.locator('.todo', { hasText: 'Call the dentist' }).locator('.energy-chip').textContent()));
+    /~25m/.test(await page.locator('.todo', { hasText: 'Call the dentist' }).locator('.energy-chip').textContent()));
   await page.locator('.todo', { hasText: 'Call the dentist' }).locator('.energy-chip').click();
   await page.locator('.todo', { hasText: 'Call the dentist' }).locator('.energy-chip').click(); // back to low
   await page.waitForTimeout(150);

@@ -91,7 +91,7 @@ export function onSnapshot(col, cb){ cb({docChanges: () => []}); return () => {}
   await D.click('nav.tabs button[data-view="today"]');
   await D.waitForTimeout(200);
   check('v48: a shared task someone else added shows an inline "added by" line',
-    /➕ Emile/.test(await D.locator('.todo', { hasText: 'take out the bins' }).textContent()));
+    /Emile/.test(await D.locator('.todo', { hasText: 'take out the bins' }).textContent()));
 
   // ---------- 5. quick-add confirms + warns under a filter ----------
   const E = await mk();
