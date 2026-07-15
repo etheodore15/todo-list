@@ -39,7 +39,10 @@ const { chromium } = require('playwright');
   check('calls tag applied', chipTexts.includes('calls'));
   check('family tag applied', chipTexts.includes('family'));
 
-  // 4. Tag filter bar: appears, filters, and resets.
+  // 4. Tag filter bar: appears, filters, and resets. (v63: structuring is
+  // background — the app stays on capture, so go to Today like a user would.)
+  await page.click('nav.tabs button[data-view="today"]');
+  await page.waitForTimeout(200);
   const chips = await page.locator('#tagFilter .fchip').allTextContents();
   check('filter bar shows tags with counts', chips.length >= 3 && chips[0] === 'All');
   await page.locator('#tagFilter .fchip', { hasText: 'shopping' }).click();

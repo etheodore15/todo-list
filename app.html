@@ -371,6 +371,9 @@
     font-size:.85rem; margin-left:14px; cursor:pointer; padding:2px 4px;}
   .spin{display:inline-block; animation:spin 1s linear infinite;}
   @keyframes spin{to{transform:rotate(360deg);}}
+  .proc-strip{display:flex; gap:8px; align-items:center; margin-top:10px; padding:9px 12px;
+    background:var(--card2); border-radius:10px; color:var(--muted); font-size:.82rem;}
+  .proc-strip .spin{color:var(--accent);}
 
   /* Quiet visual mode (B7): calmer palette, no motion, less visual noise */
   body.quiet{--accent:#6a5ea8; --accent2:#5b5192; --hi:#a05a66; --med:#8a7550; --low:#5f8f76;
@@ -491,6 +494,7 @@
       <button class="btn primary" id="saveNoteBtn" style="display:none;"><span class="ic ic-note" aria-hidden="true"></span> Save note</button>
       <button class="btn primary" id="saveIdeaBtn">Summarize &amp; Add</button>
     </div>
+    <div id="procStrip" class="proc-strip" role="status" aria-live="polite" style="display:none;"></div>
   </section>
 
   <!-- IDEAS -->
@@ -667,7 +671,7 @@
       <input type="file" id="importFile" accept=".json,application/json" style="display:none">
       <button class="btn ghost" id="wipeBtn">Delete all data</button>
     </div>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v62<br><span id="envInfo"></span></p>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v63<br><span id="envInfo"></span></p>
   </section>
 </main>
 
@@ -1919,19 +1923,70 @@ function startRec(){
   recording = true;
   micBtn.classList.add('recording');
   micBtn.textContent = '⏹';
-  micHint.textContent = 'Listening… tap again to stop.';
+  startRecTimer('sr');
   try{ rec.start(); }catch(_){}
 }
 function stopRec(){
   recording = false;
+  stopRecTimer();
   micBtn.classList.remove('recording');
   setIconLabel(micBtn, 'mic');
   micHint.innerHTML = 'Tap the mic and speak your idea.<br>Or type below.';
   if (rec) try{ rec.stop(); }catch(_){}
 }
 
-/* ---------- offline recording path (MediaRecorder → Whisper on-device) ---------- */
-let mediaRec = null, mediaChunks = [], mediaStream = null;
+/* ---------- offline recording path (MediaRecorder → Whisper on-device) ----------
+   v63: NEAR-LIVE transcription. Instead of recording one long clip and
+   transcribing it after stop (a long silent wait), record in short
+   self-contained segments; each finished segment transcribes in the
+   background while the next records, and its text appends to the box as it
+   lands. A tiny audio gap between segments is the trade-off for streaming. */
+let mediaRec = null, mediaStream = null, segTimer = null;
+let asrQueue = Promise.resolve(), asrPendingN = 0;
+const SEG_MS = 5000;
+
+function asrDrain(){ return asrQueue; }
+
+async function blobToAudio(blob){
+  const buf = await blob.arrayBuffer();
+  // decode + resample to the 16 kHz mono float audio Whisper expects
+  const ctx = new OfflineAudioContext(1, 1, 16000);
+  const decoded = await ctx.decodeAudioData(buf);
+  const off = new OfflineAudioContext(1, Math.ceil(decoded.duration * 16000), 16000);
+  const src = off.createBufferSource();
+  src.buffer = decoded; src.connect(off.destination); src.start();
+  return (await off.startRendering()).getChannelData(0);
+}
+
+function queueSegment(blob){
+  if (!blob || !blob.size) return;
+  asrPendingN++; updateAsrHint();
+  asrQueue = asrQueue.then(async () => {
+    try {
+      const audio = await blobToAudio(blob);
+      if (audio.length >= 16000 * 0.4){          // skip sub-0.4s fragments
+        const {text} = await aiCall('transcribe', {audio}, [audio.buffer]);
+        if (text && text.trim())
+          liveText.value = (liveText.value + ' ' + text.trim()).replace(/\s+/g,' ').trim();
+      }
+    } catch (_) { /* one bad segment shouldn't kill the take */ }
+    finally { asrPendingN--; updateAsrHint(); }
+  });
+}
+
+function startSegment(){
+  if (!mediaStream) return;
+  const chunks = [];
+  mediaRec = new MediaRecorder(mediaStream);
+  mediaRec.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
+  mediaRec.onstop = () => {
+    queueSegment(new Blob(chunks, chunks[0] ? {type: chunks[0].type} : undefined));
+    if (recording) startSegment();             // roll straight into the next segment
+  };
+  mediaRec.start();
+  clearTimeout(segTimer);
+  segTimer = setTimeout(() => { try { mediaRec.stop(); } catch(_){} }, SEG_MS);
+}
 
 async function startRecLocal(){
   baseText = liveText.value.trim();
@@ -1941,51 +1996,57 @@ async function startRecLocal(){
     toast('Microphone permission denied — allow it in site settings.');
     return;
   }
-  mediaChunks = [];
-  mediaRec = new MediaRecorder(mediaStream);
-  mediaRec.ondataavailable = (e) => { if (e.data.size) mediaChunks.push(e.data); };
-  mediaRec.start();
   recording = true;
   micBtn.classList.add('recording');
   micBtn.textContent = '⏹';
-  micHint.textContent = 'Recording (offline)… tap again to stop.';
+  startRecTimer('local');
+  startSegment();
 }
 
 async function stopRecLocal(){
   recording = false;
+  stopRecTimer();
   micBtn.classList.remove('recording');
   setIconLabel(micBtn, 'mic');
-  if (!mediaRec) return;
-  const rec2 = mediaRec; mediaRec = null;
-  const stopped = new Promise(res => { rec2.onstop = res; });
-  try{ rec2.stop(); }catch(_){}
-  await stopped;
-  mediaStream.getTracks().forEach(t => t.stop());
-  if (!mediaChunks.length){ micHint.innerHTML = 'Tap the mic and speak your idea.<br>Or type below.'; return; }
-
-  micBtn.disabled = true;
-  micHint.textContent = 'Transcribing on your phone…';
-  try {
-    const buf = await new Blob(mediaChunks).arrayBuffer();
-    // decode + resample to the 16 kHz mono float audio Whisper expects
-    const ctx = new OfflineAudioContext(1, 1, 16000);
-    const decoded = await ctx.decodeAudioData(buf);
-    const off = new OfflineAudioContext(1, Math.ceil(decoded.duration * 16000), 16000);
-    const src = off.createBufferSource();
-    src.buffer = decoded; src.connect(off.destination); src.start();
-    const rendered = await off.startRendering();
-    const audio = rendered.getChannelData(0);
-    const {text} = await aiCall('transcribe', {audio}, [audio.buffer]);
-    if (text){
-      liveText.value = (baseText + ' ' + text).replace(/\s+/g,' ').trim();
-    } else {
-      toast("Didn't catch any speech — try again, a little closer to the mic.");
-    }
-  } catch (err) {
-    toast('Transcription failed: ' + err.message);
+  clearTimeout(segTimer);
+  if (mediaRec){
+    const r = mediaRec; mediaRec = null;
+    // keep startSegment's onstop (it queues the final chunk), then resolve
+    await new Promise(res => {
+      const prev = r.onstop;
+      r.onstop = (e) => { try { prev && prev(e); } catch(_){} res(); };
+      try { r.stop(); } catch(_) { res(); }
+    });
   }
-  micBtn.disabled = false;
-  micHint.innerHTML = 'Tap the mic and speak your idea.<br>Or type below.';
+  if (mediaStream){ mediaStream.getTracks().forEach(t => t.stop()); mediaStream = null; }
+  updateAsrHint();
+}
+
+function updateAsrHint(){
+  if (recording) return;                        // the live timer owns the hint while recording
+  if (asrPendingN > 0)
+    micHint.innerHTML = '<span class="spin" aria-hidden="true">◌</span> Finishing transcription…';
+  else
+    micHint.innerHTML = 'Tap the mic and speak your idea.<br>Or type below.';
+}
+
+/* live elapsed-time hint for both voice paths */
+let recTimerInt = null, recStartedAt = 0;
+function startRecTimer(kind){
+  recStartedAt = Date.now();
+  const tick = () => {
+    const s = Math.floor((Date.now() - recStartedAt) / 1000);
+    const mmss = Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+    micHint.textContent = kind === 'local'
+      ? `● Recording ${mmss} — transcribing as you go${asrPendingN ? '…' : ''}`
+      : `● Listening ${mmss} — tap again to stop`;
+  };
+  tick();
+  clearInterval(recTimerInt);
+  recTimerInt = setInterval(tick, 1000);
+}
+function stopRecTimer(){
+  clearInterval(recTimerInt); recTimerInt = null;
 }
 
 function useLocalASR(){
@@ -2207,30 +2268,38 @@ async function claudeSummarize(text, apiKey){
   return normalizeIdeaJson(JSON.parse(raw), text);
 }
 
-/* ---------- save idea ---------- */
-const saveIdeaBtn = document.getElementById('saveIdeaBtn');
-saveIdeaBtn.addEventListener('click', async () => {
-  const raw = liveText.value.trim();
-  if (!raw){ toast('Nothing to save — speak or type an idea first.'); return; }
-  if (recording) stopRec();
+/* ---------- save idea → background structuring (v63) ----------
+   Capture is INSTANT: the idea is stored and the input clears the moment the
+   button is tapped; the AI / built-in structuring runs in the background and a
+   toast (or a system notification when the app is hidden) says when the tasks
+   are live and which space they landed in. Pending ideas survive a reload and
+   resume on the next boot. */
+function renderProcStrip(){
+  const el = document.getElementById('procStrip');
+  if (!el) return;
+  const n = ideas.filter(i => i.pending).length;
+  if (!n){ el.style.display = 'none'; el.textContent = ''; return; }
+  el.style.display = '';
+  el.innerHTML = '<span class="spin" aria-hidden="true">◌</span> ';
+  el.appendChild(document.createTextNode(n === 1
+    ? 'Structuring your idea in the background — keep going.'
+    : `Structuring ${n} ideas in the background — keep going.`));
+}
 
-  saveIdeaBtn.disabled = true;
-  saveIdeaBtn.innerHTML = '<span class="spin">◌</span> Summarizing…';
-
+async function structureIdea(idea){
   let result = null, engine = 'built-in';
   const cKey = store.get('apiKey', '');
   if (aiEnabled()){
-    try { result = await geminiSummarize(raw); engine = aiViaProxy() ? 'ai' : 'gemini'; }
-    catch(e){ toast('Smart summary unavailable (' + e.message + ') — trying fallback.'); }
+    try { result = await geminiSummarize(idea.raw); engine = aiViaProxy() ? 'ai' : 'gemini'; } catch(_){}
   }
   if (!result && cKey){
-    try { result = await claudeSummarize(raw, cKey); engine = 'claude'; }
-    catch(e){ toast('Claude unavailable — used built-in summary.'); }
+    try { result = await claudeSummarize(idea.raw, cKey); engine = 'claude'; } catch(_){}
   }
-  if (!result) result = localSummarize(raw);
-
-  const idea = {id: uid(), raw, summary: result.summary, priority: result.priority, engine, ts: Date.now()};
-  ideas.unshift(idea); saveIdeas();
+  if (!result) result = localSummarize(idea.raw);
+  if (!ideas.some(i => i.id === idea.id)){ renderProcStrip(); return; }   // deleted while pending
+  idea.summary = result.summary; idea.priority = result.priority; idea.engine = engine;
+  const dest = idea.dest || null;   // destination captured at QUEUE time, not completion time
+  delete idea.pending; delete idea.dest;
 
   const t = todayStr();
   const norm = s => s.toLowerCase().replace(/[^a-z0-9\s]/g,'').replace(/\s+/g,' ').trim();
@@ -2244,28 +2313,57 @@ saveIdeaBtn.addEventListener('click', async () => {
       assignees: task.assignees || [], done:false, date: task.date || t, recur: task.recur || null,
       energy: task.energy || detectEnergy(task.text), minutes: task.minutes || null,
       time: task.time || null,
-      space: newTaskSpace(), ideaId: idea.id, createdBy: myName() || null, createdAt: Date.now()});
+      space: dest, ideaId: idea.id, createdBy: myName() || null, createdAt: Date.now()});
     logEvent('created', todos[todos.length - 1]);
     if ((task.assignees || []).length) delegated.push(task.assignees.join(', '));
     if (task.recur) scheduled.push(recurLabel(task.recur).replace('↻ ', '↻'));
     else if (task.date && task.date > t) scheduled.push(fmtDay(task.date));
     added++;
   });
-  saveTodos();
+  saveIdeas(); saveTodos(); updateBadge(); renderProcStrip();
+  renderTodos();   // keep the (possibly hidden) list fresh; showView also re-renders on switch
+  if (document.getElementById('view-ideas').classList.contains('active')) renderIdeas();
 
+  const destSp = spacesList().find(s => s.hid === dest);
+  const msg = added
+    ? `${added} task${added===1?'':'s'} live${destSp ? ` in “${destSp.name}”` : ' on Today'}${scheduled.length ? ` (${scheduled.join(', ')})` : ''}${delegated.length ? ` (→ ${delegated.join('; ')})` : ''}${skipped ? ` (${skipped} already listed)` : ''}`
+    : (skipped ? 'Those tasks are already on your list'
+               : 'Saved to Ideas — no to-dos detected, your note is kept');
+  if (added){
+    toast(msg, () => { if (destSp) activeSpace = destSp.hid; showView('today'); renderTodos(); }, 'View');
+  } else if (skipped){
+    toast(msg);
+  } else {
+    // nothing became a task: if they're still waiting on an idle capture screen,
+    // show them the saved note (v48 — transcript must not feel lost); if they've
+    // moved on or started typing, don't yank them — the toast's View suffices
+    const idleOnCapture = document.getElementById('view-capture').classList.contains('active')
+      && !liveText.value.trim() && !recording;
+    if (idleOnCapture) highlightIdea(idea.id);
+    else toast(msg, () => { showView('ideas'); highlightIdea(idea.id); }, 'View');
+    if (idleOnCapture) toast(msg);
+  }
+  // app in the background (phone locked, other tab) → system notification
+  if (document.hidden && 'Notification' in window && Notification.permission === 'granted'){
+    try { new Notification('Idea → Todo', {body: msg, icon: 'icons/icon-192.png', tag: 'structured'}); } catch(_){}
+  }
+}
+
+const saveIdeaBtn = document.getElementById('saveIdeaBtn');
+saveIdeaBtn.addEventListener('click', async () => {
+  if (recording) (useLocalASR() ? stopRecLocal() : stopRec());
+  await asrDrain();                       // let any in-flight offline transcription land first
+  const raw = liveText.value.trim();
+  if (!raw){ toast('Nothing to save — speak or type an idea first.'); return; }
+  const idea = {id: uid(), raw, summary: raw.length > 120 ? raw.slice(0, 117) + '…' : raw,
+    priority: 'medium', engine: 'built-in', pending: true, dest: newTaskSpace(), ts: Date.now()};
+  ideas.unshift(idea); saveIdeas();
   liveText.value = ''; baseText = '';
-  saveIdeaBtn.disabled = false;
-  saveIdeaBtn.textContent = 'Summarize & Add';
-  updateBadge();
-  // name the destination space so it's obvious WHERE the tasks were published
-  const destSp = spacesList().find(s => s.hid === newTaskSpace());
-  toast(added
- ? `Added ${added} task${added===1?'':'s'}${destSp ? ` to “${destSp.name}”` : ''}${scheduled.length ? ` (${scheduled.join(', ')})` : ''}${delegated.length ? ` (→ ${delegated.join('; ')})` : ''}${skipped ? ` (${skipped} already listed)` : ''}`
- : (skipped ? 'Those tasks are already on your list' : 'Saved to Ideas — no to-dos detected, your note is kept'));
-  // If nothing became a task, don't dump the user on an unchanged Today with the
-  // transcript seemingly lost — take them to Ideas and highlight the saved note.
-  if (added) showView('today');
-  else highlightIdea(idea.id);
+  renderProcStrip();
+  // brief button acknowledgement, then back to the normal label
+  saveIdeaBtn.textContent = 'Got it ✓';
+  setTimeout(() => refreshCaptureMode(), 900);
+  structureIdea(idea);                    // deliberately not awaited
 });
 
 /* ---------- capture as a care journal note (v45) ----------
@@ -2338,7 +2436,8 @@ function renderIdeas(){
         <span class="chip"><span class="dot ${idea.priority}"></span> ${idea.priority}</span>
         <span class="chip">${d.toLocaleDateString(undefined,{day:'numeric',month:'short'})} ${d.toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'})}</span>
         ${linked.length ? `<span class="chip"><span class="ic ic-check" aria-hidden="true"></span> ${doneCount}/${linked.length}</span>` : ''}
-        ${idea.engine ? `<span class="chip"><span class="ic ic-${idea.engine === 'built-in' ? 'settings' : 'sparkles'}" aria-hidden="true"></span> ${idea.engine}</span>` : ''}
+        ${idea.pending ? `<span class="chip"><span class="spin" aria-hidden="true">◌</span> structuring…</span>`
+          : idea.engine ? `<span class="chip"><span class="ic ic-${idea.engine === 'built-in' ? 'settings' : 'sparkles'}" aria-hidden="true"></span> ${idea.engine}</span>` : ''}
         <button class="del" aria-label="Delete idea"><span class="ic ic-trash" aria-hidden="true"></span></button>
       </div>`;
     card.querySelector('.summary').textContent = idea.summary;
@@ -5572,6 +5671,9 @@ refreshCohortSetting();
 refreshAnalytics();
 if (analyticsConsent()) initGA();
 track('app_open');
+// resume any idea whose background structuring was cut short by a reload/close
+renderProcStrip();
+ideas.filter(i => i.pending).forEach(i => structureIdea(i));
 // Only greet genuinely new users — someone upgrading (with tasks, ideas, or a
 // space already) shouldn't be interrupted; they can revisit from Settings.
 if (!store.get('onboarded', false) && !todos.length && !ideas.length && !spacesList().length){

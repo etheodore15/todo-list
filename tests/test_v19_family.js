@@ -32,7 +32,9 @@ const { chromium } = require('playwright');
   const prompt = await page.evaluate(() => buildIdeaPrompt('test'));
   check('prompt includes household members', /Household members: emile, lulu/.test(prompt));
 
-  // 4. share (headless: falls back to clipboard)
+  // 4. share (headless: falls back to clipboard) — navigate to Today first (v63)
+  await page.click('nav.tabs button[data-view="today"]');
+  await page.waitForTimeout(200);
   await page.locator('#tagFilter .fchip', { hasText: 'lulu' }).click();
   await page.click('#shareBtn');
   await page.waitForTimeout(300);

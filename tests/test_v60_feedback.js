@@ -62,10 +62,17 @@ export function onSnapshot(col, cb){ cb({docChanges: () => []}); return () => {}
   check('T1: drop-off gets the spoken time (nine AM → 09:00)', !!drop && drop.time === '09:00');
   check('T1: pick-up task extracted with its own time (twelve PM → 12:00)', !!pick && pick.time === '12:00');
   check('T1: tasks published into the active space', made.every(t => t.space === 'hh-care'));
-  check('T1: after adding, the user is taken to Today (not left on capture)',
-    await A.evaluate(() => document.getElementById('view-today').classList.contains('active')));
+  // v63: structuring runs in the background — the user STAYS on capture and a
+  // toast with a View action announces where the tasks landed
+  check('T1: capture stays put (structuring is background)',
+    await A.evaluate(() => document.getElementById('view-capture').classList.contains('active')));
   const addToast = await A.locator('#toast').textContent();
   check('T2: the toast names the destination space', /Mum's care/.test(addToast));
+  check('v63: toast offers a View action', (await A.locator('#toast .undo').textContent()) === 'View');
+  await A.click('#toast .undo');
+  await A.waitForTimeout(300);
+  check('v63: View lands on Today filtered to the space',
+    await A.evaluate(() => document.getElementById('view-today').classList.contains('active') && activeSpace === 'hh-care'));
 
   // ---------- 1b. break-down steps specific to the outing ----------
   const steps = await A.evaluate(async () => {
