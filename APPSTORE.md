@@ -22,6 +22,14 @@ tasks doable in-repo; **[both]** need a decision then code.
       Authentication → Settings → Authorized domains (Google sign-in).
 - [ ] **[Claude] Set `appUrl`** in managed-config.js to the live host so invite
       links point at production.
+- [ ] **[Claude] Redirect the old GitHub Pages URL to the new domain** at
+      cutover, so anyone holding an old link (shared invites, the Humanitech
+      email, bookmarks) lands on the live site instead of a stale copy or 404.
+      Plan: switch the Pages source to a `gh-pages` branch containing only a
+      redirect page (meta refresh + `location.replace` + canonical link) for
+      every old path (`/`, `/app.html`, `/investors.html`). ⚠️ The redirect
+      only stays alive while the repo remains **public** (free-tier Pages
+      requires it) — see the repo-privacy item in Track E.
 - [ ] **[both] Custom domain?** (e.g. ideatodo.app / a sharpenit subdomain).
       Optional but store listings, invite links and assetlinks are nicer on a
       stable domain. Decide before the Play listing is filed.
@@ -106,9 +114,13 @@ tasks doable in-repo; **[both]** need a decision then code.
       live URL (not localhost) — she's our best QA.
 - [ ] **[Claude] Add minimal error telemetry** (window.onerror → anonymous
       counter) so store-scale breakage is visible on the ops dashboard.
-- [ ] **[you] Flip the repo private** once Firebase Hosting is confirmed live
-      (GitHub Pages dies at that moment — invite links must already point at
-      the new host).
+- [ ] **[you] Repo privacy — decide the timing.** Free-tier GitHub Pages needs
+      a public repo, and the Pages URL is bound to this repo's name — so going
+      private kills the old-link redirect (Track A) with no way to preserve
+      the URL from another repo. Options: (a) keep the repo public while the
+      redirect matters (recommended for a few months post-cutover), or
+      (b) GitHub Pro allows Pages from a private repo, or (c) accept old-link
+      rot and go private immediately.
 - [ ] **[Claude] Tag the store-baseline release** and document the release
       process (version label + SW cache + tag) in OPERATORS.md.
 
