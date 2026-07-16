@@ -723,7 +723,7 @@
       <input type="file" id="importFile" accept=".json,application/json" style="display:none">
       <button class="btn ghost" id="wipeBtn">Delete all data</button>
     </div>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v75<br><span id="envInfo"></span></p>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v76<br><span id="envInfo"></span></p>
   </section>
 </main>
 
@@ -900,6 +900,18 @@
   </div>
 </div>
 
+<div id="circleOwnerSheet" class="sheet-overlay" role="dialog" aria-modal="true" aria-label="Who is this circle for" style="display:none;">
+  <div class="sheet">
+    <h3><span class="ic ic-spark" aria-hidden="true"></span> Who is this circle for?</h3>
+    <p class="side-note" style="margin:2px 0 12px;">The person the circle supports owns this record.
+      If you're setting it up for someone else, you'll be recorded as acting on their behalf.
+      You can change this later.</p>
+    <button class="btn primary" id="circleForMe">It’s for me — these are my supports</button>
+    <button class="btn ghost" id="circleForOther">Someone I support — I’m their decision-maker</button>
+    <button class="btn ghost" id="circleOwnerCancel">Cancel</button>
+  </div>
+</div>
+
 <div id="dateSheet" class="sheet-overlay" role="dialog" aria-modal="true" aria-label="When" style="display:none;">
   <div class="sheet">
     <h3><span class="ic ic-calendar" aria-hidden="true"></span> When?</h3>
@@ -1034,6 +1046,37 @@ const capName = (s) => String(s == null ? '' : s)
   .replace(/(^|[\s\-'’])(\p{Ll})/gu, (m, p, c) => p + c.toUpperCase());
 const myName = () => capName(store.get('myName', ''));
 
+/* ---------- build flavors (v76 — see ARCHITECTURE.md) ----------
+   One engine, several products. A deploy may ship a flavor config
+   (window.FLAVOR, stamped alongside managed-config.js): product name, theme
+   tokens, which cohorts are offered, feature flags, base URL. Engine code
+   READS this config; it never branches on which product it is. No FLAVOR
+   present = the ideatodo defaults, unchanged. */
+const APP_FLAVOR = window.FLAVOR || {};
+const flavorName = () => APP_FLAVOR.name || 'Idea → Todo';
+// feature flags: set by the flavor, or locally for development/pilot testing
+// (store.set('flag:circle', true) in the console)
+const flagOn = (f) => !!((APP_FLAVOR.flags || {})[f]) || store.get('flag:' + f, false);
+function visibleCohorts(){
+  let list = COHORTS;
+  if (Array.isArray(APP_FLAVOR.cohorts) && APP_FLAVOR.cohorts.length)
+    list = list.filter(c => APP_FLAVOR.cohorts.includes(c.id));
+  return list.filter(c => !c.flag || flagOn(c.flag));
+}
+function applyFlavor(){
+  if (APP_FLAVOR.name){
+    document.title = flavorName();
+    const h = document.getElementById('hdrTitle');
+    if (h && h.textContent === 'Idea → Todo') h.textContent = flavorName();
+    document.querySelectorAll('p').forEach(p => {
+      if (/^Idea → Todo v\d+/.test(p.textContent))
+        p.innerHTML = p.innerHTML.replace('Idea → Todo', flavorName());
+    });
+  }
+  Object.entries(APP_FLAVOR.theme || {}).forEach(([k, v]) =>
+    document.documentElement.style.setProperty('--' + k, v));
+}
+
 /* ---------- cohorts + onboarding (v37) ----------
    Users self-select what they use the app for on first run. This segments them
    for the operator (cohort tracking) and drives a tailored explainer of which
@@ -1078,7 +1121,23 @@ const COHORTS = [
      ['Who did what', 'Every add and tick shows who and when.'],
      ['<span class="ic ic-bell" aria-hidden="true"></span> Daily digest', 'A once-a-day summary of what’s open and what the family did.']
    ],
-   actions: [{label: 'Create a family space', fn: () => openSpaceCreate('family')}]}
+   actions: [{label: 'Create a family space', fn: () => openSpaceCreate('family')}]},
+  // Cooee circle pack (v76, Phase 1a) — behind the 'circle' feature flag until
+  // the pilot hardening gate passes (build brief §Phase 5). Copy rule: the
+  // participant is always the grammatical subject.
+  {id: 'ndis-circle', ico: 'spark', title: 'Coordinating my own supports', flag: 'circle',
+   desc: 'I have a support circle — family and workers — who need to stay in step.',
+   features: [
+     ['<span class="ic ic-mic" aria-hidden="true"></span> Speak it once', 'Your voice note becomes tasks and notes your whole circle can act on.'],
+     ['<span class="ic ic-heart" aria-hidden="true"></span> About Me', 'How you like support to happen — the first thing every new worker sees.'],
+     ['<span class="ic ic-pill" aria-hidden="true"></span> Routines & medications', 'Every tick is a record; a miss is flagged for the next visit.'],
+     ['<span class="ic ic-scroll" aria-hidden="true"></span> Your record, owned by you', 'Append-only history you can read, print, and take with you any time.'],
+     ['<span class="ic ic-lock" aria-hidden="true"></span> You choose who sees what', 'Workers, family and viewers each see only what you decide.']
+   ],
+   actions: [{label: 'Create my Circle', fn: () => {
+     const s = OB_SPACE_FOR['ndis-circle'];
+     if (s) createFirstSpace(s);
+   }}]}
 ];
 const cohorts = () => store.get('cohorts', []);
 
@@ -2512,7 +2571,7 @@ function noteSpace(){
   // old any-single-care-space fallback predated the chips and could show
   // "Save to journal" while the active chip pointed at a family space.)
   const sp = spacesList().find(s => s.hid === captureDestVal());
-  return sp && sp.type === 'care' ? sp : null;
+  return sp && (sp.type === 'care' || sp.type === 'circle') ? sp : null;
 }
 
 /* ---------- capture destination picker (v68) ----------
@@ -2862,6 +2921,16 @@ const SPACE_ACTIONS = {
     ['clipboard', 'Week report', sp => openFamilyReport(sp)],
     ['scroll', 'History & export', sp => openHistory(sp)],
     ['share', 'Invite', sp => shareSpaceInvite(sp)]
+  ],
+  // Cooee circle pack (v76): the participant's space. Reuses the care-pack
+  // profile/meds/journal primitives; roles + scoped visibility land in
+  // Phase 1c (see COOEE-MAPPING.md).
+  circle: [
+    ['heart', 'About Me', sp => openProfile(sp)],
+    ['pill', 'Routines & meds', sp => openMeds(sp)],
+    ['note', 'Add a note', () => { showView('capture'); toast('Speak or type, then tap “Save to journal”.'); }],
+    ['scroll', 'History & export', sp => openHistory(sp)],
+    ['share', 'Invite', sp => shareSpaceInvite(sp)]
   ]
 };
 function renderSpaceBar(){
@@ -2894,7 +2963,7 @@ function renderSpaceHeader(){
   if (!t) return;
   const sp = activeSpaceObj();
   if (sp) setIconLabel(t, SPACE_ICON[sp.type] || 'users', sp.name);
-  else t.textContent = 'Idea → Todo';
+  else t.textContent = flavorName();
 }
 
 // v43: keep the ADHD toolkit reachable after the onboarding modal closes — a
@@ -3896,7 +3965,7 @@ let careHandoffDismissed = false;
 function renderCareHandoff(){
   const host = document.getElementById('careHandoff');
   if (!host) return;
-  const cares = spacesList().filter(s => s.type === 'care')
+  const cares = spacesList().filter(s => s.type === 'care' || s.type === 'circle')
     .filter(s => activeSpace === 'all' || activeSpace === s.hid);
   if (!cares.length || careHandoffDismissed){ host.style.display = 'none'; host.innerHTML = ''; return; }
   const me = (myName() || '').toLowerCase();
@@ -4035,7 +4104,7 @@ let fbFs = null, fbInitApp = null, applyingRemote = false;
 const spaceRt = {};    // hid → {db, unsub, lastPush: {id → serialized core}}
 
 // icon-set names per space type (rendered via setIconLabel / ic-* classes)
-const SPACE_ICON = {family: 'users', coparenting: 'handshake', care: 'heart'};
+const SPACE_ICON = {family: 'users', coparenting: 'handshake', care: 'heart', circle: 'spark'};
 const spacesList = () => store.get('spaces', []);
 const spaceName = (hid) => { const sp = spacesList().find(s => s.hid === hid); return sp ? sp.name : null; };
 
@@ -4119,7 +4188,7 @@ const EVENT_LABEL = {created: 'added', edited: 'edited', ticked: 'ticked off',
   unticked: 'un-ticked', deleted: 'deleted', restored: 'restored',
   rescheduled: 'rescheduled', parked: 'parked for someday', moved: 'moved',
   missed: 'missed', note: 'noted', 'note-removed': 'removed the note',
-  expense: 'logged an expense on'};
+  'circle-owner': 'recorded', expense: 'logged an expense on'};
 
 // joining/creating the FIRST space adopts existing shareable tasks into it,
 // matching the old "everything local syncs up" behaviour
@@ -5741,8 +5810,81 @@ function guideSpaceSetup(sp){
   }
   if (sp.type === 'family') steps.push({label: 'Add people to delegate to',
     desc: 'Assign tasks to who they’re for.', fn: () => { editSpaceMembers(sp); return true; }});
+  if (sp.type === 'circle'){
+    // Cooee Phase 1b. Order matters: ownership is settled before anything else.
+    steps.unshift({label: 'Who is this circle for?',
+      desc: 'You, or someone you support — this sets who owns the record. You can change it later.',
+      fn: () => openCircleOwner(sp)});
+    steps.push({label: 'Record About Me', desc: 'How you like support to happen — every new worker sees it first.',
+      fn: () => { openProfile(sp); return true; }});
+    steps.push({label: 'Add routines & medications', desc: 'Timed, repeating tasks — every tick becomes part of your record.',
+      fn: () => { openMeds(sp); return true; }});
+    // plan-goal tags join this checklist in Phase 3
+  }
   setIconLabel(document.getElementById('setupTitle'), SPACE_ICON[sp.type] || 'users', '“' + sp.name + '” is ready');
   document.getElementById('setupIntro').textContent = 'A couple of quick things to make it work for you:';
+  guideRender(steps, done);
+}
+
+/* ---------- circle ownership (v76 — Cooee invariant 1) ----------
+   The participant is the tenant. A circle may be set up BY a substitute
+   decision-maker / POA — recorded as acting on the participant's behalf,
+   never silently owning the record. Plain language, changeable later,
+   every change appended to the history. Role enforcement (rules) is
+   Phase 1c; this records the declaration. */
+let circleOwnerResolve = null, circleOwnerSp = null;
+function openCircleOwner(sp){
+  circleOwnerSp = sp;
+  document.getElementById('circleOwnerSheet').style.display = 'flex';
+  return new Promise(res => { circleOwnerResolve = res; });
+}
+function closeCircleOwner(v){
+  document.getElementById('circleOwnerSheet').style.display = 'none';
+  const r = circleOwnerResolve; circleOwnerResolve = null;
+  if (r) r(v);
+}
+async function setCircleOwner(mode){
+  const sp = circleOwnerSp;
+  if (!sp) return;
+  document.getElementById('circleOwnerSheet').style.display = 'none';   // sub-inputs go on top
+  const reopen = () => { document.getElementById('circleOwnerSheet').style.display = 'flex'; };
+  let participant = myName();
+  if (mode === 'self' && !participant){
+    const v = await askInput({title: 'Your name', placeholder: 'Shown on your record'});
+    if (!v){ reopen(); return; }
+    setMyName(v); participant = myName();
+  }
+  if (mode === 'nominee'){
+    const v = await askInput({title: 'The participant’s name',
+      placeholder: 'Who this circle supports',
+      hint: 'You’ll be recorded as their decision-maker.'});
+    if (v === null || !v.trim()){ reopen(); return; }
+    participant = capName(v.trim().slice(0, 24));
+    if (!myName()){
+      const n = await askInput({title: 'Your name', placeholder: 'Shown as their decision-maker'});
+      if (n) setMyName(n);
+    }
+  }
+  sp.circle = {participant, mode,
+    nominee: mode === 'nominee' ? (myName() || null) : null,
+    setAt: Date.now(), setBy: myName() || null};
+  store.set('spaces', spacesList().map(s => s.hid === sp.hid ? sp : s));
+  // TODO Phase 1c: persist onto the household doc alongside roles, guarded by rules
+  logEvent('circle-owner', {id: 'circle-owner-' + Date.now().toString(36),
+    text: mode === 'nominee'
+      ? `${participant} owns this record — ${myName() || 'someone'} is acting as their decision-maker`
+      : `${participant} owns this record`,
+    space: sp.hid});
+  toast(mode === 'nominee'
+    ? `${participant} owns this circle — you’re recorded as acting on their behalf`
+    : 'This circle is yours — you own the record');
+  closeCircleOwner(true);
+}
+document.getElementById('circleForMe').addEventListener('click', () => setCircleOwner('self'));
+document.getElementById('circleForOther').addEventListener('click', () => setCircleOwner('nominee'));
+document.getElementById('circleOwnerCancel').addEventListener('click', () => closeCircleOwner(false));
+
+function guideRender(steps, done){
   const host = document.getElementById('setupSteps');
   const render = () => {
     host.innerHTML = '';
@@ -5914,6 +6056,7 @@ document.addEventListener('keydown', (e) => {
     ['onboarding', () => dismissOnboarding()],
     ['scopeSheet', () => closeScopeSheet()],
     ['inputSheet', () => closeInput(null)],
+    ['circleOwnerSheet', () => closeCircleOwner(false)],
     ['tagSheet', () => closeTagSheet()],
     ['dateSheet', () => { document.getElementById('dateSheet').style.display = 'none'; dateTask = null; }],
     ['repeatSheet', () => { document.getElementById('repeatSheet').style.display = 'none'; repeatTask = null; }],
@@ -5962,8 +6105,9 @@ document.addEventListener('keydown', (e) => {
 let obSelected = new Set();
 function renderObChips(){
   const host = document.getElementById('obChips');
+  const offered = visibleCohorts();
   host.innerHTML = '';
-  COHORTS.forEach(c => {
+  offered.forEach(c => {
     const b = document.createElement('button');
     b.className = 'ob-chip';
     b.type = 'button';
@@ -6073,7 +6217,9 @@ const OB_SPACE_FOR = {
   caregiving:  {type: 'care', ico: 'heart', t: 'Care-team space',
     d: 'A shared profile, meds and journal for the person you care for.', name: 'Care team'},
   family:      {type: 'family', ico: 'family', t: 'Family space',
-    d: 'One list that syncs to everyone at home.', name: 'Family'}
+    d: 'One list that syncs to everyone at home.', name: 'Family'},
+  'ndis-circle': {type: 'circle', ico: 'spark', t: 'Circle',
+    d: 'Your support circle — family and workers, on the same page.', name: 'My Circle'}
 };
 function renderObSpaces(){
   const host = document.getElementById('obSpaceChoices');
@@ -6102,6 +6248,13 @@ function renderObSpaces(){
 // per-type setup checklist. Managed builds create in one tap; self-hosted opens
 // the Firebase walkthrough (advanced path) since it needs a project config.
 async function createFirstSpace(s){
+  // Circle spaces are managed-only: role-scoped visibility is enforced by
+  // Firestore rules bound to Auth UIDs, which self-hosted spaces don't have
+  // (COOEE-MAPPING.md §3.4).
+  if (s.type === 'circle' && !window.MANAGED){
+    toast('Circles run on the hosted service so roles can be enforced — not available self-hosted.');
+    return;
+  }
   const raw = await askInput({title: 'Name this space',
     value: s.name, placeholder: 'e.g. ' + s.name, hint: 'Everyone who joins sees this name.'});
   if (raw === null) return; // cancelled — stay on the choose-a-space step
@@ -6178,6 +6331,7 @@ function refreshCohortSetting(){
 }
 
 /* ---------- init ---------- */
+applyFlavor();   // product name/theme from the deploy's flavor config (v76)
 // v75 one-time normalization: names stored lowercase by older versions (and by
 // voice extraction) become capitalized. Events are left untouched — the
 // append-only record isn't rewritten; its names are capitalized at display.

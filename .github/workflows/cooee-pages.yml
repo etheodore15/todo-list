@@ -1,0 +1,57 @@
+# Publishes the cooee flavor to the dedicated front-door repo
+# (github.com/etheodore15/cooee → https://etheodore15.github.io/cooee/).
+#
+# Needs one repo secret: COOEE_DEPLOY_TOKEN — a fine-grained PAT with
+# "Contents: read & write" on etheodore15/cooee only. Without the secret the
+# job skips quietly (so forks/CI without it stay green).
+#
+# Layout published:
+#   /            holding page (flavors/cooee/site/, when present)
+#   /app/        the stamped cooee app build
+name: cooee-pages
+on:
+  push:
+    branches: [main, feat/cooee-circle]
+    paths:
+      - 'app.html'
+      - 'sw.js'
+      - 'icons.css'
+      - 'digest.js'
+      - 'ai-worker.js'
+      - 'vendor/**'
+      - 'icons/**'
+      - 'flavors/cooee/**'
+      - 'build-flavor.sh'
+      - '.github/workflows/cooee-pages.yml'
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build both flavors (smoke)
+        run: |
+          chmod +x build-flavor.sh
+          ./build-flavor.sh ideatodo
+          ./build-flavor.sh cooee
+          node -e "const s=require('fs').readFileSync('dist/cooee/app.html','utf8');
+            for (const m of s.matchAll(/<script>([\s\S]*?)<\/script>/g)) new Function(m[1]);
+            console.log('cooee flavor parses');"
+      - name: Assemble site
+        run: |
+          mkdir -p site/app
+          cp -r dist/cooee/* site/app/
+          if [ -d flavors/cooee/site ]; then cp -r flavors/cooee/site/* site/; fi
+      - name: Push to etheodore15/cooee
+        env:
+          TOKEN: ${{ secrets.COOEE_DEPLOY_TOKEN }}
+        run: |
+          if [ -z "$TOKEN" ]; then echo "COOEE_DEPLOY_TOKEN not set — skipping publish"; exit 0; fi
+          cd site
+          git init -b main
+          git config user.name "cooee-ci"
+          git config user.email "ci@users.noreply.github.com"
+          git add -A
+          git commit -m "publish cooee flavor from ${GITHUB_SHA::7}"
+          git push --force "https://x-access-token:${TOKEN}@github.com/etheodore15/cooee.git" main

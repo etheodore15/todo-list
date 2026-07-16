@@ -3,3 +3,4 @@ testmodels/
 # local Firebase project binding (from .firebaserc.example)
 .firebaserc
 functions/node_modules/
+dist/
