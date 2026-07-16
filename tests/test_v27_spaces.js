@@ -127,7 +127,7 @@ export function onSnapshot(col, cb, errCb){
   check('A: care view shows only its task',
     (await A.locator('#todoList .ttext').allTextContents()).join() === 'pick up prescriptions');
   // personal task never syncs
-  await A.locator('#spaceFilter .fchip', { hasText: 'Personal' }).click();
+  await A.locator('#spaceFilter .fchip', { hasText: 'Private' }).click();
   await A.fill('#quickAdd', 'secret gift for lulu');
   await A.click('#quickAddBtn');
   await A.waitForTimeout(600);

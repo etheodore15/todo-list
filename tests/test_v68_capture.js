@@ -120,7 +120,7 @@ export function onSnapshot(col, cb){ cb({docChanges: () => []}); return () => {}
     /Renew the car registration/.test(refl) && /1h/.test(refl) && /high effort/.test(refl));
   await A.click('#briefClose');
   // the Personal filter view gets its own action bar with the report
-  await A.locator('#spaceFilter .fchip', { hasText: 'Personal' }).click();
+  await A.locator('#spaceFilter .fchip', { hasText: 'Private' }).click();
   await A.waitForTimeout(300);
   check('v68: personal view shows a My-week-in-review action bar',
     await A.locator('#spaceBar .space-act', { hasText: 'My week in review' }).count() === 1);

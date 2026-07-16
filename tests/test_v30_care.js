@@ -184,7 +184,7 @@ export function onSnapshot(col, cb){
     /dizzy this morning/.test(briefPrompt) && /MISSED/.test(briefPrompt));
   check('C2d: structured brief returned', /two dizzy spells/.test(brief.b.overview));
   check('C2d: printable brief renders all sections',
-    /visit brief/.test(brief.html) && /26 of 28 days/.test(brief.html) &&
+    /doctor briefing/.test(brief.html) && /26 of 28 days/.test(brief.html) &&
     /Questions for the doctor/.test(brief.html) && /not medical advice/.test(brief.html));
 
   console.log(errors.length ? 'ERRORS:\n' + errors.join('\n') : 'NO JS ERRORS');

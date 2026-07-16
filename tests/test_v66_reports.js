@@ -125,7 +125,7 @@ export function onSnapshot(col, cb){ cb({docChanges: () => []}); return () => {}
   const famActs = await B.evaluate(() => SPACE_ACTIONS.family.map(a => a[1]));
   const copActs = await B.evaluate(() => SPACE_ACTIONS.coparenting.map(a => a[1]));
   check('v66: family space bar offers the week report', famActs.includes('Week report'));
-  check('v66: co-parenting space bar offers the summary', copActs.includes('Summary'));
+  check('v66: co-parenting space bar offers the summary', copActs.includes('Records summary'));
   check('v66: wins block offers the personal reflection',
     await B.evaluate(() => !!document.getElementById('reflectBtn')));
 

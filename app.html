@@ -189,6 +189,11 @@
   .scope-member{display:flex; align-items:center; gap:10px; padding:9px 4px;
     font-size:.95rem; color:var(--text);}
   .scope-member input{width:18px; height:18px; accent-color:var(--accent);}
+  /* v74: tag picker — two-column checkbox list, scrolls if long */
+  #tagChoices{display:grid; grid-template-columns:1fr 1fr; column-gap:8px;
+    max-height:42vh; overflow-y:auto;}
+  #tagChoices .scope-member{padding:8px 4px;}
+  #tagChoices input:disabled + span{opacity:.4;}
   #tagFilter{display:flex; gap:8px; overflow-x:auto; margin-bottom:14px;
     -webkit-overflow-scrolling:touch; scrollbar-width:none;}
   #tagFilter:empty{display:none;}
@@ -718,7 +723,7 @@
       <input type="file" id="importFile" accept=".json,application/json" style="display:none">
       <button class="btn ghost" id="wipeBtn">Delete all data</button>
     </div>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v73<br><span id="envInfo"></span></p>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v74<br><span id="envInfo"></span></p>
   </section>
 </main>
 
@@ -881,6 +886,20 @@
   </div>
 </div>
 
+<div id="tagSheet" class="sheet-overlay" role="dialog" aria-modal="true" aria-label="Tags" style="display:none;">
+  <div class="sheet">
+    <h3><span class="ic ic-tag" aria-hidden="true"></span> Tags</h3>
+    <p class="side-note" id="tagHint" style="margin:2px 0 8px;">Tick up to 3.</p>
+    <div id="tagChoices"></div>
+    <div style="display:flex; gap:8px; margin-top:10px;">
+      <input id="tagNew" class="med-inp" style="flex:1;" autocomplete="off" placeholder="New tag…" aria-label="Add a new tag" enterkeyhint="done">
+      <button class="btn ghost" id="tagAdd" style="flex:0 0 auto; width:auto;">Add</button>
+    </div>
+    <button class="btn primary" id="tagSave" style="margin-top:12px;">Save</button>
+    <button class="btn ghost" id="tagCancel">Cancel</button>
+  </div>
+</div>
+
 <div id="dateSheet" class="sheet-overlay" role="dialog" aria-modal="true" aria-label="When" style="display:none;">
   <div class="sheet">
     <h3><span class="ic ic-calendar" aria-hidden="true"></span> When?</h3>
@@ -969,7 +988,7 @@
   <div id="histList"></div>
 </div>
 
-<div id="briefOverlay" class="sheet-overlay" role="dialog" aria-modal="true" aria-label="Doctor visit brief" style="display:none;">
+<div id="briefOverlay" class="sheet-overlay" role="dialog" aria-modal="true" aria-label="Report" style="display:none;">
   <div class="sheet" style="max-width:640px; max-height:88vh; display:flex; flex-direction:column;">
     <div id="briefBody" style="overflow-y:auto; background:#fff; color:#111; border-radius:10px; padding:16px 18px; margin-bottom:10px;"></div>
     <div style="display:flex; gap:8px;">
@@ -2618,7 +2637,8 @@ function renderJournal(){
     }
     const hist = document.createElement('button');
     hist.className = 'btn ghost';
-    setIconLabel(hist, 'scroll', 'History & export');
+    // same words as the space's own action bar
+    setIconLabel(hist, 'scroll', sp.type === 'care' ? 'History & briefing' : 'History & export');
     hist.addEventListener('click', () => openHistory(sp));
     row.appendChild(hist);
     rec.appendChild(row);
@@ -2769,7 +2789,7 @@ function renderSpaceFilter(){
   };
   mk('All', 'all');
   spaces.forEach(sp => mk(sp.name, sp.hid, SPACE_ICON[sp.type] || 'users'));
-  mk('Personal', 'personal', 'lock');
+  mk('Private', 'personal', 'lock');   // v74: same word as the capture screen ('personal' stays as the stored key)
 }
 
 function renderTagFilter(list){
@@ -2820,8 +2840,8 @@ const SPACE_ACTIONS = {
   coparenting: [
     ['calendar', 'Custody', sp => openCustody(sp)],
     ['dollar', 'Ledger', sp => openLedger(sp)],
-    ['clipboard', 'Summary', sp => openCoparentReport(sp)],
-    ['scroll', 'History', sp => openHistory(sp)],
+    ['clipboard', 'Records summary', sp => openCoparentReport(sp)],
+    ['scroll', 'History & export', sp => openHistory(sp)],
     ['share', 'Invite', sp => shareSpaceInvite(sp)]
   ],
   care: [
@@ -2834,7 +2854,7 @@ const SPACE_ACTIONS = {
   family: [
     ['users', 'People', sp => editSpaceMembers(sp)],
     ['clipboard', 'Week report', sp => openFamilyReport(sp)],
-    ['scroll', 'History', sp => openHistory(sp)],
+    ['scroll', 'History & export', sp => openHistory(sp)],
     ['share', 'Invite', sp => shareSpaceInvite(sp)]
   ]
 };
@@ -3027,6 +3047,77 @@ async function editText(td){
   if (document.getElementById('view-ideas').classList.contains('active')) renderIdeas();
 }
 
+/* ---------- v74: tag picker ----------
+   Tags were edited as comma-separated TEXT — a typing task, and a hard one
+   for anyone the app targets. Now: a checkbox list of every tag the app
+   knows (the stable sorting vocabulary, household members, and any tag
+   already in use), tick up to 3, with a small field only for coining a
+   genuinely new tag. */
+let tagTask = null;
+function allKnownTags(){
+  const set = new Set(TAG_RULES.map(([t]) => t));
+  set.add('general');
+  store.get('members', []).forEach(m => set.add(m));
+  todos.forEach(t => (t.tags || []).forEach(tg => set.add(tg)));
+  return [...set].sort((a, b) => a.localeCompare(b));
+}
+function tagRow(tag, checked){
+  const lab = document.createElement('label');
+  lab.className = 'scope-member';
+  const cb = document.createElement('input');
+  cb.type = 'checkbox'; cb.value = tag; cb.checked = checked;
+  cb.addEventListener('change', enforceTagMax);
+  const txt = document.createElement('span');
+  txt.textContent = tag;
+  lab.appendChild(cb); lab.appendChild(txt);
+  return lab;
+}
+function enforceTagMax(){
+  const boxes = [...document.querySelectorAll('#tagChoices input')];
+  const n = boxes.filter(b => b.checked).length;
+  boxes.forEach(b => { b.disabled = !b.checked && n >= 3; });
+  document.getElementById('tagHint').textContent =
+    n >= 3 ? 'Three ticked — untick one to swap.' : 'Tick up to 3.';
+}
+function openTagSheet(td){
+  tagTask = td;
+  const host = document.getElementById('tagChoices');
+  host.innerHTML = '';
+  const current = (td.tags || []).filter(t => t !== 'general' || (td.tags || []).length === 1);
+  const rest = allKnownTags().filter(t => !current.includes(t));
+  [...current, ...rest].forEach(t => host.appendChild(tagRow(t, current.includes(t))));
+  enforceTagMax();
+  document.getElementById('tagNew').value = '';
+  document.getElementById('tagSheet').style.display = 'flex';
+}
+function closeTagSheet(){ document.getElementById('tagSheet').style.display = 'none'; tagTask = null; }
+function addNewTag(){
+  const field = document.getElementById('tagNew');
+  const v = field.value.toLowerCase().replace(/[^a-z0-9 -]/g, '').trim().slice(0, 24);
+  if (!v){ field.value = ''; return; }
+  const host = document.getElementById('tagChoices');
+  const existing = [...host.querySelectorAll('input')].find(b => b.value === v);
+  const canTick = [...host.querySelectorAll('input')].filter(b => b.checked).length < 3;
+  if (existing){ if (canTick) existing.checked = true; }
+  else host.prepend(tagRow(v, canTick));
+  field.value = '';
+  enforceTagMax();
+}
+document.getElementById('tagAdd').addEventListener('click', addNewTag);
+document.getElementById('tagNew').addEventListener('keydown', e => {
+  if (e.key === 'Enter'){ e.preventDefault(); addNewTag(); }
+});
+document.getElementById('tagSave').addEventListener('click', () => {
+  if (!tagTask) return;
+  const sel = [...document.querySelectorAll('#tagChoices input')]
+    .filter(b => b.checked).map(b => b.value).slice(0, 3);
+  tagTask.tags = sel.length ? sel : ['general'];
+  saveTodos(); renderTodos();
+  if (document.getElementById('view-ideas').classList.contains('active')) renderIdeas();
+  closeTagSheet();
+});
+document.getElementById('tagCancel').addEventListener('click', closeTagSheet);
+
 // Date picker sheet: quick chips + a native <input type="date">.
 let dateTask = null;
 function applyTaskDate(td, date, someday){
@@ -3194,17 +3285,7 @@ function todoRow(td){
       tg.appendChild(s);
     }
     // tap tags to edit them (doesn't toggle the transcript)
-    tg.addEventListener('click', async (e) => {
-      e.stopPropagation();
-      const edited = await askInput({title: 'Edit tags', value: (td.tags || []).join(', '),
-        placeholder: 'e.g. home, urgent', hint: 'Comma-separated, up to 3.'});
-      if (edited === null) return;
-      td.tags = edited.split(',')
-        .map(s => s.toLowerCase().replace(/[^a-z0-9 -]/g,'').trim())
-        .filter(Boolean).slice(0, 3);
-      if (!td.tags.length) td.tags = ['general'];
-      saveTodos(); renderTodos();
-    });
+    tg.addEventListener('click', (e) => { e.stopPropagation(); openTagSheet(td); });
     row.appendChild(tg);
   }
   // tiny steps from "break it down"
@@ -3865,7 +3946,13 @@ function openScopeSheet(td){
   const spWrap = document.getElementById('scopeSpaces');
   spWrap.innerHTML = '';
   const spaces = spacesList();
-  document.getElementById('scopeFamily').style.display = spaces.length > 1 ? 'none' : '';
+  const famBtn = document.getElementById('scopeFamily');
+  famBtn.style.display = spaces.length > 1 ? 'none' : '';
+  // v74: name the actual space — "Family" read wrong on a care or co-parenting space
+  if (spaces.length === 1)
+    setIconLabel(famBtn, SPACE_ICON[spaces[0].type] || 'users', `Everyone in “${spaces[0].name}”`);
+  else if (!spaces.length)
+    setIconLabel(famBtn, 'users', 'Family — everyone in the household');
   if (spaces.length > 1){
     spaces.forEach(sp => {
       const b = document.createElement('button');
@@ -4692,7 +4779,7 @@ function briefingInner(sp, b){
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
   const sec = (title, arr) => (arr && arr.length)
     ? `<h2 style="font-size:14px;margin:16px 0 6px;">${title}</h2><ul style="margin:0;padding-left:20px;">${arr.map(x => '<li style="font-size:13px;line-height:1.55;">' + esc(x) + '</li>').join('')}</ul>` : '';
-  return `<h1 style="font-size:18px;margin:0 0 2px;">${esc(sp.name)} — visit brief</h1>` +
+  return `<h1 style="font-size:18px;margin:0 0 2px;">${esc(sp.name)} — doctor briefing</h1>` +
     `<p style="color:#555;font-size:11px;margin:0 0 8px;">Covers the last 4 weeks of shared care records · prepared ${new Date().toLocaleDateString()}. Family coordination summary, not medical advice.</p>` +
     `<p style="font-size:13px;line-height:1.55;">${esc(b.overview)}</p>` +
     sec('Observations', b.observations) +
@@ -4705,12 +4792,12 @@ function briefingHtml(sp, b){
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
   const sec = (title, arr) => (arr && arr.length)
     ? `<h2>${title}</h2><ul>${arr.map(x => '<li>' + esc(x) + '</li>').join('')}</ul>` : '';
-  return `<!DOCTYPE html><html><head><title>${esc(sp.name)} — doctor visit brief</title>
+  return `<!DOCTYPE html><html><head><title>${esc(sp.name)} — doctor briefing</title>
 <style>body{font-family:Georgia,serif; margin:36px; color:#111; max-width:720px;}
 h1{font-size:19px; margin-bottom:2px;} h2{font-size:14px; margin:18px 0 6px;}
 p,li{font-size:13px; line-height:1.55;} ul{margin:0; padding-left:20px;}
 .meta{color:#555; font-size:11px;}</style></head><body>
-<h1>${esc(sp.name)} — visit brief</h1>
+<h1>${esc(sp.name)} — doctor briefing</h1>
 <p class="meta">Covers the last 4 weeks of shared care records · prepared ${new Date().toLocaleDateString()} with Idea → Todo.
 Family coordination summary, not medical advice.</p>
 <p>${esc(b.overview)}</p>
@@ -4757,7 +4844,7 @@ async function openBriefing(sp){
     toast('Nothing to brief yet — save a care note or tick off a medication first, then the report has something to include.');
     return;
   }
-  openReport(sp.name + ' — visit brief',
+  openReport(sp.name + ' — doctor briefing',
     aiEnabled() ? 'Reading 4 weeks of shared records and composing the brief…'
                 : 'Reading 4 weeks of shared records…',
     async () => {
@@ -4855,7 +4942,7 @@ function familyReportHtml(sp){
     .sort((a, b) => a.date < b.date ? -1 : 1).slice(0, 8)
     .map(t => repEsc(t.text) + ' — ' + fmtDay(t.date) + (t.time ? ' ' + fmtTime(t.time) : '') +
       ((t.assignees || []).length ? repMeta('for ' + repEsc(t.assignees.join(', '))) : ''));
-  return repHead(sp.name + ' — week in review', 'Last 7 days · generated ' + new Date().toLocaleDateString()) +
+  return repHead(sp.name + ' — week report', 'Last 7 days · generated ' + new Date().toLocaleDateString()) +
     `<p style="font-size:13px;line-height:1.6;">The household finished <b>${done.length}</b> task${done.length === 1 ? '' : 's'} this week, with <b>${open.length}</b> still open.</p>` +
     repSec('Who did what', Object.entries(per).sort((a, b) => b[1] - a[1]).map(([w, n]) => `<b>${repEsc(w)}</b> ticked off ${n}`)) +
     repSec('Finished — the detail', done.slice().sort((a, b) => b.doneAt - a.doneAt).slice(0, 12).map(t =>
@@ -4917,7 +5004,7 @@ function openFamilyReport(sp){
     return;
   }
   track('feature_used', {feature: 'family_report'});
-  openReport(sp.name + ' — week in review', 'Adding up the household’s week…', () => familyReportHtml(sp));
+  openReport(sp.name + ' — week report', 'Adding up the household’s week…', () => familyReportHtml(sp));
 }
 function openCoparentReport(sp){
   if (!todos.some(t => t.space === sp.hid)){
@@ -5821,6 +5908,7 @@ document.addEventListener('keydown', (e) => {
     ['onboarding', () => dismissOnboarding()],
     ['scopeSheet', () => closeScopeSheet()],
     ['inputSheet', () => closeInput(null)],
+    ['tagSheet', () => closeTagSheet()],
     ['dateSheet', () => { document.getElementById('dateSheet').style.display = 'none'; dateTask = null; }],
     ['repeatSheet', () => { document.getElementById('repeatSheet').style.display = 'none'; repeatTask = null; }],
     ['setupSheet', () => { document.getElementById('setupSheet').style.display = 'none'; }],

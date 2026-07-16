@@ -43,12 +43,17 @@ const { chromium } = require('playwright');
   check('prompt primes existing tags', /existing tags.*finance/s.test(lastPrompt));
   check('prompt demands reuse', /STRONGLY prefer reusing/.test(lastPrompt));
 
-  // tag editing via tap
+  // tag editing via tap — v74: a checkbox sheet (untick the old, add the new)
   await page.click('nav.tabs button[data-view="today"]');
   await page.locator('.todo', { hasText: 'Renew the car insurance' }).locator('.ttags').click();
   await page.waitForTimeout(150);
-  await page.fill('#inputField', 'work, urgent');
-  await page.click('#inputSave');
+  await page.locator('#tagChoices label', { hasText: 'finance' }).locator('input').uncheck();
+  await page.locator('#tagChoices label', { hasText: 'car' }).first().locator('input').uncheck();
+  await page.fill('#tagNew', 'work');
+  await page.click('#tagAdd');
+  await page.fill('#tagNew', 'urgent');
+  await page.click('#tagAdd');
+  await page.click('#tagSave');
   await page.waitForTimeout(300);
   const tags = await page.locator('.todo', { hasText: 'Renew the car insurance' }).locator('.ttag').allTextContents();
   check('tag edit applied', tags.includes('work') && tags.includes('urgent'));

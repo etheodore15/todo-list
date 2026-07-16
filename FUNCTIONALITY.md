@@ -6,7 +6,7 @@ to them would require. Everything below describes working software unless marked
 otherwise. Landing page: https://etheodore15.github.io/todo-list/*
 
 *This is a **living document** — it is amended with every release so it never
-drifts from the shipped product. Last updated: v73.*
+drifts from the shipped product. Last updated: v74.*
 
 > **Caveat:** the product is in active development. Some features are new and may
 > behave unpredictably; the AI layer currently runs on a built-in heuristic for
@@ -81,7 +81,9 @@ solves that once; each new cohort is mostly a new surface on the same engine.
 - **Just One Thing**: a full-screen single-task focus mode for overwhelm
 - **Wins view**: what got finished today/this week; streak counts activity and
   never punishes gaps
-- Tags with counts and filtering; per-person filter chips
+- Tags with counts and filtering; per-person filter chips. Tags are edited
+  with a tick-up-to-3 checkbox picker over the known vocabulary (typing only
+  to coin a new tag) — no comma-separated text entry
 - **Quiet visual mode**: a calmer, lower-stimulus theme
 - Undo on destructive actions; edit-in-place for text, dates, tags, scope
 
