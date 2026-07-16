@@ -166,6 +166,43 @@ export function onSnapshot(col, cb){ cb({docChanges: () => []}); return () => {}
   check('v69: switching to Private hides it again',
     !(await C.locator('#saveNoteBtn').isVisible()));
 
+  // ---------- 7. v70 regression: briefing stacks ABOVE history; bar wraps ----------
+  const D = await mk(() => {
+    localStorage.setItem('onboarded', 'true');
+    localStorage.setItem('myName', JSON.stringify('Alex'));
+    localStorage.setItem('spaces', JSON.stringify([
+      {hid:'hh-care', name:"Mum's care", type:'care', cfg:{apiKey:'k',projectId:'p'}},
+      {hid:'hh-fam', name:'Home', type:'family', cfg:{apiKey:'k',projectId:'p'}}]));
+    localStorage.setItem('events', JSON.stringify([
+      {id:'e1', kind:'note', space:'hh-care', who:'Alex', ts: Date.now(), text:'Ate well today'}]));
+  });
+  await D.setViewportSize({ width: 390, height: 844 });
+  await D.click('nav.tabs button[data-view="today"]');
+  await D.waitForTimeout(300);
+  // filter to the care space so its action bar renders, then check nothing clips
+  await D.locator('#spaceFilter .fchip', { hasText: "Mum's care" }).click();
+  await D.waitForTimeout(300);
+  const clipped = await D.evaluate(() => {
+    const bar = document.querySelector('#spaceBar .space-bar');
+    return [...bar.querySelectorAll('.space-act')].some(b => {
+      const r = b.getBoundingClientRect();
+      return r.right > innerWidth || r.left < 0;
+    });
+  });
+  check('v70: care action bar wraps — no button clipped off-screen', clipped === false);
+  // doctor briefing must open ON TOP of the history overlay, not underneath it
+  await D.evaluate(() => openHistory(spacesList().find(s => s.type === 'care')));
+  await D.waitForTimeout(300);
+  await D.click('#histBriefBtn');
+  await D.waitForTimeout(200);
+  const stack = await D.evaluate(() => ({
+    briefShown: document.getElementById('briefOverlay').style.display !== 'none',
+    briefZ: +getComputedStyle(document.getElementById('briefOverlay')).zIndex,
+    histZ: +getComputedStyle(document.getElementById('histOverlay')).zIndex
+  }));
+  check('v70: briefing overlay opens above the history screen (z-order)',
+    stack.briefShown && stack.briefZ > stack.histZ);
+
   console.log(errors.length ? 'ERRORS:\n' + errors.join('\n') : 'NO JS ERRORS');
   console.log(pass + ' passed, ' + fail + ' failed');
   await browser.close();

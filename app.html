@@ -327,6 +327,9 @@
   .tone-suggested{border-color:var(--ok);}
 
   /* history / audit log (C1) */
+  /* v70: reports must open ON TOP of the history screen they're launched from
+     (histOverlay is 64; the brief used to open invisibly underneath at 60) */
+  #briefOverlay{z-index:70;}
   #histOverlay, #ledgerOverlay{position:fixed; inset:0; z-index:64; background:var(--bg); overflow-y:auto;
     padding:calc(14px + env(safe-area-inset-top)) 16px calc(24px + env(safe-area-inset-bottom));
     max-width:640px; margin:0 auto;}
@@ -390,8 +393,9 @@
   body.quiet .progress > div{background:var(--accent);}
 
   /* v43: space-aware Today — action bar + ADHD toolkit strip + setup steps */
-  .space-bar{display:flex; gap:8px; overflow-x:auto; margin-bottom:12px; scrollbar-width:none;}
-  .space-bar::-webkit-scrollbar{display:none;}
+  /* v70: wrap onto extra rows on narrow screens — the bar used to clip
+     mid-label ("History &…") with the last buttons pushed off-screen */
+  .space-bar{display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px;}
   .space-act{white-space:nowrap; flex:0 0 auto; padding:8px 12px; font-size:.85rem;}
   .adhd-strip{border:1px solid var(--border); border-radius:12px; padding:10px 12px; margin-bottom:12px;
     background:linear-gradient(180deg, rgba(125,138,165,.10), transparent);}
@@ -683,7 +687,7 @@
       <input type="file" id="importFile" accept=".json,application/json" style="display:none">
       <button class="btn ghost" id="wipeBtn">Delete all data</button>
     </div>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v69<br><span id="envInfo"></span></p>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v70<br><span id="envInfo"></span></p>
   </section>
 </main>
 
@@ -5050,7 +5054,7 @@ function renderProfileCards(){
     const head = document.createElement('div');
     head.className = 'profile-head';
     head.innerHTML = `<b><span class="ic ic-heart" aria-hidden="true"></span> ${p.name || sp.name}</b>` +
-      (p.age ? `<span class="profile-age">${p.age}</span>` : '');
+      (p.age ? `<span class="profile-age">Age ${p.age}</span>` : '');
     const edit = document.createElement('button');
     edit.className = 'profile-edit'; edit.textContent = 'Edit';
     edit.addEventListener('click', () => openProfile(sp));
