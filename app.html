@@ -671,7 +671,7 @@
       <input type="file" id="importFile" accept=".json,application/json" style="display:none">
       <button class="btn ghost" id="wipeBtn">Delete all data</button>
     </div>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v64<br><span id="envInfo"></span></p>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v65<br><span id="envInfo"></span></p>
   </section>
 </main>
 
@@ -1905,6 +1905,9 @@ if (!SR && !(navigator.mediaDevices && window.MediaRecorder)){
     liveText.value = (baseText + ' ' + parts.join(' ')).replace(/\s+/g,' ').trim();
   };
   rec.onerror = (e) => {
+    // some devices won't share the mic between the recognizer and our
+    // route-pinning stream — release the pin permanently and behave as before
+    if (e.error === 'audio-capture'){ routePinBlocked = true; unpinAudioRoute(); }
     stopRec();
     if (e.error === 'not-allowed') toast('Microphone permission denied — allow it in site settings.');
     else if (e.error !== 'aborted' && e.error !== 'no-speech') toast('Speech error: ' + e.error);
@@ -1918,6 +1921,30 @@ if (!SR && !(navigator.mediaDevices && window.MediaRecorder)){
   };
 }
 
+/* v65: pin the audio route while dictating. Android tears down and
+   renegotiates the microphone audio session on EVERY recognizer restart — and
+   continuous dictation restarts often (after each pause/final). When any
+   Bluetooth audio device is in the mix that renegotiation flips the BT link
+   in/out of call-audio (SCO) mode, which hogs the shared 2.4 GHz radio and is
+   a classic cause of BLE wearables (watches, trackers) dropping off. Holding
+   ONE getUserMedia stream for the whole dictation keeps the audio session up
+   so recognizer restarts reuse the route instead of flapping it. If a device
+   won't share the mic (recognizer reports 'audio-capture'), we release the
+   pin and never use it again this session — worst case is the old behavior. */
+let routePin = null, routePinBlocked = false;
+function pinAudioRoute(){
+  if (routePin || routePinBlocked || !(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)) return;
+  navigator.mediaDevices.getUserMedia({audio: true})
+    .then(s => {
+      if (recording) routePin = s;                      // still dictating → hold it
+      else s.getTracks().forEach(t => t.stop());        // stopped meanwhile → let go
+    })
+    .catch(() => {});
+}
+function unpinAudioRoute(){
+  if (routePin){ routePin.getTracks().forEach(t => t.stop()); routePin = null; }
+}
+
 function startRec(){
   baseText = liveText.value.trim();
   recording = true;
@@ -1925,10 +1952,12 @@ function startRec(){
   micBtn.textContent = '⏹';
   startRecTimer('sr');
   try{ rec.start(); }catch(_){}
+  pinAudioRoute();
 }
 function stopRec(){
   recording = false;
   stopRecTimer();
+  unpinAudioRoute();
   micBtn.classList.remove('recording');
   setIconLabel(micBtn, 'mic');
   micHint.innerHTML = 'Tap the mic and speak your idea.<br>Or type below.';
