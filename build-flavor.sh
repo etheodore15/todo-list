@@ -28,6 +28,16 @@ for f in digest.js ai-worker.js; do [ -f "$SRC/$f" ] && cp "$SRC/$f" "$OUT/"; do
 cp "${CFG}/managed-config.js"     "$OUT/managed-config.js"     2>/dev/null || cp "$SRC/managed-config.js" "$OUT/"
 cp "${CFG}/manifest.webmanifest"  "$OUT/manifest.webmanifest"  2>/dev/null || cp "$SRC/manifest.webmanifest" "$OUT/"
 
+# directory index: the app's entry file is app.html, so static hosts 404 on
+# the bare directory URL without this redirect shim
+cat > "$OUT/index.html" <<'HTML'
+<!doctype html><html lang="en"><head><meta charset="UTF-8">
+<meta http-equiv="refresh" content="0; url=app.html">
+<link rel="canonical" href="app.html"><title>Loading…</title>
+<script>location.replace('app.html' + location.search + location.hash);</script>
+</head><body><p><a href="app.html">Open the app</a></p></body></html>
+HTML
+
 # per-flavor SW cache namespace (ideatodo keeps its historic name)
 if [ "$FLAVOR" != "ideatodo" ]; then
   sed -i.bak "s/'idea-todo-v/'${FLAVOR}-v/; s/'idea-todo-libs-/'${FLAVOR}-libs-/" "$OUT/sw.js"
