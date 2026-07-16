@@ -5,6 +5,9 @@ other communities or cohorts this application could serve, and what adapting it
 to them would require. Everything below describes working software unless marked
 otherwise. Landing page: https://etheodore15.github.io/todo-list/*
 
+*This is a **living document** — it is amended with every release so it never
+drifts from the shipped product. Last updated: v66.*
+
 > **Caveat:** the product is in active development. Some features are new and may
 > behave unpredictably; the AI layer currently runs on a built-in heuristic for
 > most users until the operator AI proxy is deployed (imminent).
@@ -73,6 +76,18 @@ solves that once; each new cohort is mostly a new surface on the same engine.
 - **Quiet visual mode**: a calmer, lower-stimulus theme
 - Undo on destructive actions; edit-in-place for text, dates, tags, scope
 
+### Per-cohort reports (one overlay, one print path, a different question each)
+- **Care — doctor briefing**: "what does the doctor need to know?" (see below)
+- **ADHD/personal — My week in review**: "did using this actually help me?"
+- **Family — Week report**: "who carried what, and what's coming?" — household
+  completions, who did what / who added what (load sharing made visible without
+  blame), the next week's dated tasks
+- **Co-parenting — Records summary**: "what would we both sign off on?" —
+  completions per parent, expenses as recorded with a 50/50 balance line,
+  neutral wording, drawn from the append-only record
+- Every report opens instantly with a progress state and composes locally
+  (the care briefing optionally uses AI); all are printable/saveable as PDF
+
 ### Sharing & trust (all shared spaces)
 - Multiple simultaneous spaces with a space switcher; per-space task scoping
 - Attribution on every action: who added, who ticked, with timestamps
@@ -112,6 +127,10 @@ solves that once; each new cohort is mostly a new surface on the same engine.
 - Voice brain-dump (capture without organising), Break it down, Just One
   Thing, energy matching + easy wins, no-shame carry-over, Wins/streaks, quiet
   mode — surfaced together in a dismissible "focus toolkit" strip on Today
+- **My week in review**: a one-tap personal report — tasks you finished with
+  total effort minutes, high-effort tasks called out, strongest day, trend vs
+  the prior week, and parked/let-go items framed as a skill. Deliberately
+  no-shame: a quieter week "is allowed"
 
 ### Platform
 - Installable PWA: offline-capable, no app store required (store distribution
@@ -173,6 +192,9 @@ This is the part that matters for "where else could this apply":
 - **Prompts** — the structuring prompt is composed at runtime (known tags,
   household members, date context); cohort-specific extraction rules are a
   prompt change, not an engine change
+- **Reports are per-cohort composers on one shared overlay** — adding a new
+  cohort's report is writing one compose function over the existing task/event
+  data; the loading UX, print path and entry patterns are already generic
 - **The trust layer is generic** — append-only events, attribution, exports,
   timed/recurring tasks with miss-flagging: built for co-parents and carers but
   not specific to them
