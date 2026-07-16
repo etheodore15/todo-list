@@ -147,6 +147,9 @@
   .mini-task.done .mchk{background:var(--ok); border-color:var(--ok); color:#fff;}
   .mini-task.done .mtxt{color:var(--muted); text-decoration:line-through;}
   .mini-task .mtxt{flex:1; line-height:1.35;}
+  .mini-task .mmove{background:none; border:none; color:var(--muted); cursor:pointer;
+    padding:4px 6px; font-size:.85rem; flex:0 0 auto;}
+  .mini-task .mmove:hover{color:var(--accent);}
   .card.flash{animation:flash 1.8s ease-out;}
   @keyframes flash{
     0%, 55%{border-color:var(--accent); box-shadow:0 0 0 2px rgba(113,50,245,.45);}
@@ -715,7 +718,7 @@
       <input type="file" id="importFile" accept=".json,application/json" style="display:none">
       <button class="btn ghost" id="wipeBtn">Delete all data</button>
     </div>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v72<br><span id="envInfo"></span></p>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v73<br><span id="envInfo"></span></p>
   </section>
 </main>
 
@@ -2652,20 +2655,32 @@ function renderIdeas(){
     const rawEl = card.querySelector('.raw');
     rawEl.textContent = idea.raw;
     rawEl.addEventListener('click', () => rawEl.classList.toggle('open'));
-    // C2c: opt-in care journal — ideas stay private unless shared to a care space
+    // C2c: opt-in care journal — ideas stay private unless shared to a care space.
+    // v73: a misdirected share can be taken back — the journal stops showing the
+    // note (and the doctor briefing excludes it), but the append-only record
+    // keeps BOTH entries: the share and the removal.
     store.get('spaces', []).filter(s => s.type === 'care').forEach(sp => {
       const shared = (idea.sharedTo || []).includes(sp.hid);
       const b = document.createElement('button');
       b.className = 'chip share-note';
       b.style.cssText = 'border:none; cursor:pointer;' + (shared ? ' color:var(--ok);' : '');
-      if (shared) setIconLabel(b, 'check', `in ${sp.name} journal`);
-      else setIconLabel(b, 'share', `Share to ${sp.name}`);
-      b.disabled = shared;
+      if (shared){
+        setIconLabel(b, 'check', `in ${sp.name} journal · remove`);
+        b.setAttribute('aria-label', `Remove from the ${sp.name} journal`);
+        b.title = 'The record keeps both the entry and the removal';
+      } else setIconLabel(b, 'share', `Share to ${sp.name}`);
       b.addEventListener('click', () => {
-        logEvent('note', {id: 'note-' + idea.id, text: idea.raw.slice(0, 600), space: sp.hid});
-        idea.sharedTo = [...(idea.sharedTo || []), sp.hid];
-        saveIdeas(); renderIdeas();
-        toast(`Shared to the ${sp.name} journal`, () => openHistory(sp), 'View');
+        if (shared){
+          logEvent('note-removed', {id: 'note-' + idea.id, text: idea.raw.slice(0, 600), space: sp.hid});
+          idea.sharedTo = (idea.sharedTo || []).filter(h => h !== sp.hid);
+          saveIdeas(); renderIdeas();
+          toast(`Removed from the ${sp.name} journal — the record keeps both entries`, () => openHistory(sp), 'View');
+        } else {
+          logEvent('note', {id: 'note-' + idea.id, text: idea.raw.slice(0, 600), space: sp.hid});
+          idea.sharedTo = [...(idea.sharedTo || []), sp.hid];
+          saveIdeas(); renderIdeas();
+          toast(`Shared to the ${sp.name} journal`, () => openHistory(sp), 'View');
+        }
       });
       card.querySelector('.meta').insertBefore(b, card.querySelector('.del'));
     });
@@ -2684,11 +2699,14 @@ function renderIdeas(){
         const row = document.createElement('div');
         row.className = 'mini-task' + (td.done ? ' done' : '');
         row.innerHTML = `<button class="mchk" aria-label="Toggle done"><span class="ic ic-check" aria-hidden="true"></span></button>
-          <span class="mtxt"></span><span class="dot ${td.priority}"></span>`;
+          <span class="mtxt"></span><span class="dot ${td.priority}"></span>
+          <button class="mmove" aria-label="Move to a space or person" title="Move to a space or person"><span class="ic ic-share" aria-hidden="true"></span></button>`;
         row.querySelector('.mtxt').textContent = td.text;
         row.querySelector('.mchk').addEventListener('click', () => {
           setDone(td, !td.done); saveTodos(); renderIdeas(); updateBadge();
         });
+        // v73: re-home a task straight from the Journal — same sheet as Today
+        row.querySelector('.mmove').addEventListener('click', () => openScopeSheet(td));
         wrap.appendChild(row);
       });
       card.appendChild(wrap);
@@ -4007,7 +4025,8 @@ function flushPendingEvents(sp){
 const EVENT_LABEL = {created: 'added', edited: 'edited', ticked: 'ticked off',
   unticked: 'un-ticked', deleted: 'deleted', restored: 'restored',
   rescheduled: 'rescheduled', parked: 'parked for someday', moved: 'moved',
-  missed: 'missed', note: 'noted', expense: 'logged an expense on'};
+  missed: 'missed', note: 'noted', 'note-removed': 'removed the note',
+  expense: 'logged an expense on'};
 
 // joining/creating the FIRST space adopts existing shareable tasks into it,
 // matching the old "everything local syncs up" behaviour
@@ -4597,8 +4616,11 @@ function briefingInput(sp){
   // missed doses aren't attributable to a person — phrase as "not recorded"
   const missedLine = (e) => new Date(e.ts).toLocaleDateString() + ' — ' + e.text + ' — not recorded as done' +
     (e.detail ? ' (' + e.detail + ')' : '');
+  // v73: a note whose share was taken back must not feed the briefing —
+  // the removal event pairs with the note via the shared taskId
+  const removed = new Set(evs.filter(e => e.kind === 'note-removed').map(e => e.taskId));
   return {
-    notes: evs.filter(e => e.kind === 'note').map(line),
+    notes: evs.filter(e => e.kind === 'note' && !removed.has(e.taskId)).map(line),
     ticked: evs.filter(e => e.kind === 'ticked').map(line),
     missed: evs.filter(e => e.kind === 'missed').map(missedLine),
     open: todos.filter(t => t.space === sp.hid && !t.done)
@@ -4799,7 +4821,7 @@ function weekReflectionHtml(){
   const evs = store.get('events', []).filter(e => e.ts >= now - wk);
   const letGo = evs.filter(e => e.kind === 'deleted').length;
   const parked = evs.filter(e => e.kind === 'parked').length;
-  const open = todos.filter(t => !t.done && !t.someday && visibleToMe(t)).length;
+  const openList = todos.filter(t => !t.done && !t.someday && visibleToMe(t));
   const trend = prev.length ? Math.round(((cur.length - prev.length) / prev.length) * 100) : null;
   const hi = [];
   hi.push(`<b>${cur.length}</b> task${cur.length === 1 ? '' : 's'} finished — about <b>${fmtMins(mins(cur))}</b> of doing.`);
@@ -4815,7 +4837,9 @@ function weekReflectionHtml(){
     repSec('Finished this week', cur.slice().sort((a, b) => b.doneAt - a.doneAt).slice(0, 10).map(t =>
       repEsc(t.text) + repMeta(`${repWhen(t.doneAt)} · ~${fmtMins(t.minutes || ENERGY_MIN[t.energy || 'medium'])}` +
         ((t.energy || 'medium') === 'high' ? ' · high effort' : '')))) +
-    (open ? `<p style="font-size:12px;color:#555;margin-top:12px;">${open} task${open === 1 ? '' : 's'} still open — they'll wait kindly.</p>` : '');
+    repSec(`Still open — they'll wait kindly`, openList.slice(0, 10).map(t =>
+      repEsc(t.text) + (t.date ? repMeta(fmtDay(t.date) + (t.time ? ' ' + fmtTime(t.time) : '')) : ''))) +
+    (openList.length > 10 ? `<p style="font-size:12px;color:#555;margin-top:6px;">…and ${openList.length - 10} more, waiting on Today.</p>` : '');
 }
 
 function familyReportHtml(sp){
@@ -4837,7 +4861,9 @@ function familyReportHtml(sp){
     repSec('Finished — the detail', done.slice().sort((a, b) => b.doneAt - a.doneAt).slice(0, 12).map(t =>
       repEsc(t.text) + repMeta(`${repEsc(t.doneBy || 'someone')} · ${repWhen(t.doneAt)}`))) +
     repSec('Who added what', Object.entries(added).sort((a, b) => b[1] - a[1]).map(([w, n]) => `${repEsc(w)} added ${n}`)) +
-    repSec('Coming up', upcoming);
+    repSec('Coming up', upcoming) +
+    repSec('Still open', open.filter(t => !t.date || t.date <= todayStr()).slice(0, 10).map(t =>
+      repEsc(t.text) + ((t.assignees || []).length ? repMeta('for ' + repEsc(t.assignees.join(', '))) : '')));
 }
 
 function coparentReportHtml(sp){

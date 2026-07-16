@@ -6,7 +6,7 @@ to them would require. Everything below describes working software unless marked
 otherwise. Landing page: https://etheodore15.github.io/todo-list/*
 
 *This is a **living document** — it is amended with every release so it never
-drifts from the shipped product. Last updated: v72.*
+drifts from the shipped product. Last updated: v73.*
 
 > **Caveat:** the product is in active development. Some features are new and may
 > behave unpredictably; the AI layer currently runs on a built-in heuristic for
@@ -98,7 +98,8 @@ solves that once; each new cohort is mostly a new surface on the same engine.
   (the care briefing optionally uses AI); all are printable/saveable as PDF
 - Reports itemize the record: finished tasks with who ticked them and when,
   each expense as a dated line item with the payer, effort per task in the
-  personal reflection
+  personal reflection — and the open tasks themselves ("Still open"), not
+  just a count, in the personal and family reports
 - Reachability: the **Journal tab** (one of the four main tabs) is the home
   of every report — a one-tap card per report the user can generate. Each
   space's report also sits on that space's action bar; the personal
@@ -114,7 +115,11 @@ back (Journal)**. Three sections:
   no detour through the history screen
 - **Notes** — every raw capture, word for word: zero-task voice notes,
   care observations (labelled with the journal they were shared to), and
-  the source transcript behind each extracted task with tick-off links
+  the source transcript behind each extracted task with tick-off links.
+  A misdirected journal share can be taken back from here — the journal
+  and doctor briefing stop showing the note, while the append-only record
+  keeps both the entry and the removal. Each extracted task can also be
+  moved to another space or person from here (same sheet as Today)
 - **Records** — per shared space: append-only history + CSV/PDF export,
   and the expense ledger for co-parenting spaces
 

@@ -116,6 +116,88 @@ export function onSnapshot(col, cb){ cb({docChanges: () => []}); return () => {}
   check('v72: notes empty state explains what lands here',
     /No notes yet/.test(await B.locator('#ideasList').textContent()));
 
+  // ---------- 3. v73: open tasks IN the reports ----------
+  const E = await mk(() => {
+    const DAY = 86400000, now = Date.now();
+    localStorage.setItem('onboarded', 'true');
+    localStorage.setItem('myName', JSON.stringify('Alex'));
+    localStorage.setItem('spaces', JSON.stringify([
+      {hid:'hh-care', name:"Mum's care", type:'care', cfg:{apiKey:'k',projectId:'p'}},
+      {hid:'hh-fam', name:'Home', type:'family', cfg:{apiKey:'k',projectId:'p'}}]));
+    const t = new Date().toISOString().slice(0,10);
+    localStorage.setItem('todos', JSON.stringify([
+      {id:'p1', text:'Renew the car registration', priority:'high', tags:[], done:true,
+       date:t, doneAt: now - 2*DAY, energy:'high', minutes:60},
+      {id:'p2', text:'File the insurance claim', priority:'medium', tags:[], done:false, date:t, createdBy:'Alex'},
+      {id:'i2-0', text:'Call the plumber', priority:'medium', tags:[], done:false, date:t, ideaId:'i2', createdBy:'Alex'},
+      {id:'f1', text:'Fix the gate', priority:'medium', tags:[], done:false, space:'hh-fam', createdBy:'Alex'}]));
+    localStorage.setItem('ideas', JSON.stringify([
+      {id:'i2', raw:'call the plumber about the hot water', summary:'call the plumber about the hot water',
+       priority:'medium', engine:'built-in', ts: now - DAY}]));
+  });
+  await E.evaluate(() => openReflection());
+  await E.waitForTimeout(400);
+  const refl2 = await E.locator('#briefBody').textContent();
+  check('v73: week in review lists the open tasks, not just a count',
+    /Still open/.test(refl2) && /File the insurance claim/.test(refl2));
+  await E.evaluate(() => { document.getElementById('briefOverlay').style.display='none';
+    openFamilyReport(spacesList().find(s => s.type === 'family')); });
+  await E.waitForTimeout(400);
+  check('v73: family week report lists its open tasks',
+    /Still open/.test(await E.locator('#briefBody').textContent()) &&
+    /Fix the gate/.test(await E.locator('#briefBody').textContent()));
+  await E.evaluate(() => { document.getElementById('briefOverlay').style.display='none'; });
+
+  // ---------- 4. v73: a journal share can be taken back (both entries logged) ----------
+  await E.click('nav.tabs button[data-view="ideas"]');
+  await E.waitForTimeout(300);
+  await E.locator('.card .share-note', { hasText: "Share to Mum's care" }).click();
+  await E.waitForTimeout(200);
+  check('v73: shared chip now offers removal',
+    /in Mum's care journal · remove/.test(await E.locator('.card .share-note').textContent()));
+  check('v73: the share itself is in the record', await E.evaluate(() =>
+    JSON.parse(localStorage.getItem('events')).some(e => e.kind === 'note' && /plumber/.test(e.text))));
+  check('v73: briefing would include the note before removal', await E.evaluate(async () => {
+    histEvents = await collectSpaceEvents(spacesList()[0]);
+    return briefingInput(spacesList()[0]).notes.length === 1;
+  }));
+  await E.locator('.card .share-note').click();   // take it back
+  await E.waitForTimeout(200);
+  check('v73: removal logged as its own append-only entry', await E.evaluate(() =>
+    JSON.parse(localStorage.getItem('events')).some(e => e.kind === 'note-removed')));
+  check('v73: note and removal pair via the same record id', await E.evaluate(() => {
+    const evs = JSON.parse(localStorage.getItem('events'));
+    const n = evs.find(e => e.kind === 'note'), r = evs.find(e => e.kind === 'note-removed');
+    return n && r && n.taskId === r.taskId;
+  }));
+  check('v73: chip returns to offering the share',
+    /Share to Mum's care/.test(await E.locator('.card .share-note').textContent()));
+  check('v73: the briefing excludes the removed note', await E.evaluate(async () => {
+    histEvents = await collectSpaceEvents(spacesList()[0]);
+    return briefingInput(spacesList()[0]).notes.length === 0;
+  }));
+  await E.evaluate(() => openHistory(spacesList()[0]));
+  await E.waitForTimeout(400);
+  const histText = await E.locator('#histList').textContent();
+  check('v73: history shows BOTH the note and its removal',
+    /noted/.test(histText) && /removed the note/.test(histText));
+  await E.click('#histClose');
+
+  // ---------- 5. v73: move a task to another space from the Journal ----------
+  await E.waitForTimeout(200);
+  check('v73: journal task rows offer a move button',
+    await E.locator('.card .mini-task .mmove').count() === 1);
+  await E.locator('.card .mini-task .mmove').click();
+  await E.waitForTimeout(200);
+  check('v73: move button opens the same scope sheet as Today',
+    await E.locator('#scopeSheet').isVisible());
+  await E.locator('#scopeSpaces .btn', { hasText: 'Home' }).click();
+  await E.waitForTimeout(300);
+  check('v73: the task now lives in the chosen space', await E.evaluate(() =>
+    JSON.parse(localStorage.getItem('todos')).find(t => t.id === 'i2-0').space === 'hh-fam'));
+  check('v73: the move is in the space record', await E.evaluate(() =>
+    JSON.parse(localStorage.getItem('events')).some(e => e.kind === 'moved' && /plumber/i.test(e.text))));
+
   console.log(errors.length ? 'ERRORS:\n' + errors.join('\n') : 'NO JS ERRORS');
   console.log(pass + ' passed, ' + fail + ' failed');
   await browser.close();
