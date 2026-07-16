@@ -27,22 +27,38 @@ const { chromium } = require('playwright');
   check('v57: landing stylesheet is the shared marketing sheet',
     await page.locator('link[href="landing.css"]').count() === 1);
 
-  // ---------- animated demos (hero transcription + 3 flow vignettes) ----------
-  check('anim: hero + three vignettes have animation stages',
-    await page.locator('[data-cycle]').count() === 4);
+  // ---------- animated demos (hero + 3 flow vignettes + 4 report vignettes) ----------
+  check('anim: hero + seven vignettes have animation stages',
+    await page.locator('[data-cycle]').count() === 8);
   await page.waitForTimeout(1600);   // mid-cycle: typing underway, tasks not in yet
   const midLen = ((await page.locator('#heroType').textContent()) || '').length;
   const midTasks = await page.locator('.demo .task.on').count();
+  const midReports = await page.locator('.mrep.on').count();
   await page.waitForTimeout(4200);   // late-cycle: typing done, tasks cascaded in
   const endLen = ((await page.locator('#heroType').textContent()) || '').length;
   const endTasks = await page.locator('.demo .task.on').count();
   check('anim: hero transcript types out over time', midLen > 5 && endLen > midLen && endLen > 100);
   check('anim: tasks appear only after the transcription', midTasks === 0 && endTasks === 3);
+  check('anim: report cards compose only after their source records',
+    midReports === 0 && await page.locator('.mrep.on').count() === 4);
   await page.waitForTimeout(1600);   // ~7.4s in: invite code (4.7s) + missed banner (6.8s) shown
   check('anim: space-creation vignette reaches its invite code',
     await page.locator('.mini.ok.on .mcode').count() === 1);
   check('anim: reminder vignette flags the missed dose',
     await page.locator('.vmiss.on').count() === 1);
+
+  // ---------- report vignettes: one per cohort, sources → report ----------
+  const repText = (await page.locator('#reports').textContent()) || '';
+  check('reports: one animated example per cohort (4 report cards)',
+    await page.locator('#reports .mrep').count() === 4);
+  check('reports: care briefing derives from journal + med records',
+    /Journal — Alex/.test(repText) && /Doctor briefing/.test(repText) && /27 of 28/.test(repText));
+  check('reports: focus week-in-review derives from finished tasks',
+    /Renew the car registration/.test(repText) && /week in review/i.test(repText) && /1h 35m/.test(repText));
+  check('reports: co-parenting summary derives from expenses',
+    /\$160\.00/.test(repText) && /Sam owes Alex \$40\.00/.test(repText));
+  check('reports: household week report shows who did what',
+    /Lulu ticked 2/.test(repText) && /week report/i.test(repText));
 
   // reduced motion → static final state, no animation runner
   const rctx = await browser.newContext({ reducedMotion: 'reduce' });
