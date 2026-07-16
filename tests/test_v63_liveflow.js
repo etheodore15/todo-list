@@ -72,6 +72,39 @@ export function onSnapshot(col, cb){ cb({docChanges: () => []}); return () => {}
     /live in “Mum's care”/.test(await A.locator('#toast').textContent()));
   check('v63: processing strip cleared', !(await A.locator('#procStrip').isVisible()));
 
+  // ---------- saving MID-RECORDING ends the recording first ----------
+  const C = await mk();
+  await C.click('nav.tabs button[data-view="capture"]');
+  await C.evaluate(() => {   // simulate an active Web Speech recording
+    recording = true;
+    micBtn.classList.add('recording');
+    startRecTimer('sr');
+    document.getElementById('liveText').value = 'water the garden before it gets hot';
+  });
+  await C.click('#saveIdeaBtn');
+  await C.waitForTimeout(1700);   // finishVoiceCapture's onend timeout is 1.2s
+  check('v63b: Summarize mid-recording stops the recording',
+    await C.evaluate(() => recording === false && !micBtn.classList.contains('recording')));
+  check('v63b: the spoken text still became the idea',
+    await C.evaluate(() => ideas[0] && /water the garden/.test(ideas[0].raw)));
+  check('v63b: and produced its task',
+    await C.evaluate(() => todos.some(t => /water the garden/i.test(t.text))));
+
+  // same guarantee on the care-note button (offline/whisper path flags set)
+  const D = await mk();
+  await D.click('nav.tabs button[data-view="capture"]');
+  await D.evaluate(() => {
+    store.set('localASR', true);          // offline path selected
+    recording = true;
+    micBtn.classList.add('recording');
+    document.getElementById('liveText').value = 'Mum had a good morning walk';
+  });
+  await D.click('#saveNoteBtn');
+  await D.waitForTimeout(600);
+  check('v63b: Save note mid-recording (offline path) stops and saves',
+    await D.evaluate(() => recording === false &&
+      JSON.parse(localStorage.getItem('events') || '[]').some(e => e.kind === 'note' && /morning walk/.test(e.text))));
+
   // ---------- pending ideas resume after a reload ----------
   const B = await mk(() => {
     localStorage.setItem('onboarded', 'true');

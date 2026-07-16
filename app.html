@@ -671,7 +671,7 @@
       <input type="file" id="importFile" accept=".json,application/json" style="display:none">
       <button class="btn ghost" id="wipeBtn">Delete all data</button>
     </div>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v63<br><span id="envInfo"></span></p>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v64<br><span id="envInfo"></span></p>
   </section>
 </main>
 
@@ -2030,6 +2030,31 @@ function updateAsrHint(){
     micHint.innerHTML = 'Tap the mic and speak your idea.<br>Or type below.';
 }
 
+/* Stop whichever voice path is live and wait until the LAST words have landed
+   in the box — so tapping "Summarize & Add" / "Save note" mid-recording ends
+   the recording and captures the tail instead of cutting it off.
+   - Whisper path: stopping queues the final segment; drain the queue.
+   - Web Speech path: the engine flushes final results between stop() and
+     onend — wait for onend (with a timeout so a wedged engine can't hang the
+     button). */
+async function finishVoiceCapture(){
+  if (!recording){ await asrDrain(); return; }
+  if (useLocalASR()){
+    await stopRecLocal();
+    await asrDrain();
+    return;
+  }
+  await new Promise(res => {
+    if (!rec){ stopRec(); res(); return; }
+    let done = false;
+    const finish = () => { if (!done){ done = true; rec.onend = prevEnd; res(); } };
+    const prevEnd = rec.onend;
+    const t = setTimeout(finish, 1200);
+    rec.onend = (e) => { try { prevEnd && prevEnd(e); } catch(_){} clearTimeout(t); finish(); };
+    stopRec();
+  });
+}
+
 /* live elapsed-time hint for both voice paths */
 let recTimerInt = null, recStartedAt = 0;
 function startRecTimer(kind){
@@ -2351,8 +2376,9 @@ async function structureIdea(idea){
 
 const saveIdeaBtn = document.getElementById('saveIdeaBtn');
 saveIdeaBtn.addEventListener('click', async () => {
-  if (recording) (useLocalASR() ? stopRecLocal() : stopRec());
-  await asrDrain();                       // let any in-flight offline transcription land first
+  saveIdeaBtn.disabled = true;            // no double-fires while the tail lands
+  await finishVoiceCapture();             // ends any recording + waits for the last words
+  saveIdeaBtn.disabled = false;
   const raw = liveText.value.trim();
   if (!raw){ toast('Nothing to save — speak or type an idea first.'); return; }
   const idea = {id: uid(), raw, summary: raw.length > 120 ? raw.slice(0, 117) + '…' : raw,
@@ -2396,10 +2422,13 @@ function refreshCaptureMode(){
     lt.setAttribute('placeholder', 'Your transcribed idea appears here… you can also just type.');
   }
 }
-document.getElementById('saveNoteBtn').addEventListener('click', () => {
+document.getElementById('saveNoteBtn').addEventListener('click', async () => {
+  const noteBtn = document.getElementById('saveNoteBtn');
+  noteBtn.disabled = true;
+  await finishVoiceCapture();             // ends any recording + waits for the last words
+  noteBtn.disabled = false;
   const raw = liveText.value.trim();
   if (!raw){ toast('Nothing to save — speak or type a note first.'); return; }
-  if (recording) stopRec();
   const sp = noteSpace();
   if (!sp) return;
   // keep a private copy in Ideas too, marked already-shared to this space
