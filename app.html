@@ -374,6 +374,9 @@
   .proc-strip{display:flex; gap:8px; align-items:center; margin-top:10px; padding:9px 12px;
     background:var(--card2); border-radius:10px; color:var(--muted); font-size:.82rem;}
   .proc-strip .spin{color:var(--accent);}
+  .report-loading{display:flex; gap:12px; align-items:center; padding:26px 6px; font-size:13px;
+    line-height:1.5; color:#333;}
+  .report-loading .spin{font-size:1.5rem; color:var(--accent); flex:0 0 auto;}
 
   /* Quiet visual mode (B7): calmer palette, no motion, less visual noise */
   body.quiet{--accent:#6a5ea8; --accent2:#5b5192; --hi:#a05a66; --med:#8a7550; --low:#5f8f76;
@@ -529,6 +532,7 @@
     <details id="winsBlock" class="side-block" style="display:none;">
       <summary><span class="ic ic-trophy" aria-hidden="true"></span> Wins</summary>
       <div id="winsList"></div>
+      <button class="btn ghost" id="reflectBtn" style="width:100%; margin-top:8px;"><span class="ic ic-clipboard" aria-hidden="true"></span> My week in review</button>
     </details>
     <button class="btn ghost" id="shareBtn" style="display:none; width:100%; margin-top:6px;"><span class="ic ic-share" aria-hidden="true"></span> Share this list</button>
   </section>
@@ -671,7 +675,7 @@
       <input type="file" id="importFile" accept=".json,application/json" style="display:none">
       <button class="btn ghost" id="wipeBtn">Delete all data</button>
     </div>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v65<br><span id="envInfo"></span></p>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v66<br><span id="envInfo"></span></p>
   </section>
 </main>
 
@@ -2652,6 +2656,7 @@ const SPACE_ACTIONS = {
   coparenting: [
     ['calendar', 'Custody', sp => openCustody(sp)],
     ['dollar', 'Ledger', sp => openLedger(sp)],
+    ['clipboard', 'Summary', sp => openCoparentReport(sp)],
     ['scroll', 'History', sp => openHistory(sp)],
     ['share', 'Invite', sp => shareSpaceInvite(sp)]
   ],
@@ -2664,6 +2669,7 @@ const SPACE_ACTIONS = {
   ],
   family: [
     ['users', 'People', sp => editSpaceMembers(sp)],
+    ['clipboard', 'Week report', sp => openFamilyReport(sp)],
     ['scroll', 'History', sp => openHistory(sp)],
     ['share', 'Invite', sp => shareSpaceInvite(sp)]
   ]
@@ -4536,8 +4542,31 @@ ${sec('Questions for the doctor', b.questions)}
 </body></html>`;
 }
 
-let curBrief = null;
-document.getElementById('histBriefBtn').addEventListener('click', async () => {
+/* ---------- generic report overlay (v66) ----------
+   One overlay serves every cohort's report. openReport() shows it IMMEDIATELY
+   with a progress state — the user is never left staring at the button they
+   just pressed — then the composed content swaps in. `compose` may be async
+   (the care briefing calls the AI); everything else composes locally. */
+let curReport = null;   // {title, bodyHtml} — for the print path
+let reportSeq = 0;      // ignore stale results if a newer report was opened
+
+async function openReport(title, loadingMsg, compose){
+  const seq = ++reportSeq;
+  const body = document.getElementById('briefBody');
+  body.innerHTML = `<div class="report-loading"><span class="spin" aria-hidden="true">◌</span>` +
+    `<div><b>${title}</b><br>${loadingMsg}</div></div>`;
+  document.getElementById('briefPrint').disabled = true;
+  document.getElementById('briefOverlay').style.display = 'flex';
+  let html;
+  try { html = await compose(); }
+  catch (err) { html = `<p style="font-size:13px;">Couldn’t build this report (${String(err && err.message || err).slice(0,120)}). Close and try again.</p>`; }
+  if (seq !== reportSeq) return;                      // a newer report replaced this one
+  body.innerHTML = html;
+  curReport = {title, bodyHtml: html};
+  document.getElementById('briefPrint').disabled = false;
+}
+
+document.getElementById('histBriefBtn').addEventListener('click', () => {
   if (!histSpace){ toast('Open a care space’s history first.'); return; }
   // nothing recorded yet → an empty report helps no one; say what to do instead
   const inp = briefingInput(histSpace);
@@ -4545,29 +4574,159 @@ document.getElementById('histBriefBtn').addEventListener('click', async () => {
     toast('Nothing to brief yet — save a care note or tick off a medication first, then the report has something to include.');
     return;
   }
-  const btn = document.getElementById('histBriefBtn');
-  btn.disabled = true; setIconLabel(btn, 'stethoscope', 'Preparing…');
-  let b = null;
-  if (aiEnabled()){
-    try { b = await geminiBriefing(histSpace); track('feature_used', {feature: 'briefing'}); }
-    catch (err) { toast('Smart brief unavailable (' + err.message + ') — showing a plain summary.'); }
-  }
-  if (!b) b = localBriefing(histSpace);   // no AI, or AI failed/timed out → always works
-  curBrief = {sp: histSpace, b};
-  document.getElementById('briefBody').innerHTML = briefingInner(histSpace, b);
-  document.getElementById('briefOverlay').style.display = 'flex';
-  btn.disabled = false; setIconLabel(btn, 'stethoscope', 'Doctor briefing');
+  const sp = histSpace;
+  openReport(sp.name + ' — visit brief',
+    aiEnabled() ? 'Reading 4 weeks of shared records and composing the brief…'
+                : 'Reading 4 weeks of shared records…',
+    async () => {
+      let b = null;
+      if (aiEnabled()){
+        try { b = await geminiBriefing(sp); track('feature_used', {feature: 'briefing'}); }
+        catch (_) { /* fall through to the plain summary */ }
+      }
+      if (!b) b = localBriefing(sp);   // no AI, or AI failed/timed out → always works
+      return briefingInner(sp, b);
+    });
 });
 document.getElementById('briefClose').addEventListener('click', () => {
+  reportSeq++;                                        // cancel any in-flight compose
   document.getElementById('briefOverlay').style.display = 'none';
 });
 document.getElementById('briefPrint').addEventListener('click', () => {
-  if (!curBrief) return;
+  if (!curReport) return;
   const w = window.open('', '_blank');   // direct from a click → not pop-up-blocked
   if (!w){ toast('Pop-ups are blocked — allow them to print or save a PDF.'); return; }
-  w.document.write(briefingHtml(curBrief.sp, curBrief.b));
+  const esc = (s) => String(s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+  w.document.write(`<!DOCTYPE html><html><head><title>${esc(curReport.title)}</title>
+<style>body{font-family:Georgia,serif; margin:36px; color:#111; max-width:720px;}</style></head>
+<body>${curReport.bodyHtml}</body></html>`);
   w.document.close(); w.focus(); w.print();
 });
+
+/* ---------- per-cohort reports (v66) ----------
+   Same overlay, different question per cohort:
+   - ADHD / personal — "did using this actually help me?": completions, effort,
+     trend vs last week, in the kindest honest framing.
+   - Family — "who carried what, and what's coming?": load sharing without blame.
+   - Co-parenting — "what would we both sign off on?": neutral, numbers-first,
+     drawn from the append-only record.
+   - Care keeps its doctor briefing (above). All of these compose locally. */
+const repEsc = (s) => String(s == null ? '' : s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+const repSec = (title, rows) => rows && rows.length
+  ? `<h2 style="font-size:14px;margin:16px 0 6px;">${title}</h2><ul style="margin:0;padding-left:20px;">` +
+    rows.map(r => `<li style="font-size:13px;line-height:1.55;">${r}</li>`).join('') + '</ul>' : '';
+const repHead = (title, sub) =>
+  `<h1 style="font-size:18px;margin:0 0 2px;">${repEsc(title)}</h1>` +
+  `<p style="color:#555;font-size:11px;margin:0 0 8px;">${repEsc(sub)}</p>`;
+
+function weekReflectionHtml(){
+  const now = Date.now(), wk = 7 * 86400000;
+  // MY week: personal ticks plus shared tasks I ticked — not the household's
+  const mine = t => !t.doneBy || t.doneBy.toLowerCase() === (myName() || '').toLowerCase();
+  const doneIn = (a, b) => todos.filter(t => t.done && t.doneAt >= a && t.doneAt < b && mine(t));
+  const cur = doneIn(now - wk, now + 1), prev = doneIn(now - 2 * wk, now - wk);
+  const mins = list => list.reduce((s, t) => s + (t.minutes || ENERGY_MIN[t.energy || 'medium']), 0);
+  const hard = cur.filter(t => (t.energy || 'medium') === 'high');
+  const byDay = {};
+  cur.forEach(t => { const d = new Date(t.doneAt).toLocaleDateString(undefined, {weekday: 'long'}); byDay[d] = (byDay[d] || 0) + 1; });
+  const bestDay = Object.entries(byDay).sort((a, b) => b[1] - a[1])[0];
+  const evs = store.get('events', []).filter(e => e.ts >= now - wk);
+  const letGo = evs.filter(e => e.kind === 'deleted').length;
+  const parked = evs.filter(e => e.kind === 'parked').length;
+  const open = todos.filter(t => !t.done && !t.someday && visibleToMe(t)).length;
+  const trend = prev.length ? Math.round(((cur.length - prev.length) / prev.length) * 100) : null;
+  const hi = [];
+  hi.push(`<b>${cur.length}</b> task${cur.length === 1 ? '' : 's'} finished — about <b>${fmtMins(mins(cur))}</b> of doing.`);
+  if (hard.length) hi.push(`${hard.length} of them were high-effort — the hard kind. That counts double.`);
+  if (bestDay) hi.push(`Your strongest day was <b>${bestDay[0]}</b> (${bestDay[1]} done).`);
+  if (trend !== null) hi.push(trend >= 0
+    ? `That's <b>${trend}% more</b> than the week before — the app is earning its keep.`
+    : `A quieter week than last (${Math.abs(trend)}% fewer) — quiet weeks are allowed.`);
+  if (parked || letGo) hi.push(`You parked ${parked || 'no'} task${parked === 1 ? '' : 's'} for someday and let ${letGo || 'none'} go — choosing what NOT to do is a skill.`);
+  return repHead('My week in review',
+      'Last 7 days · effort estimates are approximate · generated ' + new Date().toLocaleDateString()) +
+    `<p style="font-size:13px;line-height:1.6;">${hi.join(' ')}</p>` +
+    repSec('Finished this week', cur.slice().sort((a, b) => b.doneAt - a.doneAt).slice(0, 8).map(t => repEsc(t.text))) +
+    (open ? `<p style="font-size:12px;color:#555;margin-top:12px;">${open} task${open === 1 ? '' : 's'} still open — they'll wait kindly.</p>` : '');
+}
+
+function familyReportHtml(sp){
+  const now = Date.now(), wk = 7 * 86400000;
+  const inSp = t => t.space === sp.hid;
+  const done = todos.filter(t => inSp(t) && t.done && t.doneAt >= now - wk);
+  const evs = store.get('events', []).filter(e => e.space === sp.hid && e.ts >= now - wk);
+  const per = {}, added = {};
+  done.forEach(t => { const w = t.doneBy || 'someone'; per[w] = (per[w] || 0) + 1; });
+  evs.filter(e => e.kind === 'created').forEach(e => { const w = e.who || 'someone'; added[w] = (added[w] || 0) + 1; });
+  const open = todos.filter(t => inSp(t) && !t.done && !t.someday);
+  const upcoming = open.filter(t => t.date && t.date > todayStr())
+    .sort((a, b) => a.date < b.date ? -1 : 1).slice(0, 8)
+    .map(t => repEsc(t.text) + ' — ' + fmtDay(t.date) + (t.time ? ' ' + fmtTime(t.time) : ''));
+  return repHead(sp.name + ' — week in review', 'Last 7 days · generated ' + new Date().toLocaleDateString()) +
+    `<p style="font-size:13px;line-height:1.6;">The household finished <b>${done.length}</b> task${done.length === 1 ? '' : 's'} this week, with <b>${open.length}</b> still open.</p>` +
+    repSec('Who did what', Object.entries(per).sort((a, b) => b[1] - a[1]).map(([w, n]) => `<b>${repEsc(w)}</b> ticked off ${n}`)) +
+    repSec('Who added what', Object.entries(added).sort((a, b) => b[1] - a[1]).map(([w, n]) => `${repEsc(w)} added ${n}`)) +
+    repSec('Coming up', upcoming);
+}
+
+function coparentReportHtml(sp){
+  const now = Date.now(), period = 28 * 86400000;
+  const inSp = t => t.space === sp.hid;
+  const done = todos.filter(t => inSp(t) && t.done && t.doneAt >= now - period);
+  const per = {};
+  done.forEach(t => { const w = t.doneBy || 'unattributed'; per[w] = (per[w] || 0) + 1; });
+  const exp = todos.filter(t => inSp(t) && t.amount && (t.expenseAt || 0) >= now - period);
+  const paid = {};
+  let total = 0;
+  exp.forEach(t => { const w = t.expenseBy || 'unattributed'; paid[w] = (paid[w] || 0) + t.amount; total += t.amount; });
+  const names = Object.keys(paid);
+  let balance = '';
+  if (names.length === 2){
+    const [a, b] = names;
+    const diff = (paid[a] - paid[b]) / 2;
+    if (Math.abs(diff) >= 0.01)
+      balance = `${repEsc(diff > 0 ? b : a)} owes ${repEsc(diff > 0 ? a : b)} <b>$${Math.abs(diff).toFixed(2)}</b> to even the period up`;
+    else balance = 'Spending is even for the period';
+  }
+  const evs = store.get('events', []).filter(e => e.space === sp.hid && e.ts >= now - period);
+  const open = todos.filter(t => inSp(t) && !t.done && !t.someday).length;
+  return repHead(sp.name + ' — records summary',
+      'Last 4 weeks · drawn from the shared append-only record · generated ' + new Date().toLocaleDateString()) +
+    `<p style="font-size:13px;line-height:1.6;">${done.length} shared task${done.length === 1 ? '' : 's'} completed, ${open} open. ${evs.length} entr${evs.length === 1 ? 'y was' : 'ies were'} appended to the shared history in this period.</p>` +
+    repSec('Completed — by whom', Object.entries(per).sort((a, b) => b[1] - a[1]).map(([w, n]) => `${repEsc(w)}: ${n}`)) +
+    (exp.length ? repSec('Expenses (as recorded)',
+      [`Total logged: <b>$${total.toFixed(2)}</b> across ${exp.length} item${exp.length === 1 ? '' : 's'}`]
+        .concat(Object.entries(paid).map(([w, a]) => `${repEsc(w)} paid $${a.toFixed(2)}`))
+        .concat(balance ? [balance] : [])) : '') +
+    `<p style="font-size:11px;color:#555;margin-top:12px;">The balance line assumes a 50/50 split. The full, unedited history can be exported as CSV or PDF from the History screen.</p>`;
+}
+
+function openReflection(){
+  const now = Date.now();
+  if (!todos.some(t => t.done && t.doneAt >= now - 14 * 86400000)){
+    toast('Nothing to reflect on yet — tick something off first, then come back.');
+    return;
+  }
+  track('feature_used', {feature: 'reflection'});
+  openReport('My week in review', 'Adding up your week…', () => weekReflectionHtml());
+}
+function openFamilyReport(sp){
+  if (!todos.some(t => t.space === sp.hid)){
+    toast('Nothing to report yet — add some tasks to the space first.');
+    return;
+  }
+  track('feature_used', {feature: 'family_report'});
+  openReport(sp.name + ' — week in review', 'Adding up the household’s week…', () => familyReportHtml(sp));
+}
+function openCoparentReport(sp){
+  if (!todos.some(t => t.space === sp.hid)){
+    toast('Nothing to summarise yet — shared tasks and expenses will appear here.');
+    return;
+  }
+  track('feature_used', {feature: 'coparent_report'});
+  openReport(sp.name + ' — records summary', 'Reading the shared record…', () => coparentReportHtml(sp));
+}
+document.getElementById('reflectBtn').addEventListener('click', openReflection);
 
 document.getElementById('histClose').addEventListener('click', () => {
   document.getElementById('histOverlay').style.display = 'none';
