@@ -77,7 +77,7 @@ const { chromium } = require('playwright');
   // cohort bars: adhd appears in 2 docs, coparenting 1, caregiving 1
   const cohortText = await A.locator('#cohortBars').textContent();
   check('dash: cohort counts aggregate multi-select',
-    /Focus & ADHD/.test(cohortText) && /2/.test(cohortText));
+    /Focus & follow-through/.test(cohortText) && /2/.test(cohortText));
   check('dash: no-cohort note shown', /haven’t chosen/.test(await A.locator('#cohortNote').textContent()));
 
   const featText = await A.locator('#featureBars').textContent();

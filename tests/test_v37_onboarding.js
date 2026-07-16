@@ -24,12 +24,12 @@ const { chromium } = require('playwright');
   check('v37: dialog semantics present',
     await A.locator('#onboarding[role="dialog"][aria-modal="true"]').count() === 1);
   check('v37: all four cohorts offered', await A.locator('#obChips .ob-chip').count() === 4);
-  check('v37: cohorts named', /Focus & ADHD/.test(await A.locator('#obChips').textContent()) &&
+  check('v37: cohorts named', /Focus & follow-through/.test(await A.locator('#obChips').textContent()) &&
     /Co-parenting/.test(await A.locator('#obChips').textContent()) &&
     /Caring for someone/.test(await A.locator('#obChips').textContent()));
 
   // ---------- multi-select + continue → tailored toolkit ----------
-  await A.locator('.ob-chip', { hasText: 'Focus & ADHD' }).click();
+  await A.locator('.ob-chip', { hasText: 'Focus & follow-through' }).click();
   await A.locator('.ob-chip', { hasText: 'Co-parenting' }).click();
   check('v37: selection reflected via aria-pressed',
     await A.locator('.ob-chip[aria-pressed="true"]').count() === 2);
@@ -62,7 +62,7 @@ const { chromium } = require('playwright');
   // ---------- settings shows the cohort + can revisit ----------
   await A.click('nav.tabs button[data-view="settings"]');
   check('v37: settings reflects chosen cohorts',
-    /Focus & ADHD/.test(await A.locator('#cohortStatus').textContent()));
+    /Focus & follow-through/.test(await A.locator('#cohortStatus').textContent()));
   await A.click('#cohortBtn');
   check('v37: revisit reopens onboarding', await A.locator('#onboarding').isVisible());
   check('v37: prior selections restored on revisit',
@@ -86,7 +86,7 @@ const { chromium } = require('playwright');
 
   // ---------- an action button applies + closes ----------
   const C = await fresh();
-  await C.locator('.ob-chip', { hasText: 'Focus & ADHD' }).click();
+  await C.locator('.ob-chip', { hasText: 'Focus & follow-through' }).click();
   await C.click('#obContinue');
   await C.waitForTimeout(150);
   await C.locator('#obToolkit button', { hasText: 'quiet visual mode' }).click();

@@ -6,7 +6,7 @@ to them would require. Everything below describes working software unless marked
 otherwise. Landing page: https://etheodore15.github.io/todo-list/*
 
 *This is a **living document** — it is amended with every release so it never
-drifts from the shipped product. Last updated: v66.*
+drifts from the shipped product. Last updated: v67.*
 
 > **Caveat:** the product is in active development. Some features are new and may
 > behave unpredictably; the AI layer currently runs on a built-in heuristic for
@@ -19,8 +19,12 @@ drifts from the shipped product. Last updated: v66.*
 An installable web app (PWA) that turns **spoken, messy intentions into
 structured, shared, delegated to-do lists**. One capture-and-structure engine
 serves several audiences through "packs" — feature bundles keyed to the kind of
-coordination load the user carries. Current packs: **ADHD / executive function**,
-**co-parenting**, **family caregiving**, and **general households**.
+coordination load the user carries. Current packs: **focus & follow-through
+(ADHD / executive function)**, **co-parenting**, **family caregiving**, and
+**general households**. In-product labels are functional-first ("Focus &
+follow-through" — describing the struggle, not a condition) so no one has to
+identify with a label to pick the toolkit; external-facing copy may still say
+ADHD where people search for it.
 
 The product thesis: the hard part of every to-do tool is getting a real human
 intention out of someone's head and into a form others can act on and trust.
