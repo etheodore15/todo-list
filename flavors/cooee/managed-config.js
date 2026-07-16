@@ -10,8 +10,12 @@ window.MANAGED = {
   projectId: 'cooee-dbde6',
   storageBucket: 'cooee-dbde6.firebasestorage.app',
   appId: '1:412085245732:web:62ae1caf21ae35202d85b1',
-  appUrl: 'https://etheodore15.github.io/cooee/app/'
-  // aiProxy: added when the operator AI proxy deploys to this project
+  appUrl: 'https://etheodore15.github.io/cooee/app/',
+  // Operator AI proxy (Sydney) — the Gemini key lives in Secret Manager behind
+  // this function, never in any client. Until the function is deployed
+  // (Actions → deploy-backend), calls fail fast and the built-in heuristic
+  // carries structuring, same as before.
+  aiProxy: 'https://australia-southeast1-cooee-dbde6.cloudfunctions.net/ai'
 };
 
 window.FLAVOR = {

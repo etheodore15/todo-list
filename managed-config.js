@@ -10,9 +10,15 @@ window.MANAGED = {
   apiKey: 'AIzaSyDOtAvnrWCQfYN-tjnzPmp9RbrXjbz5zI0',
   authDomain: 'todo-list-50050.firebaseapp.com',
   projectId: 'todo-list-50050',
-  appId: '1:913426523006:web:692d78760ab0fecb15c92f'
+  appId: '1:913426523006:web:692d78760ab0fecb15c92f',
+  // Operator AI proxy — the Gemini key lives in Google Secret Manager behind
+  // this function (deployed via Actions → deploy-backend), never in a client.
+  // NOTE: this file goes live when the branch merges to main — run the
+  // deploy-backend workflow for ideatodo first (needs Blaze + the
+  // FIREBASE_SERVICE_ACCOUNT secret). Until the function exists, calls fail
+  // fast and the built-in heuristic carries structuring, as today.
+  aiProxy: 'https://us-central1-todo-list-50050.cloudfunctions.net/ai'
   // Optional, add later:
-  // aiProxy: 'https://us-central1-todo-list-50050.cloudfunctions.net/ai',  // P2 shared AI
   // gaId: 'G-L3GM4LZY5H',   // consented GA4 opt-in (measurementId from the console)
   // appUrl: 'https://…/'    // only when you move off GitHub Pages / add a custom domain
 };

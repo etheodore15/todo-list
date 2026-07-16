@@ -1,20 +1,28 @@
 // AI proxy (P2) — a single Cloud Function that lets every app user reach Gemini
 // through the OPERATOR's key, with per-user daily quotas, so no one pastes a
-// key of their own. Deploy: see functions/README.md.
+// key of their own. Deploy: see functions/README.md / .github/workflows/deploy-backend.yml.
 //
 // The client posts a Gemini generateContent body with a Firebase ID token in
 // the Authorization header. This function verifies the token, checks/increments
 // that user's daily counter in Firestore, injects the operator's key + model,
 // forwards to Gemini, and returns the raw response.
+//
+// The key lives in Google Secret Manager (`firebase functions:secrets:set
+// GEMINI_KEY`, or the CI workflow) — never in code, config files, or the
+// client. One codebase serves both products: FN_REGION is set per project at
+// deploy time (ideatodo: us-central1; cooee: australia-southeast1, so the
+// only AU-exit is the model API call itself — see the build brief §Phase 5).
 
-const functions = require('firebase-functions');
+const {onRequest} = require('firebase-functions/v2/https');
+const {defineSecret} = require('firebase-functions/params');
 const admin = require('firebase-admin');
 admin.initializeApp();
 
-const GEMINI_KEY = process.env.GEMINI_KEY || (functions.config().gemini || {}).key;
-const MODEL = process.env.GEMINI_MODEL || (functions.config().gemini || {}).model || 'gemini-2.5-flash';
+const geminiKey = defineSecret('GEMINI_KEY');
+const MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
 const FREE_DAILY = parseInt(process.env.FREE_DAILY || '30', 10);   // AI calls per user per day
 const ALLOW_ORIGIN = process.env.ALLOW_ORIGIN || '*';
+const REGION = process.env.FN_REGION || 'us-central1';             // set per project by the deploy
 
 const cors = (res) => {
   res.set('Access-Control-Allow-Origin', ALLOW_ORIGIN);
@@ -22,10 +30,13 @@ const cors = (res) => {
   res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
 };
 
-exports.ai = functions.https.onRequest(async (req, res) => {
+exports.ai = onRequest(
+  {region: REGION, secrets: [geminiKey], invoker: 'public', maxInstances: 5},
+  async (req, res) => {
   cors(res);
   if (req.method === 'OPTIONS'){ res.status(204).end(); return; }
   if (req.method !== 'POST'){ res.status(405).json({error: {message: 'POST only'}}); return; }
+  const GEMINI_KEY = geminiKey.value() || process.env.GEMINI_KEY;
   if (!GEMINI_KEY){ res.status(500).json({error: {message: 'proxy not configured: set GEMINI_KEY'}}); return; }
 
   // 1. verify the caller

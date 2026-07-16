@@ -1,0 +1,75 @@
+# Deploys the AI proxy (and Firestore rules) to one or both Firebase projects,
+# and stores the operator's Gemini key in Google Secret Manager — so no user
+# (and no client build) ever holds the key.
+#
+# Repo secrets used:
+#   GEMINI_KEY                      the operator Gemini API key (one key, both apps)
+#   FIREBASE_SERVICE_ACCOUNT        service-account JSON for todo-list-50050 (ideatodo)
+#   FIREBASE_SERVICE_ACCOUNT_COOEE  service-account JSON for cooee-dbde6 (cooee)
+#
+# Service accounts need roles: Cloud Functions Admin, Secret Manager Admin,
+# Firebase Rules Admin, Service Account User, Artifact Registry Reader.
+# Both projects must be on the Blaze plan (Cloud Functions requirement).
+#
+# Run from the Actions tab (workflow_dispatch). A target whose secrets are
+# missing is skipped with a notice rather than failing.
+name: deploy-backend
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Which backend(s) to deploy'
+        type: choice
+        options: [both, ideatodo, cooee]
+        default: both
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - flavor: ideatodo
+            project: todo-list-50050
+            region: us-central1
+            sa_secret: FIREBASE_SERVICE_ACCOUNT
+          - flavor: cooee
+            project: cooee-dbde6
+            region: australia-southeast1
+            sa_secret: FIREBASE_SERVICE_ACCOUNT_COOEE
+    steps:
+      - name: Skip if not targeted
+        id: gate
+        env:
+          TARGET: ${{ inputs.target }}
+        run: |
+          if [ "$TARGET" != "both" ] && [ "$TARGET" != "${{ matrix.flavor }}" ]; then
+            echo "run=false" >> "$GITHUB_OUTPUT"; echo "not targeted — skipping"; else
+            echo "run=true" >> "$GITHUB_OUTPUT"; fi
+      - uses: actions/checkout@v4
+        if: steps.gate.outputs.run == 'true'
+      - uses: actions/setup-node@v4
+        if: steps.gate.outputs.run == 'true'
+        with: {node-version: 20}
+      - name: Deploy ${{ matrix.flavor }} backend
+        if: steps.gate.outputs.run == 'true'
+        env:
+          SA_JSON: ${{ secrets[matrix.sa_secret] }}
+          GEMINI_KEY: ${{ secrets.GEMINI_KEY }}
+          FN_REGION: ${{ matrix.region }}
+          PROJECT: ${{ matrix.project }}
+        run: |
+          if [ -z "$SA_JSON" ]; then echo "::notice::${{ matrix.sa_secret }} not set — skipping ${{ matrix.flavor }}"; exit 0; fi
+          echo "$SA_JSON" > "$RUNNER_TEMP/sa.json"
+          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/sa.json"
+          npm i -g firebase-tools
+          (cd functions && npm install --omit=dev)
+          if [ -n "$GEMINI_KEY" ]; then
+            printf '%s' "$GEMINI_KEY" | firebase functions:secrets:set GEMINI_KEY \
+              --project "$PROJECT" --data-file=- --force
+          else
+            echo "::notice::GEMINI_KEY secret not set — deploying without updating the stored key"
+          fi
+          firebase deploy --only firestore:rules,functions --project "$PROJECT" --force
+          echo "::notice::${{ matrix.flavor }} AI proxy: https://${FN_REGION}-${PROJECT}.cloudfunctions.net/ai"
