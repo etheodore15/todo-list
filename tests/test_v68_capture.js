@@ -143,6 +143,29 @@ export function onSnapshot(col, cb){ cb({docChanges: () => []}); return () => {}
   const B = await mk(() => localStorage.setItem('onboarded', 'true'));
   check('v68: no spaces → no destination row', !(await B.locator('#destRow').isVisible()));
 
+  // ---------- 6. v69 regression: family default + care space also present ----------
+  // Bug: the chips defaulted to the family space but "Save to journal" still
+  // showed (old single-care fallback). The journal save must track the chips.
+  const C = await mk(() => {
+    localStorage.setItem('onboarded', 'true');
+    localStorage.setItem('spaces', JSON.stringify([
+      {hid:'hh-fam', name:'Home', type:'family', cfg:{apiKey:'k',projectId:'p'}},
+      {hid:'hh-care', name:"Mum's care", type:'care', cfg:{apiKey:'k',projectId:'p'}}]));
+    localStorage.setItem('defaultSpace', JSON.stringify('hh-fam'));
+  });
+  check('v69: default chip is the family space',
+    /Home/.test(await C.locator('#destChips .fchip.active').textContent()));
+  check('v69: NO journal button while the destination is the family space',
+    !(await C.locator('#saveNoteBtn').isVisible()));
+  await C.locator('#destChips .fchip', { hasText: "Mum's care" }).click();
+  await C.waitForTimeout(100);
+  check('v69: picking the care chip brings the journal save back',
+    await C.locator('#saveNoteBtn').isVisible());
+  await C.locator('#destChips .fchip', { hasText: 'Private' }).click();
+  await C.waitForTimeout(100);
+  check('v69: switching to Private hides it again',
+    !(await C.locator('#saveNoteBtn').isVisible()));
+
   console.log(errors.length ? 'ERRORS:\n' + errors.join('\n') : 'NO JS ERRORS');
   console.log(pass + ' passed, ' + fail + ' failed');
   await browser.close();

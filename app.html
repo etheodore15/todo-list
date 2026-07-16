@@ -683,7 +683,7 @@
       <input type="file" id="importFile" accept=".json,application/json" style="display:none">
       <button class="btn ghost" id="wipeBtn">Delete all data</button>
     </div>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v68<br><span id="envInfo"></span></p>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v69<br><span id="envInfo"></span></p>
   </section>
 </main>
 
@@ -2440,14 +2440,12 @@ saveIdeaBtn.addEventListener('click', async () => {
    transcript straight into that space's journal (feeding the shift handoff + the
    doctor briefing) and keeps a private copy in Ideas. */
 function noteSpace(){
-  if (captureDest !== undefined){          // an explicit pick on the capture screen wins
-    const sp = spacesList().find(s => s.hid === captureDest);
-    return sp && sp.type === 'care' ? sp : null;
-  }
-  const a = activeSpaceObj();
-  if (a && a.type === 'care') return a;
-  const cares = spacesList().filter(s => s.type === 'care');
-  return cares.length === 1 ? cares[0] : null;
+  // v69: the destination chips are the single source of truth — the journal
+  // save is offered only when the EFFECTIVE destination is a care space. (The
+  // old any-single-care-space fallback predated the chips and could show
+  // "Save to journal" while the active chip pointed at a family space.)
+  const sp = spacesList().find(s => s.hid === captureDestVal());
+  return sp && sp.type === 'care' ? sp : null;
 }
 
 /* ---------- capture destination picker (v68) ----------
