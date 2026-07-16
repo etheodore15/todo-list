@@ -95,6 +95,10 @@
     padding:14px; font-size:1rem; line-height:1.5; resize:vertical; outline:none;}
   #liveText:focus{border-color:var(--accent);}
   .cap-actions{display:flex; gap:10px; margin-top:12px;}
+  /* v68: destination picker on the capture screen */
+  .dest-row{display:flex; align-items:center; gap:10px; margin-top:12px;}
+  .dest-lbl{flex:0 0 auto; font-size:.75rem; color:var(--muted); text-transform:uppercase; letter-spacing:.08em;}
+  .dest-chips{display:flex; gap:8px; overflow-x:auto; scrollbar-width:none; min-width:0;}
   .btn{flex:1; border:none; border-radius:var(--radius-btn); padding:13px 16px; font-size:.95rem;
     font-weight:600; cursor:pointer; transition:filter .15s, background .15s;}
   .btn.primary{background:var(--accent); color:#fff;}
@@ -492,9 +496,13 @@
       <div class="mic-hint" id="micHint" role="status" aria-live="polite">Tap the mic and speak your idea.<br>Or type below.</div>
     </div>
     <textarea id="liveText" aria-label="Your idea — speak or type" placeholder="Your transcribed idea appears here… you can also just type."></textarea>
+    <div id="destRow" class="dest-row" style="display:none;">
+      <span class="dest-lbl">Add to</span>
+      <div id="destChips" class="dest-chips" role="group" aria-label="Where this capture will be added"></div>
+    </div>
     <div class="cap-actions">
       <button class="btn ghost" id="clearBtn">Clear</button>
-      <button class="btn primary" id="saveNoteBtn" style="display:none;"><span class="ic ic-note" aria-hidden="true"></span> Save note</button>
+      <button class="btn ghost" id="saveNoteBtn" style="display:none;"><span class="ic ic-note" aria-hidden="true"></span> Save note</button>
       <button class="btn primary" id="saveIdeaBtn">Summarize &amp; Add</button>
     </div>
     <div id="procStrip" class="proc-strip" role="status" aria-live="polite" style="display:none;"></div>
@@ -675,7 +683,7 @@
       <input type="file" id="importFile" accept=".json,application/json" style="display:none">
       <button class="btn ghost" id="wipeBtn">Delete all data</button>
     </div>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v67<br><span id="envInfo"></span></p>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v68<br><span id="envInfo"></span></p>
   </section>
 </main>
 
@@ -2415,7 +2423,7 @@ saveIdeaBtn.addEventListener('click', async () => {
   const raw = liveText.value.trim();
   if (!raw){ toast('Nothing to save — speak or type an idea first.'); return; }
   const idea = {id: uid(), raw, summary: raw.length > 120 ? raw.slice(0, 117) + '…' : raw,
-    priority: 'medium', engine: 'built-in', pending: true, dest: newTaskSpace(), ts: Date.now()};
+    priority: 'medium', engine: 'built-in', pending: true, dest: captureDestVal(), ts: Date.now()};
   ideas.unshift(idea); saveIdeas();
   liveText.value = ''; baseText = '';
   renderProcStrip();
@@ -2432,26 +2440,64 @@ saveIdeaBtn.addEventListener('click', async () => {
    transcript straight into that space's journal (feeding the shift handoff + the
    doctor briefing) and keeps a private copy in Ideas. */
 function noteSpace(){
+  if (captureDest !== undefined){          // an explicit pick on the capture screen wins
+    const sp = spacesList().find(s => s.hid === captureDest);
+    return sp && sp.type === 'care' ? sp : null;
+  }
   const a = activeSpaceObj();
   if (a && a.type === 'care') return a;
   const cares = spacesList().filter(s => s.type === 'care');
   return cares.length === 1 ? cares[0] : null;
 }
+
+/* ---------- capture destination picker (v68) ----------
+   Members of several spaces need to SAY where a capture lands, not guess.
+   A chip row above the buttons shows Private + every space; the default
+   follows the space being viewed on Today (newTaskSpace()) until the user
+   picks one explicitly — the pick then sticks for subsequent captures. */
+let captureDest;   // undefined = auto (follow Today's space filter); null = private; hid = that space
+function captureDestVal(){
+  if (captureDest && !spacesList().some(s => s.hid === captureDest)) captureDest = undefined;   // space left/deleted
+  return captureDest === undefined ? newTaskSpace() : captureDest;
+}
+function renderDestChips(){
+  const row = document.getElementById('destRow');
+  const host = document.getElementById('destChips');
+  if (!row || !host) return;
+  const spaces = spacesList();
+  if (!spaces.length){ row.style.display = 'none'; host.innerHTML = ''; return; }
+  row.style.display = '';
+  host.innerHTML = '';
+  const eff = captureDestVal();
+  const mk = (label, val, icon) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'fchip' + (eff === val ? ' active' : '');
+    b.setAttribute('aria-pressed', eff === val ? 'true' : 'false');
+    setIconLabel(b, icon, label);
+    b.addEventListener('click', () => { captureDest = val; refreshCaptureMode(); });
+    host.appendChild(b);
+  };
+  mk('Private', null, 'lock');
+  spaces.forEach(sp => mk(sp.name, sp.hid, SPACE_ICON[sp.type] || 'users'));
+}
+
 function refreshCaptureMode(){
+  renderDestChips();
   const sp = noteSpace();
   const noteBtn = document.getElementById('saveNoteBtn');
   const ideaBtn = document.getElementById('saveIdeaBtn');
   const lt = document.getElementById('liveText');
+  // task creation is always the primary action (v68); the journal save is the
+  // secondary option offered alongside it when a care space is the destination
+  ideaBtn.classList.add('primary'); ideaBtn.classList.remove('ghost');
+  ideaBtn.textContent = 'Summarize & Add';
   if (sp){
     noteBtn.style.display = '';
     setIconLabel(noteBtn, 'note', `Save to ${sp.name} journal`);
-    ideaBtn.classList.remove('primary'); ideaBtn.classList.add('ghost');
-    ideaBtn.textContent = '…or pull out tasks';
-    lt.setAttribute('placeholder', 'Speak or type an observation about the person you care for…');
+    lt.setAttribute('placeholder', 'Speak or type — pull out tasks, or save it as a care observation…');
   } else {
     noteBtn.style.display = 'none';
-    ideaBtn.classList.add('primary'); ideaBtn.classList.remove('ghost');
-    ideaBtn.textContent = 'Summarize & Add';
     lt.setAttribute('placeholder', 'Your transcribed idea appears here… you can also just type.');
   }
 }
@@ -2678,8 +2724,12 @@ function renderSpaceBar(){
   const host = document.getElementById('spaceBar');
   if (!host) return;
   const sp = activeSpaceObj();
-  const acts = sp && SPACE_ACTIONS[sp.type];
-  if (!sp || !acts){ host.style.display = 'none'; host.innerHTML = ''; return; }
+  let acts = sp && SPACE_ACTIONS[sp.type];
+  // v68: the personal view gets its own bar — the week-in-review report was
+  // buried inside the collapsed Wins block and nobody found it
+  if (!acts && (activeSpace === 'personal' || (!spacesList().length && todos.some(t => t.done))))
+    acts = [['clipboard', 'My week in review', () => openReflection()]];
+  if (!acts){ host.style.display = 'none'; host.innerHTML = ''; return; }
   host.innerHTML = '';
   const bar = document.createElement('div');
   bar.className = 'space-bar';
@@ -2715,6 +2765,7 @@ const ADHD_TOOLS = [
   ['target', 'Just one thing', () => openFocus()],
   ['wand', 'Break down a task', () => { const t = firstOpenTask(); if (t) breakDown(t); else toast('Add a task first, then I’ll break it into steps.'); }],
   ['battery', 'Easy wins', () => { easyOnly = !easyOnly; renderTodos(); }],
+  ['clipboard', 'Week in review', () => openReflection()],
   ['leaf', 'Quiet mode', () => { store.set('quietMode', !store.get('quietMode', false)); applyQuiet(); toast(store.get('quietMode', false) ? 'Quiet mode on' : 'Quiet mode off'); }]
 ];
 function renderAdhdStrip(){
@@ -4618,6 +4669,8 @@ const repSec = (title, rows) => rows && rows.length
 const repHead = (title, sub) =>
   `<h1 style="font-size:18px;margin:0 0 2px;">${repEsc(title)}</h1>` +
   `<p style="color:#555;font-size:11px;margin:0 0 8px;">${repEsc(sub)}</p>`;
+const repWhen = ts => ts ? new Date(ts).toLocaleDateString(undefined, {weekday:'short', day:'numeric', month:'short'}) : '';
+const repMeta = s => ` <span style="color:#777;font-size:12px;">— ${s}</span>`;
 
 function weekReflectionHtml(){
   const now = Date.now(), wk = 7 * 86400000;
@@ -4646,7 +4699,9 @@ function weekReflectionHtml(){
   return repHead('My week in review',
       'Last 7 days · effort estimates are approximate · generated ' + new Date().toLocaleDateString()) +
     `<p style="font-size:13px;line-height:1.6;">${hi.join(' ')}</p>` +
-    repSec('Finished this week', cur.slice().sort((a, b) => b.doneAt - a.doneAt).slice(0, 8).map(t => repEsc(t.text))) +
+    repSec('Finished this week', cur.slice().sort((a, b) => b.doneAt - a.doneAt).slice(0, 10).map(t =>
+      repEsc(t.text) + repMeta(`${repWhen(t.doneAt)} · ~${fmtMins(t.minutes || ENERGY_MIN[t.energy || 'medium'])}` +
+        ((t.energy || 'medium') === 'high' ? ' · high effort' : '')))) +
     (open ? `<p style="font-size:12px;color:#555;margin-top:12px;">${open} task${open === 1 ? '' : 's'} still open — they'll wait kindly.</p>` : '');
 }
 
@@ -4661,10 +4716,13 @@ function familyReportHtml(sp){
   const open = todos.filter(t => inSp(t) && !t.done && !t.someday);
   const upcoming = open.filter(t => t.date && t.date > todayStr())
     .sort((a, b) => a.date < b.date ? -1 : 1).slice(0, 8)
-    .map(t => repEsc(t.text) + ' — ' + fmtDay(t.date) + (t.time ? ' ' + fmtTime(t.time) : ''));
+    .map(t => repEsc(t.text) + ' — ' + fmtDay(t.date) + (t.time ? ' ' + fmtTime(t.time) : '') +
+      ((t.assignees || []).length ? repMeta('for ' + repEsc(t.assignees.join(', '))) : ''));
   return repHead(sp.name + ' — week in review', 'Last 7 days · generated ' + new Date().toLocaleDateString()) +
     `<p style="font-size:13px;line-height:1.6;">The household finished <b>${done.length}</b> task${done.length === 1 ? '' : 's'} this week, with <b>${open.length}</b> still open.</p>` +
     repSec('Who did what', Object.entries(per).sort((a, b) => b[1] - a[1]).map(([w, n]) => `<b>${repEsc(w)}</b> ticked off ${n}`)) +
+    repSec('Finished — the detail', done.slice().sort((a, b) => b.doneAt - a.doneAt).slice(0, 12).map(t =>
+      repEsc(t.text) + repMeta(`${repEsc(t.doneBy || 'someone')} · ${repWhen(t.doneAt)}`))) +
     repSec('Who added what', Object.entries(added).sort((a, b) => b[1] - a[1]).map(([w, n]) => `${repEsc(w)} added ${n}`)) +
     repSec('Coming up', upcoming);
 }
@@ -4694,8 +4752,12 @@ function coparentReportHtml(sp){
       'Last 4 weeks · drawn from the shared append-only record · generated ' + new Date().toLocaleDateString()) +
     `<p style="font-size:13px;line-height:1.6;">${done.length} shared task${done.length === 1 ? '' : 's'} completed, ${open} open. ${evs.length} entr${evs.length === 1 ? 'y was' : 'ies were'} appended to the shared history in this period.</p>` +
     repSec('Completed — by whom', Object.entries(per).sort((a, b) => b[1] - a[1]).map(([w, n]) => `${repEsc(w)}: ${n}`)) +
+    repSec('Completed — the detail', done.slice().sort((a, b) => b.doneAt - a.doneAt).slice(0, 12).map(t =>
+      repEsc(t.text) + repMeta(`${repEsc(t.doneBy || 'unattributed')} · ${repWhen(t.doneAt)}`))) +
     (exp.length ? repSec('Expenses (as recorded)',
       [`Total logged: <b>$${total.toFixed(2)}</b> across ${exp.length} item${exp.length === 1 ? '' : 's'}`]
+        .concat(exp.slice().sort((a, b) => (b.expenseAt || 0) - (a.expenseAt || 0)).slice(0, 15).map(t =>
+          repEsc(t.text) + ` — $${t.amount.toFixed(2)}` + repMeta(`paid by ${repEsc(t.expenseBy || 'unattributed')} · ${repWhen(t.expenseAt)}`)))
         .concat(Object.entries(paid).map(([w, a]) => `${repEsc(w)} paid $${a.toFixed(2)}`))
         .concat(balance ? [balance] : [])) : '') +
     `<p style="font-size:11px;color:#555;margin-top:12px;">The balance line assumes a 50/50 split. The full, unedited history can be exported as CSV or PDF from the History screen.</p>`;
@@ -5891,6 +5953,7 @@ track('app_open');
 // resume any idea whose background structuring was cut short by a reload/close
 renderProcStrip();
 ideas.filter(i => i.pending).forEach(i => structureIdea(i));
+refreshCaptureMode();   // capture is the boot view — destination chips + buttons need to be right
 // Only greet genuinely new users — someone upgrading (with tasks, ideas, or a
 // space already) shouldn't be interrupted; they can revisit from Settings.
 if (!store.get('onboarded', false) && !todos.length && !ideas.length && !spacesList().length){

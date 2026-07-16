@@ -6,7 +6,7 @@ to them would require. Everything below describes working software unless marked
 otherwise. Landing page: https://etheodore15.github.io/todo-list/*
 
 *This is a **living document** — it is amended with every release so it never
-drifts from the shipped product. Last updated: v67.*
+drifts from the shipped product. Last updated: v68.*
 
 > **Caveat:** the product is in active development. Some features are new and may
 > behave unpredictably; the AI layer currently runs on a built-in heuristic for
@@ -39,7 +39,12 @@ solves that once; each new cohort is mostly a new surface on the same engine.
    as you speak) via the browser speech engine, or a fully offline on-device
    Whisper model (opt-in download) that transcribes in near-real-time 5-second
    segments. Typing works everywhere. A one-line "quick add" exists for
-   pre-formed tasks.
+   pre-formed tasks. An **"Add to" destination row** on the capture screen
+   (Private + every space the user belongs to) shows — and lets the user
+   change — where the capture will land before saving; the pick sticks for
+   subsequent captures. Task creation is always the primary action; when the
+   destination is a care space, a secondary "Save to journal" button is
+   offered alongside it.
 2. **Structure** — the transcript is processed in the background (the user
    keeps talking; a toast/system notification announces when tasks are live and
    where they landed). Extraction produces, per task: text that keeps concrete
@@ -91,6 +96,12 @@ solves that once; each new cohort is mostly a new surface on the same engine.
   neutral wording, drawn from the append-only record
 - Every report opens instantly with a progress state and composes locally
   (the care briefing optionally uses AI); all are printable/saveable as PDF
+- Reports itemize the record: finished tasks with who ticked them and when,
+  each expense as a dated line item with the payer, effort per task in the
+  personal reflection
+- Reachability: each space's report sits on that space's action bar; the
+  personal week-in-review is on the focus toolkit strip, the personal-view
+  action bar, and the Wins block
 
 ### Sharing & trust (all shared spaces)
 - Multiple simultaneous spaces with a space switcher; per-space task scoping
