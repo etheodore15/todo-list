@@ -6,7 +6,7 @@ to them would require. Everything below describes working software unless marked
 otherwise. Landing page: https://etheodore15.github.io/todo-list/*
 
 *This is a **living document** — it is amended with every release so it never
-drifts from the shipped product. Last updated: v68.*
+drifts from the shipped product. Last updated: v72.*
 
 > **Caveat:** the product is in active development. Some features are new and may
 > behave unpredictably; the AI layer currently runs on a built-in heuristic for
@@ -99,9 +99,24 @@ solves that once; each new cohort is mostly a new surface on the same engine.
 - Reports itemize the record: finished tasks with who ticked them and when,
   each expense as a dated line item with the payer, effort per task in the
   personal reflection
-- Reachability: each space's report sits on that space's action bar; the
-  personal week-in-review is on the focus toolkit strip, the personal-view
-  action bar, and the Wins block
+- Reachability: the **Journal tab** (one of the four main tabs) is the home
+  of every report — a one-tap card per report the user can generate. Each
+  space's report also sits on that space's action bar; the personal
+  week-in-review is additionally on the focus toolkit strip, the
+  personal-view action bar, and the Wins block
+
+### The Journal tab (the review surface)
+The fourth pillar of the app's shape: capture (mic) → do (Today) → **read
+back (Journal)**. Three sections:
+- **Reports** — a card per generatable report: "My week in review" always,
+  plus per space: doctor briefing (care), week report (family), records
+  summary (co-parenting). The doctor briefing opens directly from here —
+  no detour through the history screen
+- **Notes** — every raw capture, word for word: zero-task voice notes,
+  care observations (labelled with the journal they were shared to), and
+  the source transcript behind each extracted task with tick-off links
+- **Records** — per shared space: append-only history + CSV/PDF export,
+  and the expense ledger for co-parenting spaces
 
 ### Sharing & trust (all shared spaces)
 - Multiple simultaneous spaces with a space switcher; per-space task scoping

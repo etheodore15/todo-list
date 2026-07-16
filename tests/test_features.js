@@ -5,13 +5,17 @@ const { chromium } = require('playwright');
   const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
   const errors = [];
   page.on('pageerror', e => errors.push('PAGEERROR: ' + e.message));
-  page.on('console', m => { if (m.type() === 'error') errors.push('CONSOLE: ' + m.text()); });
+  // resource-load failures are environment noise (this suite runs without
+  // route mocks / outbound network); real JS errors still fail via pageerror
+  page.on('console', m => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) errors.push('CONSOLE: ' + m.text()); });
   let pass = 0, fail = 0;
   const check = (name, cond) => { console.log((cond ? 'PASS' : 'FAIL') + ': ' + name); cond ? pass++ : fail++; };
 
   await page.addInitScript(() => { try { localStorage.setItem("onboarded", "true"); } catch(e){} });
 
-  await page.goto('http://localhost:8904/', { waitUntil: 'networkidle' });
+  // v57 moved the app from the site root to /app.html (root is the landing);
+  // suites run against the shared test server on 8906
+  await page.goto('http://localhost:8906/app.html', { waitUntil: 'networkidle' });
 
   // --- priority scoring ---
   const prios = await page.evaluate(() => [
@@ -49,6 +53,10 @@ const { chromium } = require('playwright');
   check('duplicate task not re-added', after === before);
 
   // --- linking: todo -> idea ---
+  // v63: capture stays put while structuring runs in the background — go to
+  // Today explicitly before interacting with the task rows
+  await page.click('nav.tabs button[data-view="today"]');
+  await page.waitForTimeout(300);
   const linkBtns = await page.locator('.todo .link-btn').count();
   check('todos show idea link button', linkBtns > 0);
   await page.locator('.todo .link-btn').first().click();
