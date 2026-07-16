@@ -343,9 +343,13 @@
   .ledger-balance{background:var(--card); border:1px solid var(--border); border-radius:12px;
     padding:12px 14px; margin:12px 0; font-size:.9rem; line-height:1.7;}
   .ledger-owes{color:var(--med); font-weight:700;}
-  .hist-head{display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
-  .hist-head b{flex:1; min-width:160px; font-size:1.05rem;}
+  /* v71: title + close pinned on the top row (the title wraps as text instead
+     of shoving buttons around); the action buttons get their own row below */
+  .hist-head{display:flex; align-items:flex-start; gap:10px;}
+  .hist-head b{flex:1; min-width:0; font-size:1.05rem; line-height:1.35;}
   .hist-head .btn{flex:0 0 auto; width:auto; padding:9px 12px; font-size:.8rem; margin:0;}
+  .hist-actions{display:flex; flex-wrap:wrap; gap:8px; margin-top:10px;}
+  .hist-actions .btn{flex:0 0 auto; width:auto; padding:9px 12px; font-size:.8rem; margin:0;}
   .hist-line{display:flex; gap:10px; padding:9px 2px; border-bottom:1px solid var(--border);
     font-size:.86rem; line-height:1.45; align-items:baseline;}
   .hist-line .hwhen{color:var(--muted); font-size:.72rem; white-space:nowrap; min-width:88px;}
@@ -687,7 +691,7 @@
       <input type="file" id="importFile" accept=".json,application/json" style="display:none">
       <button class="btn ghost" id="wipeBtn">Delete all data</button>
     </div>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v70<br><span id="envInfo"></span></p>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v71<br><span id="envInfo"></span></p>
   </section>
 </main>
 
@@ -926,10 +930,12 @@
 <div id="histOverlay" role="dialog" aria-modal="true" aria-label="Space history" style="display:none;">
   <div class="hist-head">
     <b id="histTitle">History</b>
+    <button class="fo-close" id="histClose" aria-label="Close" style="position:static;"><span class="ic ic-x" aria-hidden="true"></span></button>
+  </div>
+  <div class="hist-actions">
     <button class="btn ghost" id="histBriefBtn" style="display:none;"><span class="ic ic-stethoscope" aria-hidden="true"></span> Doctor briefing</button>
     <button class="btn ghost" id="histCsvBtn"><span class="ic ic-download" aria-hidden="true"></span> CSV</button>
     <button class="btn ghost" id="histPrintBtn"><span class="ic ic-printer" aria-hidden="true"></span> Print / PDF</button>
-    <button class="fo-close" id="histClose" aria-label="Close" style="position:static;"><span class="ic ic-x" aria-hidden="true"></span></button>
   </div>
   <p class="side-note" style="margin:8px 2px;">Append-only record — entries can't be edited or removed,
     and deleting a task leaves a delete entry. Everyone in the space sees the same history.</p>
@@ -2011,8 +2017,13 @@ function queueSegment(blob){
       const audio = await blobToAudio(blob);
       if (audio.length >= 16000 * 0.4){          // skip sub-0.4s fragments
         const {text} = await aiCall('transcribe', {audio}, [audio.buffer]);
-        if (text && text.trim())
-          liveText.value = (liveText.value + ' ' + text.trim()).replace(/\s+/g,' ').trim();
+        // Whisper marks non-speech with tokens like [BLANK_AUDIO] / [MUSIC] /
+        // (inaudible) — noise, not dictation; they must never reach the note
+        const clean = (text || '')
+          .replace(/\[[^\]]{0,60}\]|\((?:inaudible|silence|music|laughter|applause|coughing|no speech)[^)]*\)|♪+/gi, ' ')
+          .replace(/\s+/g, ' ').trim();
+        if (clean)
+          liveText.value = (liveText.value + ' ' + clean).replace(/\s+/g,' ').trim();
       }
     } catch (_) { /* one bad segment shouldn't kill the take */ }
     finally { asrPendingN--; updateAsrHint(); }
