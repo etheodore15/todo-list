@@ -106,7 +106,7 @@ export function onSnapshot(col, cb, errCb){
     /\$60\.00/.test(await A.locator('.todo', { hasText: 'school shoes' }).locator('.amount-chip').textContent()));
   const rc = await fetch('http://localhost:8907/dump?prefix=' + encodeURIComponent('households/hh-cop/receipts')).then(r => r.json());
   check('C1d: receipt pushed to space with who + amount',
-    Object.values(rc).some(r => r.amount === 60 && r.who === 'alex' && r.note === 'school shoes for the kids'));
+    Object.values(rc).some(r => r.amount === 60 && r.who === 'Alex' && r.note === 'school shoes for the kids'));
   const evs = await fetch('http://localhost:8907/dump?prefix=' + encodeURIComponent('households/hh-cop/events')).then(r => r.json());
   check('C1d: expense logged in audit history',
     Object.values(evs).some(e => e.kind === 'expense' && /\$60/.test(e.detail)));
@@ -146,10 +146,10 @@ export function onSnapshot(col, cb, errCb){
   await A.waitForTimeout(900);
   const totals = await A.locator('#ledgerTotals').textContent();
   check('C1d: ledger totals both expenses', /Total: \$200\.00/.test(totals));
-  check('C1d: ledger shows per-person paid', /alex paid \$60\.00/.test(totals) && /sam paid \$140\.00/.test(totals));
+  check('C1d: ledger shows per-person paid', /Alex paid \$60\.00/.test(totals) && /Sam paid \$140\.00/.test(totals));
   // equal split of $200 = $100 each; alex paid 60, owes 40; but "owes X/2" convention:
   // net alex = -40, sam = +40, half the gap = 40 → alex owes sam $40
-  check('C1d: owed split computed', /alex owes sam \$40\.00/.test(totals));
+  check('C1d: owed split computed', /Alex owes Sam \$40\.00/.test(totals));
   check('C1d: ledger lists both line items',
     (await A.locator('.ledger-line').count()) === 2);
 
@@ -195,10 +195,15 @@ export function onSnapshot(col, cb, errCb){
   await A.locator('.todo', { hasText: 'my own book' }).locator('.scope-chip').click();
   await A.waitForTimeout(200);
   await A.locator('#scopeSpaces button, #scopeFamily').first().click();  // move into the (only) space / family
-  await A.waitForTimeout(700);
-  const rcAfterMove = await fetch('http://localhost:8907/dump?prefix=' + encodeURIComponent('households/hh-cop/receipts')).then(r => r.json());
+  // the receipt push is a real network hop to the mock backend — poll rather
+  // than trust one fixed wait (flaky under machine load)
+  let rcAfterMove = {};
+  for (let i = 0; i < 20 && !('rc-t-personal' in rcAfterMove); i++){
+    await A.waitForTimeout(300);
+    rcAfterMove = await fetch('http://localhost:8907/dump?prefix=' + encodeURIComponent('households/hh-cop/receipts')).then(r => r.json());
+  }
   check('v42: moving a task with an amount into a space creates its receipt',
-    Object.values(rcAfterMove).some(r => r.taskId === 't-personal' && r.amount === 15 && r.who === 'alex'));
+    Object.values(rcAfterMove).some(r => r.taskId === 't-personal' && r.amount === 15 && r.who === 'Alex'));
   check('v42: receipt uses a deterministic per-task id (idempotent)',
     'rc-t-personal' in rcAfterMove);
 

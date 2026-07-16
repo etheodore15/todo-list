@@ -150,11 +150,11 @@ export function onSnapshot(col, cb, errCb){
   await A.fill('#quickAdd', 'return the library books');
   await A.click('#quickAddBtn');
   await A.locator('.todo', { hasText: 'library books' }).locator('.scope-chip').click();
-  await A.locator('#scopeMembers input[value="lulu"]').check();
+  await A.locator('#scopeMembers input[value="Lulu"]').check();
   await A.click('#scopeAssign');
   await B.waitForTimeout(1500);
   const chipA2 = await A.locator('.todo', { hasText: 'library books' }).locator('.scope-chip').textContent();
-  check('A: creator still sees, chip shows → lulu', /→ lulu/.test(chipA2));
+  check('A: creator still sees, chip shows → lulu', /→ Lulu/.test(chipA2));
   textsB = await B.locator('.todo .ttext').allTextContents();
   check('B (Lulu): assignee sees the task', textsB.some(t => /library books/.test(t)));
   await C.click('nav.tabs button[data-view="today"]');

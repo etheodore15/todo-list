@@ -723,7 +723,7 @@
       <input type="file" id="importFile" accept=".json,application/json" style="display:none">
       <button class="btn ghost" id="wipeBtn">Delete all data</button>
     </div>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v74<br><span id="envInfo"></span></p>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v75<br><span id="envInfo"></span></p>
   </section>
 </main>
 
@@ -1027,7 +1027,12 @@ const saveTodos = () => { store.set('todos', todos); syncPush(); };
 // ids must be globally unique once tasks sync across devices
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 
-const myName = () => store.get('myName', '');
+// v75: names are always shown capitalized — voice transcripts and casual typing
+// arrive lowercase ("remind lulu…"), but "Lulu ticked off…" is how it should read.
+// Word starts after spaces, hyphens and apostrophes are raised (o'brien → O'Brien).
+const capName = (s) => String(s == null ? '' : s)
+  .replace(/(^|[\s\-'’])(\p{Ll})/gu, (m, p, c) => p + c.toUpperCase());
+const myName = () => capName(store.get('myName', ''));
 
 /* ---------- cohorts + onboarding (v37) ----------
    Users self-select what they use the app for on first run. This segments them
@@ -1170,7 +1175,8 @@ function visibleToMe(td){
   if (!a.length) return true;
   const me = myName().toLowerCase();
   if (!me) return true;
-  if (a.includes(me) || (td.createdBy || '').toLowerCase() === me) return true;
+  // names compare case-insensitively — capitalization is display, not identity
+  if (a.some(n => (n || '').toLowerCase() === me) || (td.createdBy || '').toLowerCase() === me) return true;
   // Fail open: if this space HAS a member roster and my name isn't in it,
   // delegation can't have correctly targeted me (e.g. I saved "Lu" but was added
   // as "Lulu") — so SHOW the task rather than silently hiding it forever. Only
@@ -1184,12 +1190,12 @@ function canReassign(td){
   const a = td.assignees || [];
   if (!a.length) return true;                       // family task — any member may re-scope
   const me = myName().toLowerCase();
-  return !!me && ((td.createdBy || '').toLowerCase() === me || a.includes(me));
+  return !!me && ((td.createdBy || '').toLowerCase() === me || a.some(n => (n || '').toLowerCase() === me));
 }
 // returns {icon, text}; icon is an ic-* name or null (render via setIconLabel)
 function scopeLabel(td){
   if (td.scope === 'private') return {icon: 'lock', text: 'private'};
-  const a = td.assignees || [];
+  const a = (td.assignees || []).map(capName);
   const spaces = store.get('spaces', []);
   if (spaces.length && (td.space || null) === null) return {icon: 'lock', text: 'private'};
   const sp = spaces.find(s => s.hid === td.space);
@@ -2437,12 +2443,12 @@ async function structureIdea(idea){
   result.tasks.forEach((task, i) => {
     if (existing.has(norm(task.text))){ skipped++; return; }   // already on the list
     todos.push({id: idea.id + '-' + i, text: task.text, priority: task.priority, tags: task.tags || [],
-      assignees: task.assignees || [], done:false, date: task.date || t, recur: task.recur || null,
+      assignees: (task.assignees || []).map(capName), done:false, date: task.date || t, recur: task.recur || null,
       energy: task.energy || detectEnergy(task.text), minutes: task.minutes || null,
       time: task.time || null,
       space: dest, ideaId: idea.id, createdBy: myName() || null, createdAt: Date.now()});
     logEvent('created', todos[todos.length - 1]);
-    if ((task.assignees || []).length) delegated.push(task.assignees.join(', '));
+    if ((task.assignees || []).length) delegated.push(task.assignees.map(capName).join(', '));
     if (task.recur) scheduled.push(recurLabel(task.recur).replace('↻ ', '↻'));
     else if (task.date && task.date > t) scheduled.push(fmtDay(task.date));
     added++;
@@ -3324,7 +3330,7 @@ function todoRow(td){
   if (td.done && (td.doneBy || td.doneAt)){
     const at = document.createElement('div');
     at.className = 'attr';
-    setIconLabel(at, 'check', (td.doneBy ? td.doneBy + ' · ' : '') + fmtWhen(td.doneAt));
+    setIconLabel(at, 'check', (td.doneBy ? capName(td.doneBy) + ' · ' : '') + fmtWhen(td.doneAt));
     row.appendChild(at);
   }
   // no-shame carry-over: after 5 quiet days, gently ask instead of going red
@@ -3375,7 +3381,7 @@ function todoRow(td){
     if (td.createdBy || td.createdAt)
       lines.push('Added' + (td.createdBy ? ' by ' + td.createdBy : '') + (td.createdAt ? ' · ' + fmtWhen(td.createdAt, true) : ''));
     if (td.done && (td.doneBy || td.doneAt))
-      lines.push('Ticked off' + (td.doneBy ? ' by ' + td.doneBy : '') + (td.doneAt ? ' · ' + fmtWhen(td.doneAt, true) : ''));
+      lines.push('Ticked off' + (td.doneBy ? ' by ' + capName(td.doneBy) : '') + (td.doneAt ? ' · ' + fmtWhen(td.doneAt, true) : ''));
     if (lines.length){
       const meta = document.createElement('div');
       meta.className = 'tmeta';
@@ -3724,7 +3730,7 @@ function refreshMembers(){
 refreshMembers();
 document.getElementById('saveMembersBtn').addEventListener('click', () => {
   const members = membersInput.value.split(',')
-    .map(s => s.toLowerCase().replace(/[^a-z0-9 -]/g, '').trim())
+    .map(s => capName(s.replace(/[^a-zA-Z0-9 -]/g, '').trim().toLowerCase()))
     .filter(Boolean).slice(0, 8);
   store.set('members', members);
   refreshMembers();
@@ -3858,7 +3864,7 @@ function noteFamilyActivity(td){
   if ((td.createdAt || 0) > prevSeenAt && td.createdBy && td.createdBy.toLowerCase() !== me)
     awayItems.push(`${td.createdBy} added “${td.text}”`);
   if (td.done && (td.doneAt || 0) > prevSeenAt && td.doneBy && td.doneBy.toLowerCase() !== me)
-    awayItems.push(`${td.doneBy} ticked off “${td.text}”`);
+    awayItems.push(`${capName(td.doneBy)} ticked off “${td.text}”`);
   renderAwayBanner();
 }
 let awayDismissed = false;
@@ -3900,10 +3906,10 @@ function renderCareHandoff(){
     .sort((a, b) => a.ts - b.ts);
   const lineFor = (e) => {
     const clip = (s) => { s = String(s || ''); return s.length > 80 ? s.slice(0, 78) + '…' : s; };
-    if (e.kind === 'note')    return '' + (e.who || 'A carer') + ' noted: “' + clip(e.text) + '”';
+    if (e.kind === 'note')    return '' + (capName(e.who) || 'A carer') + ' noted: “' + clip(e.text) + '”';
     if (e.kind === 'missed')  return '' + clip(e.text) + ' — not recorded' + (e.detail ? ' (' + e.detail + ')' : '');
-    if (e.kind === 'ticked')  return '' + (e.who || 'Someone') + ' did “' + clip(e.text) + '”';
-    if (e.kind === 'created') return '' + (e.who || 'Someone') + ' added “' + clip(e.text) + '”';
+    if (e.kind === 'ticked')  return '' + (capName(e.who) || 'Someone') + ' did “' + clip(e.text) + '”';
+    if (e.kind === 'created') return '' + (capName(e.who) || 'Someone') + ' added “' + clip(e.text) + '”';
     return clip(e.text);
   };
   // don't echo the carer's own ticks/adds back to them; keep notes + missed always
@@ -3985,7 +3991,7 @@ function openScopeSheet(td){
     lab.className = 'scope-member';
     const cb = document.createElement('input');
     cb.type = 'checkbox'; cb.value = m;
-    cb.checked = (td.assignees || []).includes(m);
+    cb.checked = (td.assignees || []).some(n => (n || '').toLowerCase() === m.toLowerCase());
     lab.appendChild(cb);
     lab.appendChild(document.createTextNode(m));
     wrap.appendChild(lab);
@@ -4666,7 +4672,7 @@ function renderHistory(){
     const body = document.createElement('span');
     body.style.flex = '1';
     const who = document.createElement('b');
-    who.textContent = ev.who || 'someone';
+    who.textContent = capName(ev.who) || 'someone';
     body.appendChild(who);
     body.appendChild(document.createTextNode(' ' + (EVENT_LABEL[ev.kind] || ev.kind) + ' “' + ev.text + '”'));
     if (ev.detail){
@@ -4698,7 +4704,7 @@ function auditCsv(events, spName){
 function briefingInput(sp){
   const since = Date.now() - 28 * 86400000;
   const evs = histEvents.filter(e => e.ts >= since);
-  const line = (e) => new Date(e.ts).toLocaleDateString() + ' — ' + (e.who || 'someone') + ': ' + e.text +
+  const line = (e) => new Date(e.ts).toLocaleDateString() + ' — ' + (capName(e.who) || 'someone') + ': ' + e.text +
     (e.detail ? ' (' + e.detail + ')' : '');
   // missed doses aren't attributable to a person — phrase as "not recorded"
   const missedLine = (e) => new Date(e.ts).toLocaleDateString() + ' — ' + e.text + ' — not recorded as done' +
@@ -4935,22 +4941,22 @@ function familyReportHtml(sp){
   const done = todos.filter(t => inSp(t) && t.done && t.doneAt >= now - wk);
   const evs = store.get('events', []).filter(e => e.space === sp.hid && e.ts >= now - wk);
   const per = {}, added = {};
-  done.forEach(t => { const w = t.doneBy || 'someone'; per[w] = (per[w] || 0) + 1; });
-  evs.filter(e => e.kind === 'created').forEach(e => { const w = e.who || 'someone'; added[w] = (added[w] || 0) + 1; });
+  done.forEach(t => { const w = capName(t.doneBy) || 'someone'; per[w] = (per[w] || 0) + 1; });
+  evs.filter(e => e.kind === 'created').forEach(e => { const w = capName(e.who) || 'someone'; added[w] = (added[w] || 0) + 1; });
   const open = todos.filter(t => inSp(t) && !t.done && !t.someday);
   const upcoming = open.filter(t => t.date && t.date > todayStr())
     .sort((a, b) => a.date < b.date ? -1 : 1).slice(0, 8)
     .map(t => repEsc(t.text) + ' — ' + fmtDay(t.date) + (t.time ? ' ' + fmtTime(t.time) : '') +
-      ((t.assignees || []).length ? repMeta('for ' + repEsc(t.assignees.join(', '))) : ''));
+      ((t.assignees || []).length ? repMeta('for ' + repEsc(t.assignees.map(capName).join(', '))) : ''));
   return repHead(sp.name + ' — week report', 'Last 7 days · generated ' + new Date().toLocaleDateString()) +
     `<p style="font-size:13px;line-height:1.6;">The household finished <b>${done.length}</b> task${done.length === 1 ? '' : 's'} this week, with <b>${open.length}</b> still open.</p>` +
     repSec('Who did what', Object.entries(per).sort((a, b) => b[1] - a[1]).map(([w, n]) => `<b>${repEsc(w)}</b> ticked off ${n}`)) +
     repSec('Finished — the detail', done.slice().sort((a, b) => b.doneAt - a.doneAt).slice(0, 12).map(t =>
-      repEsc(t.text) + repMeta(`${repEsc(t.doneBy || 'someone')} · ${repWhen(t.doneAt)}`))) +
+      repEsc(t.text) + repMeta(`${repEsc(capName(t.doneBy) || 'someone')} · ${repWhen(t.doneAt)}`))) +
     repSec('Who added what', Object.entries(added).sort((a, b) => b[1] - a[1]).map(([w, n]) => `${repEsc(w)} added ${n}`)) +
     repSec('Coming up', upcoming) +
     repSec('Still open', open.filter(t => !t.date || t.date <= todayStr()).slice(0, 10).map(t =>
-      repEsc(t.text) + ((t.assignees || []).length ? repMeta('for ' + repEsc(t.assignees.join(', '))) : '')));
+      repEsc(t.text) + ((t.assignees || []).length ? repMeta('for ' + repEsc(t.assignees.map(capName).join(', '))) : '')));
 }
 
 function coparentReportHtml(sp){
@@ -4958,11 +4964,11 @@ function coparentReportHtml(sp){
   const inSp = t => t.space === sp.hid;
   const done = todos.filter(t => inSp(t) && t.done && t.doneAt >= now - period);
   const per = {};
-  done.forEach(t => { const w = t.doneBy || 'unattributed'; per[w] = (per[w] || 0) + 1; });
+  done.forEach(t => { const w = capName(t.doneBy) || 'unattributed'; per[w] = (per[w] || 0) + 1; });
   const exp = todos.filter(t => inSp(t) && t.amount && (t.expenseAt || 0) >= now - period);
   const paid = {};
   let total = 0;
-  exp.forEach(t => { const w = t.expenseBy || 'unattributed'; paid[w] = (paid[w] || 0) + t.amount; total += t.amount; });
+  exp.forEach(t => { const w = capName(t.expenseBy) || 'unattributed'; paid[w] = (paid[w] || 0) + t.amount; total += t.amount; });
   const names = Object.keys(paid);
   let balance = '';
   if (names.length === 2){
@@ -4979,11 +4985,11 @@ function coparentReportHtml(sp){
     `<p style="font-size:13px;line-height:1.6;">${done.length} shared task${done.length === 1 ? '' : 's'} completed, ${open} open. ${evs.length} entr${evs.length === 1 ? 'y was' : 'ies were'} appended to the shared history in this period.</p>` +
     repSec('Completed — by whom', Object.entries(per).sort((a, b) => b[1] - a[1]).map(([w, n]) => `${repEsc(w)}: ${n}`)) +
     repSec('Completed — the detail', done.slice().sort((a, b) => b.doneAt - a.doneAt).slice(0, 12).map(t =>
-      repEsc(t.text) + repMeta(`${repEsc(t.doneBy || 'unattributed')} · ${repWhen(t.doneAt)}`))) +
+      repEsc(t.text) + repMeta(`${repEsc(capName(t.doneBy) || 'unattributed')} · ${repWhen(t.doneAt)}`))) +
     (exp.length ? repSec('Expenses (as recorded)',
       [`Total logged: <b>$${total.toFixed(2)}</b> across ${exp.length} item${exp.length === 1 ? '' : 's'}`]
         .concat(exp.slice().sort((a, b) => (b.expenseAt || 0) - (a.expenseAt || 0)).slice(0, 15).map(t =>
-          repEsc(t.text) + ` — $${t.amount.toFixed(2)}` + repMeta(`paid by ${repEsc(t.expenseBy || 'unattributed')} · ${repWhen(t.expenseAt)}`)))
+          repEsc(t.text) + ` — $${t.amount.toFixed(2)}` + repMeta(`paid by ${repEsc(capName(t.expenseBy) || 'unattributed')} · ${repWhen(t.expenseAt)}`)))
         .concat(Object.entries(paid).map(([w, a]) => `${repEsc(w)} paid $${a.toFixed(2)}`))
         .concat(balance ? [balance] : [])) : '') +
     `<p style="font-size:11px;color:#555;margin-top:12px;">The balance line assumes a 50/50 split. The full, unedited history can be exported as CSV or PDF from the History screen.</p>`;
@@ -5522,7 +5528,7 @@ function ledgerBalances(rcs, hid){
   // normalize payer names case-insensitively so "Sam"/"sam" aren't two people
   const disp = {}, paid = {};
   rcs.forEach(r => {
-    const raw = r.who || 'unknown';
+    const raw = capName(r.who) || 'unknown';
     const key = raw.toLowerCase();
     if (!(key in disp)) disp[key] = raw;
     paid[key] = (paid[key] || 0) + (r.amount || 0);
@@ -5534,7 +5540,7 @@ function ledgerBalances(rcs, hid){
     const key = (n || '').toLowerCase();
     if (!key) return;
     if (!(key in paid)) paid[key] = 0;
-    if (!(key in disp)) disp[key] = n.charAt(0).toUpperCase() + n.slice(1);
+    if (!(key in disp)) disp[key] = capName(n);
   });
   const keys = Object.keys(paid);
   const total = Object.values(paid).reduce((a, b) => a + b, 0);
@@ -5591,7 +5597,7 @@ function renderLedger(){
     note.textContent = rc.note || '(expense)';
     const who = document.createElement('div');
     who.className = 'lwho';
-    who.textContent = (rc.who || 'someone') + ' · ' + new Date(rc.ts).toLocaleDateString();
+    who.textContent = (capName(rc.who) || 'someone') + ' · ' + new Date(rc.ts).toLocaleDateString();
     main.appendChild(note); main.appendChild(who);
     const amt = document.createElement('span');
     amt.className = 'lamt';
@@ -6172,6 +6178,34 @@ function refreshCohortSetting(){
 }
 
 /* ---------- init ---------- */
+// v75 one-time normalization: names stored lowercase by older versions (and by
+// voice extraction) become capitalized. Events are left untouched — the
+// append-only record isn't rewritten; its names are capitalized at display.
+(function capitalizeStoredNames(){
+  const members = store.get('members', []).map(capName);
+  if (members.join('|') !== store.get('members', []).join('|')) store.set('members', members);
+  const sm = store.get('spaceMembers', {}) || {};
+  let smDirty = false;
+  Object.keys(sm).forEach(h => {
+    const fixed = (sm[h] || []).map(capName);
+    if (fixed.join('|') !== (sm[h] || []).join('|')){ sm[h] = fixed; smDirty = true; }
+  });
+  if (smDirty) store.set('spaceMembers', sm);
+  const isMember = (s) => members.some(m => m.toLowerCase() === String(s || '').toLowerCase());
+  let dirty = false;
+  todos.forEach(t => {
+    ['doneBy', 'createdBy', 'expenseBy'].forEach(k => {
+      if (t[k] && t[k] !== capName(t[k])){ t[k] = capName(t[k]); dirty = true; }
+    });
+    (t.assignees || []).forEach((a, i) => {
+      if (a !== capName(a)){ t.assignees[i] = capName(a); dirty = true; }
+    });
+    (t.tags || []).forEach((tg, i) => {   // a member used as a tag is a name too
+      if (isMember(tg) && tg !== capName(tg)){ t.tags[i] = capName(tg); dirty = true; }
+    });
+  });
+  if (dirty) saveTodos();
+})();
 updateBadge();
 refreshCohortSetting();
 refreshAnalytics();

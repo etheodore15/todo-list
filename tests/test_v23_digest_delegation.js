@@ -24,10 +24,10 @@ const { chromium } = require('playwright');
   console.log(JSON.stringify(assignees));
   const washing = assignees.find(t => /washing/i.test(t.text));
   const bill = assignees.find(t => /water bill/i.test(t.text));
-  check('delegated task assigned to lulu', washing && washing.a.includes('lulu'));
+  check('delegated task assigned to lulu', washing && washing.a.includes('Lulu'));
   check('own task not assigned', bill && bill.a.length === 0);
   const chip = await page.locator('.todo', { hasText: 'washing' }).locator('.scope-chip').textContent();
-  check('scope chip shows → lulu', /→ lulu/.test(chip));
+  check('scope chip shows → lulu', /→ Lulu/.test(chip));
 
   // 2. prompt tells the AI about delegation
   const prompt = await page.evaluate(() => buildIdeaPrompt('x'));

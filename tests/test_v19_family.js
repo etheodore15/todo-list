@@ -15,7 +15,7 @@ const { chromium } = require('playwright');
   await page.fill('#membersInput', 'Emile, Lulu');
   await page.click('#saveMembersBtn');
   const ms = await page.locator('#membersStatus').textContent();
-  check('members saved', /emile, lulu/.test(ms));
+  check('members saved', /Emile, Lulu/.test(ms));
 
   // 2. member auto-tagging (heuristic path)
   await page.click('nav.tabs button[data-view="capture"]');
@@ -24,18 +24,18 @@ const { chromium } = require('playwright');
   await page.waitForTimeout(500);
   const lRow = page.locator('.todo', { hasText: 'library books' });
   const lTags = await lRow.locator('.ttag').allTextContents();
-  check('lulu tag auto-applied', lTags.includes('lulu'));
+  check('lulu tag auto-applied', lTags.includes('Lulu'));
   const chips = await page.locator('#tagFilter .fchip').allTextContents();
-  check('person filter chip appears', chips.some(c => /^lulu/.test(c)));
+  check('person filter chip appears', chips.some(c => /^Lulu/.test(c)));
 
   // 3. member names reach the AI prompt
   const prompt = await page.evaluate(() => buildIdeaPrompt('test'));
-  check('prompt includes household members', /Household members: emile, lulu/.test(prompt));
+  check('prompt includes household members', /Household members: Emile, Lulu/.test(prompt));
 
   // 4. share (headless: falls back to clipboard) — navigate to Today first (v63)
   await page.click('nav.tabs button[data-view="today"]');
   await page.waitForTimeout(200);
-  await page.locator('#tagFilter .fchip', { hasText: 'lulu' }).click();
+  await page.locator('#tagFilter .fchip', { hasText: 'Lulu' }).click();
   await page.click('#shareBtn');
   await page.waitForTimeout(300);
   const clip = await page.evaluate(() => navigator.clipboard.readText());
@@ -46,7 +46,7 @@ const { chromium } = require('playwright');
   const [dl] = await Promise.all([page.waitForEvent('download'), page.click('nav.tabs button[data-view="settings"]').then(() => page.click('#exportBtn'))]);
   const path = await dl.path();
   const backup = JSON.parse(require('fs').readFileSync(path, 'utf8'));
-  check('export contains tasks and members', backup.todos.length === 2 && backup.members.includes('lulu'));
+  check('export contains tasks and members', backup.todos.length === 2 && backup.members.includes('Lulu'));
 
   // 6. import replaces data
   backup.todos = [{id:'x1', text:'Imported task', priority:'medium', tags:['general'], done:false, date: new Date().toISOString().slice(0,10), ideaId:null}];
