@@ -108,9 +108,22 @@ v75. Purpose: flag divergences BEFORE writing code. References are to
 1. ~~Session 1: this mapping + ARCHITECTURE.md~~ ✅
 2. Session 2: flavor config + stamp script + CI both-flavors build; Phase 1a
    cohort entry + 1b `circle` space type & guided setup (behind feature flag)
-3. Sessions 3–4: Phase 1c roles + Firestore rules + rules test matrix (gate)
+3. ~~Sessions 3–4: Phase 1c roles + Firestore rules + rules test matrix
+   (gate)~~ ✅ v78 — `firestore.rules` role-scopes circle docs
+   (owner/co-admin/worker/viewer × circle/team/assigned/private); the
+   80-check emulator matrix in `tests/rules/` is the phase gate (CI:
+   `rules-test.yml`). Client: circle invites carry a clamped worker/viewer
+   role; joins/creates write `members[uid] = {name, role}`.
+   **Discovery that shapes Phase 2:** for `list`, the rules prover binds
+   `resource.data` to the query's equality constraints — a negative branch
+   like `!('vis' in resource.data)` waves *unfiltered* queries through.
+   So `allow list` uses positive-field branches only (`canListDoc`), and
+   worker/viewer clients MUST sync circles with the proven filtered query
+   shapes: `where('vis','==','circle')`, `where('vis','==','assigned') +
+   array-contains visUids`, `where('authorUid','==',uid)`. Owner/co-admin
+   (and non-circle spaces) keep the existing unfiltered onSnapshot.
 4. Session 5: Phase 1d prompt + Phase 2 worker flows (brackets, handoff,
-   incident capture)
+   incident capture) + the scoped-sync merge described above
 5. Session 6: Phase 3 plan goals + Plan Review Pack + expense export columns
 6. Session 7: Phase 4 About Me / accessibility / consent screen; Phase 5
    hardening checklist

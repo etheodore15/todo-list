@@ -6,7 +6,7 @@ to them would require. Everything below describes working software unless marked
 otherwise. Landing page: https://etheodore15.github.io/todo-list/*
 
 *This is a **living document** — it is amended with every release so it never
-drifts from the shipped product. Last updated: v77.*
+drifts from the shipped product. Last updated: v78.*
 
 > **Caveat:** the product is in active development. Some features are new and may
 > behave unpredictably; the AI layer currently runs on a built-in heuristic for
@@ -138,6 +138,12 @@ back (Journal)**. Three sections:
 - Invite links / paste codes; anonymous-first accounts with optional Google or
   email sign-in that links (not replaces) the anonymous identity, restoring
   spaces across devices
+- **Role-scoped circles** (v78, Cooee flavor / behind the `circle` flag):
+  circle spaces carry roles — owner, co-admin, worker, viewer — enforced by
+  the Firestore rules, not the UI. Per-item visibility (circle / team /
+  assigned / private) never hides anything from the owner; viewers are
+  read-only; invites can only mint worker or viewer (elevation is an
+  owner/co-admin act). Proven by an 80-check emulator matrix gating CI
 
 ### Co-parenting pack
 - **Custody days**: whose day it is (supports alternating weeks), shown on

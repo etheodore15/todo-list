@@ -4,3 +4,8 @@ testmodels/
 .firebaserc
 functions/node_modules/
 dist/
+
+# rules-test deps are installed --no-save in CI and locally
+node_modules/
+firestore-debug.log
+firebase-debug.log

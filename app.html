@@ -725,7 +725,7 @@
       <input type="file" id="importFile" accept=".json,application/json" style="display:none">
       <button class="btn ghost" id="wipeBtn">Delete all data</button>
     </div>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v77<br><span id="envInfo"></span></p>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v78<br><span id="envInfo"></span></p>
   </section>
 </main>
 
@@ -1077,6 +1077,16 @@ function applyFlavor(){
   }
   Object.entries(APP_FLAVOR.theme || {}).forEach(([k, v]) =>
     document.documentElement.style.setProperty('--' + k, v));
+  // circle pack (v78): let flagged builds create a circle from Settings too,
+  // not just onboarding — creation there mints the owner role
+  if (flagOn('circle')){
+    const sel = document.getElementById('spaceTypeSel');
+    if (sel && !sel.querySelector('option[value="circle"]')){
+      const o = document.createElement('option');
+      o.value = 'circle'; o.textContent = 'Support circle';
+      sel.appendChild(o);
+    }
+  }
 }
 
 /* ---------- cohorts + onboarding (v37) ----------
@@ -4378,7 +4388,11 @@ async function restoreUserSpaces(){
 // on this device's managed spaces and restart their listeners under the new auth
 async function reMemberLocalSpaces(){
   for (const s of spacesList().filter(x => x.managed)){
-    try { await fbFs.setDoc(fbFs.doc(managedDb, 'households', s.hid), {members: {[managedUid]: myName() || 'member'}}, {merge: true}); } catch (_) {}
+    // circles keep role-map membership — a bare string write would demote us
+    const me = s.type === 'circle'
+      ? {name: myName() || 'member', role: s.role || 'worker'}
+      : (myName() || 'member');
+    try { await fbFs.setDoc(fbFs.doc(managedDb, 'households', s.hid), {members: {[managedUid]: me}}, {merge: true}); } catch (_) {}
     const rt = spaceRt[s.hid]; if (rt && rt.unsub) rt.unsub(); delete spaceRt[s.hid];
     await startSpaceSync(s);
   }
@@ -4679,13 +4693,17 @@ function parseFbConfig(text){
   if (!apiKey || !projectId) throw new Error('could not find apiKey and projectId in that snippet');
   return {apiKey, projectId};
 }
-function inviteEncode(cfg, hid, name, type){
+function inviteEncode(cfg, hid, name, type, role){
   const sp = spacesList().find(s => s.hid === hid);
   const b64 = (o) => btoa(JSON.stringify(o)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const t = type || (sp && sp.type);
   if (sp && sp.managed)   // hosted service: no keys in the code at all
-    return 'ITODO2-' + b64({h: hid, n: name || sp.name, t: type || sp.type});
+    return 'ITODO2-' + b64({h: hid, n: name || sp.name, t,
+      // circle invites carry a role (Phase 1c); the rules only accept
+      // worker/viewer self-joins — elevation is an owner/co-admin act
+      ...(t === 'circle' ? {r: role || 'worker'} : {})});
   return 'ITODO1-' + b64({k: cfg.apiKey, p: cfg.projectId, h: hid,
-    n: name || (sp && sp.name) || undefined, t: type || (sp && sp.type) || undefined});
+    n: name || (sp && sp.name) || undefined, t: t || undefined});
 }
 function inviteDecode(code){
   const m = String(code).trim().match(/ITODO(1|2)-([A-Za-z0-9_-]+)/);
@@ -4694,7 +4712,9 @@ function inviteDecode(code){
   if (m[1] === '2'){
     if (!window.MANAGED) throw new Error('this invite is for the hosted service — update the app first');
     if (!j.h) throw new Error('invite code is incomplete');
-    return {managed: true, cfg: null, hid: j.h, name: j.n || 'Family', type: SPACE_ICON[j.t] ? j.t : 'family'};
+    return {managed: true, cfg: null, hid: j.h, name: j.n || 'Family', type: SPACE_ICON[j.t] ? j.t : 'family',
+      // clamp: a crafted code can never mint a privileged role (rules also refuse)
+      role: ['worker', 'viewer'].includes(j.r) ? j.r : 'worker'};
   }
   if (!j.k || !j.p || !j.h) throw new Error('invite code is incomplete');
   return {managed: false, cfg: {apiKey: j.k, projectId: j.p}, hid: j.h,
@@ -6018,11 +6038,17 @@ document.getElementById('joinBtn').addEventListener('click', async () => {
     document.getElementById('inviteInput').value = '';
     if (inv.managed){
       await ensureManaged();
-      // become a member BEFORE the listener starts, or the rules reject reads
+      // become a member BEFORE the listener starts, or the rules reject reads.
+      // Circle membership carries a role (Phase 1c) — everyone else stays the
+      // legacy name string.
+      const me = inv.type === 'circle'
+        ? {name: myName() || 'member', role: inv.role || 'worker'}
+        : (myName() || 'member');
       await fbFs.setDoc(fbFs.doc(managedDb, 'households', inv.hid),
-        {members: {[managedUid]: myName() || 'member'}}, {merge: true});
+        {members: {[managedUid]: me}}, {merge: true});
     }
-    if (await addSpace({hid: inv.hid, name: inv.name, type: inv.type, cfg: inv.cfg, managed: !!inv.managed}))
+    if (await addSpace({hid: inv.hid, name: inv.name, type: inv.type, cfg: inv.cfg, managed: !!inv.managed,
+        ...(inv.type === 'circle' ? {role: inv.role || 'worker'} : {})}))
       toast(`Joined "${inv.name}" `);
   } catch (err) {
     syncMsg(' ' + err.message);
@@ -6035,9 +6061,14 @@ document.getElementById('createManagedBtn').addEventListener('click', async () =
     const type = document.getElementById('spaceTypeSel').value || 'family';
     await ensureManaged();
     const hid = 'hh-' + uid() + Math.random().toString(36).slice(2, 10);
+    // creating a circle makes you its owner (role map, Phase 1c) — other
+    // space types keep the legacy name string
+    const meCreate = type === 'circle'
+      ? {name: myName() || 'member', role: 'owner'}
+      : (myName() || 'member');
     await fbFs.setDoc(fbFs.doc(managedDb, 'households', hid),
-      {created: Date.now(), name, type, members: {[managedUid]: myName() || 'member'}});
-    const sp = {hid, name, type, cfg: null, managed: true};
+      {created: Date.now(), name, type, members: {[managedUid]: meCreate}});
+    const sp = {hid, name, type, cfg: null, managed: true, ...(type === 'circle' ? {role: 'owner'} : {})};
     if (!await addSpace(sp)) return;
     document.getElementById('spaceNameInput').value = '';
     guideSpaceSetup(sp);
@@ -6343,9 +6374,12 @@ async function createFirstSpace(s){
     try {
       await ensureManaged();
       const hid = 'hh-' + uid() + Math.random().toString(36).slice(2, 10);
+      const meFirst = s.type === 'circle'
+        ? {name: myName() || 'member', role: 'owner'}
+        : (myName() || 'member');
       await fbFs.setDoc(fbFs.doc(managedDb, 'households', hid),
-        {created: Date.now(), name: finalName, type: s.type, members: {[managedUid]: myName() || 'member'}});
-      const sp = {hid, name: finalName, type: s.type, cfg: null, managed: true};
+        {created: Date.now(), name: finalName, type: s.type, members: {[managedUid]: meFirst}});
+      const sp = {hid, name: finalName, type: s.type, cfg: null, managed: true, ...(s.type === 'circle' ? {role: 'owner'} : {})};
       if (!await addSpace(sp)) return;
       finishOnboarding();
       guideSpaceSetup(sp);

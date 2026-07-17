@@ -1,74 +1,152 @@
 // Firestore rules for the MANAGED (hosted-service) deployment — see OPERATORS.md.
 // Requires sign-in and per-space membership; the events history is append-only
 // at the server. (Self-hosted households use the simpler rules in the README.)
+//
+// v78 — Cooee circle pack Phase 1c: ROLE-SCOPED VISIBILITY, enforced here, not
+// in the UI. Circle spaces (type == 'circle') store members as
+//   members[uid] = {name, role}   role ∈ owner | co-admin | worker | viewer
+// while other space types keep the legacy members[uid] = "name" strings.
+// Per-item visibility on circle docs (items/events/receipts):
+//   (no vis field)      → every member (legacy/default)
+//   vis == 'circle'     → every member
+//   vis == 'team'       → owner + co-admins + the author
+//   vis == 'assigned'   → listed visUids + the author + owner/co-admins
+//   vis == 'private'    → the author + owner/co-admins
+// Invariants (build brief §2): the owner (participant, or their recorded
+// decision-maker) can read EVERYTHING in their circle — no scope hides data
+// from the owner role. Viewers are read-only. A joiner can only add
+// themselves as worker or viewer — never self-escalate.
+// The role×scope×CRUD matrix is tested in tests/rules/ (CI: rules-test).
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // OPERATOR allowlist — put your own Firebase Auth UID(s) here to unlock the
-    // dashboard (Settings → your account → copy UID, or Firebase console → Auth).
     function isOperator() {
       return request.auth != null && request.auth.uid in [
         'REPLACE_WITH_YOUR_OPERATOR_UID'
       ];
     }
 
-    // cohort + first-party analytics (v37/v39): each user writes only their own
-    // doc; the operator may read them all for the dashboard, but never write.
     match /cohorts/{uid} {
       allow read: if (request.auth != null && request.auth.uid == uid) || isOperator();
       allow write: if request.auth != null && request.auth.uid == uid;
       allow list: if isOperator();
     }
-    // operator-only read of usage counters across the AI proxy
     match /aiQuota/{uid} {
       allow read, list: if isOperator();
-      // (writes happen server-side in the Cloud Function via the Admin SDK)
     }
-
-    // per-user "my spaces" doc (v52): lets a signed-in account restore its space
-    // list on a new device. Only the owner can read/write their own doc.
     match /users/{uid} {
       allow read, write: if request.auth != null && request.auth.uid == uid;
     }
 
     match /households/{hid} {
 
-      function isMember() {
-        return request.auth != null
-          && get(/databases/$(database)/documents/households/$(hid)).data.members[request.auth.uid] is string;
+      // ---- shared helpers (work on a household data map) ----
+      function memberOf(d) {
+        return request.auth != null && request.auth.uid in d.members;
+      }
+      function isCircle(d) { return d.get('type', '') == 'circle'; }
+      function roleIn(d) {
+        // legacy string members carry no role; inside a circle they default to
+        // the LEAST privileged writing role (never silently team)
+        return d.members[request.auth.uid] is map
+          ? d.members[request.auth.uid].get('role', 'worker')
+          : 'worker';
+      }
+      // "team" = sees everything in the circle (invariant 2 for the owner);
+      // non-circle spaces have no scoping, so every member counts as team
+      function teamIn(d) { return !isCircle(d) || roleIn(d) in ['owner', 'co-admin']; }
+      // viewers are read-only in circles
+      function writerIn(d) { return memberOf(d) && (!isCircle(d) || roleIn(d) != 'viewer'); }
+
+      // per-doc visibility for circle subcollection docs (GET — the doc is real)
+      function canSeeDoc(d, doc) {
+        return teamIn(d)
+          || !('vis' in doc) || doc.vis == 'circle'
+          || doc.get('authorUid', '') == request.auth.uid
+          || (doc.vis == 'assigned' && request.auth.uid in doc.get('visUids', []));
+      }
+      // LIST is deliberately stricter: every branch requires a POSITIVE field
+      // match, so an unconstrained query can never be waved through (the
+      // emulator binds resource.data to an empty map for list analysis, and
+      // production's prover requires the query's filters to guarantee the
+      // branch). Non-team circle members must query with explicit filters
+      // (e.g. where('vis','==','circle')); the owner/co-admins list freely.
+      function canListDoc(d, doc) {
+        return teamIn(d)
+          || doc.vis == 'circle'
+          || doc.authorUid == request.auth.uid
+          || (doc.vis == 'assigned' && request.auth.uid in doc.visUids);
+      }
+      // scoped docs must truthfully attribute their author (rules key off it)
+      function authorHonest(doc) {
+        return !('vis' in doc) || doc.vis == 'circle'
+          || doc.get('authorUid', '') == request.auth.uid;
+      }
+      function hh() {
+        return get(/databases/$(database)/documents/households/$(hid)).data;
       }
 
-      // read the space doc: members only (list is never allowed → ids stay private)
-      allow get: if request.auth != null
-        && resource.data.members[request.auth.uid] is string;
+      // ---- the household doc ----
+      // read: members only (list is never allowed → ids stay private)
+      allow get: if memberOf(resource.data);
       allow list: if false;
 
-      // create: you must put yourself in the members map
+      // create: you must put yourself in the members map; creating a circle
+      // makes you its owner (or a co-admin nominee — never worker/viewer)
       allow create: if request.auth != null
-        && request.resource.data.members[request.auth.uid] is string;
+        && request.auth.uid in request.resource.data.members
+        && (!isCircle(request.resource.data)
+            || (request.resource.data.members[request.auth.uid] is map
+                && request.resource.data.members[request.auth.uid].get('role', '')
+                     in ['owner', 'co-admin']));
 
-      // update: members may edit; a NON-member may only add themself (joining)
+      // update:
+      //  - circle: only owner/co-admins may edit the space (name, members,
+      //    roles, the circle ownership record) — workers and viewers may not
+      //  - non-circle: any member may edit (unchanged behaviour)
+      //  - joining: a NON-member may add ONLY themself; into a circle only as
+      //    worker or viewer (role comes from the invite; elevation is an
+      //    owner/co-admin act, logged in the history)
       allow update: if request.auth != null && (
-        resource.data.members[request.auth.uid] is string
+        (memberOf(resource.data)
+          && (!isCircle(resource.data) || roleIn(resource.data) in ['owner', 'co-admin']))
         || (
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['members'])
+          !memberOf(resource.data)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['members'])
           && request.resource.data.members.diff(resource.data.members).affectedKeys()
                .hasOnly([request.auth.uid])
+          && (!isCircle(resource.data)
+              || (request.resource.data.members[request.auth.uid] is map
+                  && request.resource.data.members[request.auth.uid].get('role', '')
+                       in ['worker', 'viewer']))
         )
       );
       allow delete: if false;
 
+      // ---- subcollections ----
       match /items/{item} {
-        allow read, write: if isMember();
+        allow get: if memberOf(hh()) && canSeeDoc(hh(), resource.data);
+        allow list: if memberOf(hh()) && canListDoc(hh(), resource.data);
+        allow create: if writerIn(hh()) && authorHonest(request.resource.data);
+        allow update: if writerIn(hh())
+          && canSeeDoc(hh(), resource.data)
+          // an author stamp can never be rewritten to someone else
+          && request.resource.data.get('authorUid', resource.data.get('authorUid', ''))
+               == resource.data.get('authorUid', '');
+        allow delete: if writerIn(hh()) && canSeeDoc(hh(), resource.data);
       }
 
       match /events/{event} {
-        allow read, create: if isMember();
+        allow get: if memberOf(hh()) && canSeeDoc(hh(), resource.data);
+        allow list: if memberOf(hh()) && canListDoc(hh(), resource.data);
+        allow create: if writerIn(hh()) && authorHonest(request.resource.data);
         allow update, delete: if false;   // append-only history, enforced server-side
       }
 
       match /receipts/{receipt} {
-        allow read, create: if isMember();   // C1d (future): receipt thumbnails
+        allow get: if memberOf(hh()) && canSeeDoc(hh(), resource.data);
+        allow list: if memberOf(hh()) && canListDoc(hh(), resource.data);
+        allow create: if writerIn(hh()) && authorHonest(request.resource.data);
         allow update, delete: if false;
       }
     }
