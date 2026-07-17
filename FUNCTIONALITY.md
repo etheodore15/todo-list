@@ -6,7 +6,7 @@ to them would require. Everything below describes working software unless marked
 otherwise. Landing page: https://etheodore15.github.io/todo-list/*
 
 *This is a **living document** — it is amended with every release so it never
-drifts from the shipped product. Last updated: v74.*
+drifts from the shipped product. Last updated: v80.*
 
 > **Caveat:** the product is in active development. Some features are new and may
 > behave unpredictably; the AI layer currently runs on a built-in heuristic for
@@ -35,10 +35,13 @@ solves that once; each new cohort is mostly a new surface on the same engine.
 
 **Capture → Structure → Share.**
 
-1. **Capture** — tap the mic and brain-dump. Live transcription (words appear
-   as you speak) via the browser speech engine, or a fully offline on-device
-   Whisper model (opt-in download) that transcribes in near-real-time 5-second
-   segments. Typing works everywhere. A one-line "quick add" exists for
+1. **Capture** — tap the mic and brain-dump. Voice works out of the box on
+   every device, no download: live transcription (words appear as you speak)
+   via the browser speech engine where it exists (Android/desktop Chrome),
+   and elsewhere (iOS Safari, Firefox) recordings transcribe in near-real-time
+   5-second segments through the operator AI proxy. A fully private on-device
+   Whisper model remains as an opt-in download (nothing leaves the phone;
+   works offline). Typing works everywhere. A one-line "quick add" exists for
    pre-formed tasks. An **"Add to" destination row** on the capture screen
    (Private + every space the user belongs to) shows — and lets the user
    change — where the capture will land before saving; the pick sticks for
@@ -135,6 +138,31 @@ back (Journal)**. Three sections:
 - Invite links / paste codes; anonymous-first accounts with optional Google or
   email sign-in that links (not replaces) the anonymous identity, restoring
   spaces across devices
+- **Role-scoped circles** (v78, Cooee flavor / behind the `circle` flag):
+  circle spaces carry roles — owner, co-admin, worker, viewer — enforced by
+  the Firestore rules, not the UI. Per-item visibility (circle / team /
+  assigned / private) never hides anything from the owner; viewers are
+  read-only; invites can only mint worker or viewer (elevation is an
+  owner/co-admin act). Proven by an 80-check emulator matrix gating CI
+- **Circle worker flows** (v79): support **session brackets** — a worker taps
+  Start/End support and everything they tick and note in between reads as
+  part of that session in history and handoff (auto-closes after 12h with an
+  honest marker; deliberately no per-worker duration totals — not
+  time-tracking). **Incident reports** — structured what/when/who/action,
+  voice-fillable from the capture box, visible to the author and the circle's
+  owners only, append-only, with plain copy that it notifies nobody outside
+  the space. Workers/viewers sync circles through the rules-proven filtered
+  queries; the AI structuring prompt speaks circle vocabulary (participant,
+  members, session talk, observations-are-not-tasks)
+- **Plan goals & the Plan Review Pack** (v80): the circle records what the
+  supports work toward, in the participant's words; each goal derives a tag
+  the AI and the tag picker offer, and tagged work groups under its goal in
+  the Plan Review Pack — 12 weeks of the record (goal progress, support
+  sessions, incidents, adherence, open tasks, expenses) ready for a plan
+  review, AI-summarised with a local fallback. Every render carries
+  "Participant-owned coordination record. Not medical, legal, or NDIS
+  advice." Circle expenses add provider/ABN + support date, and the ledger
+  CSV gains support_date / provider_abn / receipt_ref columns
 
 ### Co-parenting pack
 - **Custody days**: whose day it is (supports alternating weeks), shown on

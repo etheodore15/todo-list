@@ -1,0 +1,40 @@
+# Phase gate (Cooee brief §phase 1c): the Firestore rules matrix must pass
+# before any change to the rules — or to the tests that prove them — lands.
+# Runs the role×scope×CRUD matrix in the Firestore emulator.
+name: rules-test
+
+on:
+  push:
+    paths:
+      - 'firestore.rules'
+      - 'tests/rules/**'
+      - '.github/workflows/rules-test.yml'
+  pull_request:
+    paths:
+      - 'firestore.rules'
+      - 'tests/rules/**'
+      - '.github/workflows/rules-test.yml'
+  workflow_dispatch: {}
+
+jobs:
+  rules-matrix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # the emulator needs a JRE
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Install test deps (not committed)
+        run: npm install --no-save @firebase/rules-unit-testing firebase firebase-tools
+
+      - name: Run rules matrix in the Firestore emulator
+        run: npx firebase emulators:exec --only firestore --project demo-rules "node tests/rules/firestore-rules.test.mjs"

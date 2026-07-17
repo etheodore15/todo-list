@@ -186,6 +186,18 @@
     box-shadow:0 -8px 40px rgba(0,0,0,.12);}
   .sheet h3{margin:0 0 12px; font-size:1rem;}
   .sheet .btn{width:100%; margin-bottom:8px; text-align:left;}
+  /* v79: labelled-field sheets (incident report) + session/incident history lines */
+  .fld-label{display:block; font-size:.72rem; color:var(--muted); margin:10px 0 4px;}
+  #incidentSheet input, #incidentSheet textarea, #goalsSheet input{width:100%; background:var(--bg);
+    border:1px solid var(--border); border-radius:10px; color:var(--text);
+    padding:9px 10px; font-size:.85rem; font-family:inherit; box-sizing:border-box;}
+  .goal-row{display:flex; align-items:center; gap:10px; padding:8px 4px; font-size:.9rem;}
+  .goal-row .gtag{color:var(--muted); font-size:.72rem;}
+  .goal-row button{margin-left:auto; background:none; border:none; color:var(--muted);
+    cursor:pointer; font-size:1rem; padding:4px 8px;}
+  .sheet-btns{margin-top:14px;}
+  .hist-line.hist-session{border-left:3px solid var(--accent); padding-left:9px;}
+  .hist-line.hist-incident{border-left:3px solid #d83a4e; padding-left:9px;}
   .scope-member{display:flex; align-items:center; gap:10px; padding:9px 4px;
     font-size:.95rem; color:var(--text);}
   .scope-member input{width:18px; height:18px; accent-color:var(--accent);}
@@ -608,10 +620,12 @@
       <button class="btn primary" id="cohortBtn">Choose / update &amp; see my toolkit</button>
     </div>
     <div class="set-block">
-      <h3>Offline voice recognition (no API key)</h3>
-      <p>Download a small speech model once (~80 MB, use Wi-Fi) and transcription runs
-         entirely on your phone — works with no internet and nothing leaves the device.</p>
-      <button class="btn primary" id="asrBtn">Enable offline voice recognition (~80 MB)</button>
+      <h3>Private on-device voice recognition</h3>
+      <p>Voice already works out of the box — no download needed. This optional
+         privacy mode transcribes entirely on your phone instead: fetch a small
+         speech model once (~80 MB, use Wi-Fi) and nothing you say ever leaves
+         the device. It also works with no internet.</p>
+      <button class="btn ghost" id="asrBtn">Enable on-device voice recognition (~80 MB)</button>
       <p id="asrStatus"></p>
       <button class="btn ghost" id="modelsWipeBtn">Delete downloaded models</button>
     </div>
@@ -723,7 +737,7 @@
       <input type="file" id="importFile" accept=".json,application/json" style="display:none">
       <button class="btn ghost" id="wipeBtn">Delete all data</button>
     </div>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v75<br><span id="envInfo"></span></p>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v80<br><span id="envInfo"></span></p>
   </section>
 </main>
 
@@ -900,6 +914,56 @@
   </div>
 </div>
 
+<div id="circleOwnerSheet" class="sheet-overlay" role="dialog" aria-modal="true" aria-label="Who is this circle for" style="display:none;">
+  <div class="sheet">
+    <h3><span class="ic ic-spark" aria-hidden="true"></span> Who is this circle for?</h3>
+    <p class="side-note" style="margin:2px 0 12px;">The person the circle supports owns this record.
+      If you're setting it up for someone else, you'll be recorded as acting on their behalf.
+      You can change this later.</p>
+    <button class="btn primary" id="circleForMe">It’s for me — these are my supports</button>
+    <button class="btn ghost" id="circleForOther">Someone I support — I’m their decision-maker</button>
+    <button class="btn ghost" id="circleOwnerCancel">Cancel</button>
+  </div>
+</div>
+
+<div id="incidentSheet" class="sheet-overlay" role="dialog" aria-modal="true" aria-label="Report an incident" style="display:none;">
+  <div class="sheet">
+    <h3><span class="ic ic-alert" aria-hidden="true"></span> Report an incident</h3>
+    <p class="side-note" style="margin:2px 0 10px;">A record for your circle — this does not notify the
+      NDIS Commission or anyone outside this space. It’s visible to you and the circle’s owners,
+      and like everything in the record it can’t be silently edited or deleted.</p>
+    <label class="fld-label" for="incWhat">What happened</label>
+    <textarea id="incWhat" rows="3" placeholder="Plain words — what you saw or what occurred…"></textarea>
+    <label class="fld-label" for="incWhen">When</label>
+    <input id="incWhen" type="datetime-local">
+    <label class="fld-label" for="incWho">Who was present</label>
+    <input id="incWho" placeholder="Names, or “just us”" autocomplete="off">
+    <label class="fld-label" for="incAction">What was done about it</label>
+    <textarea id="incAction" rows="2" placeholder="Action taken, or “nothing needed yet”"></textarea>
+    <div class="sheet-btns">
+      <button class="btn primary" id="incSave">Save to the record</button>
+      <button class="btn ghost" id="incCancel">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div id="goalsSheet" class="sheet-overlay" role="dialog" aria-modal="true" aria-label="Plan goals" style="display:none;">
+  <div class="sheet">
+    <h3><span class="ic ic-target" aria-hidden="true"></span> Plan goals</h3>
+    <p class="side-note" style="margin:2px 0 10px;">What the supports work toward, in your words.
+      Notes and tasks tagged with a goal group under it in the Plan Review Pack.
+      Coordination only — this isn’t plan management or advice.</p>
+    <div id="goalsList"></div>
+    <div style="display:flex; gap:8px; margin-top:10px;">
+      <input id="goalNew" placeholder="e.g. Cooking for myself" autocomplete="off" style="flex:1;">
+      <button class="btn ghost" id="goalAdd" style="width:auto; margin:0;">Add</button>
+    </div>
+    <div class="sheet-btns">
+      <button class="btn primary" id="goalsDone">Done</button>
+    </div>
+  </div>
+</div>
+
 <div id="dateSheet" class="sheet-overlay" role="dialog" aria-modal="true" aria-label="When" style="display:none;">
   <div class="sheet">
     <h3><span class="ic ic-calendar" aria-hidden="true"></span> When?</h3>
@@ -946,6 +1010,16 @@
       <span class="ic ic-camera" aria-hidden="true"></span> Add receipt photo <span id="expPhotoState" style="color:var(--ok)"></span>
       <input id="expPhoto" type="file" accept="image/*" capture="environment" style="display:none;">
     </label>
+    <div id="expCircleFields" style="display:none;">
+      <!-- v80: circle expenses feed a claim-ready CSV — provider + support date
+           are the columns plan managers ask for. Optional, plain language. -->
+      <label class="fld-label" for="expProvider">Provider (and ABN if you know it)</label>
+      <input id="expProvider" placeholder="e.g. Sunshine OT — ABN 12 345 678 901" autocomplete="off"
+        style="width:100%; background:var(--bg); border:1px solid var(--border); border-radius:10px; color:var(--text); padding:9px 10px; font-size:.85rem; margin-bottom:8px; box-sizing:border-box;">
+      <label class="fld-label" for="expDate">Date of the support (if not today)</label>
+      <input id="expDate" type="date"
+        style="width:100%; background:var(--bg); border:1px solid var(--border); border-radius:10px; color:var(--text); padding:9px 10px; font-size:.85rem; margin-bottom:10px; box-sizing:border-box;">
+    </div>
     <button class="btn primary" id="expSave">Save expense</button>
     <button class="btn ghost" id="expCancel">Cancel</button>
   </div>
@@ -1034,6 +1108,47 @@ const capName = (s) => String(s == null ? '' : s)
   .replace(/(^|[\s\-'’])(\p{Ll})/gu, (m, p, c) => p + c.toUpperCase());
 const myName = () => capName(store.get('myName', ''));
 
+/* ---------- build flavors (v76 — see ARCHITECTURE.md) ----------
+   One engine, several products. A deploy may ship a flavor config
+   (window.FLAVOR, stamped alongside managed-config.js): product name, theme
+   tokens, which cohorts are offered, feature flags, base URL. Engine code
+   READS this config; it never branches on which product it is. No FLAVOR
+   present = the ideatodo defaults, unchanged. */
+const APP_FLAVOR = window.FLAVOR || {};
+const flavorName = () => APP_FLAVOR.name || 'Idea → Todo';
+// feature flags: set by the flavor, or locally for development/pilot testing
+// (store.set('flag:circle', true) in the console)
+const flagOn = (f) => !!((APP_FLAVOR.flags || {})[f]) || store.get('flag:' + f, false);
+function visibleCohorts(){
+  let list = COHORTS;
+  if (Array.isArray(APP_FLAVOR.cohorts) && APP_FLAVOR.cohorts.length)
+    list = list.filter(c => APP_FLAVOR.cohorts.includes(c.id));
+  return list.filter(c => !c.flag || flagOn(c.flag));
+}
+function applyFlavor(){
+  if (APP_FLAVOR.name){
+    document.title = flavorName();
+    const h = document.getElementById('hdrTitle');
+    if (h && h.textContent === 'Idea → Todo') h.textContent = flavorName();
+    document.querySelectorAll('p').forEach(p => {
+      if (/^Idea → Todo v\d+/.test(p.textContent))
+        p.innerHTML = p.innerHTML.replace('Idea → Todo', flavorName());
+    });
+  }
+  Object.entries(APP_FLAVOR.theme || {}).forEach(([k, v]) =>
+    document.documentElement.style.setProperty('--' + k, v));
+  // circle pack (v78): let flagged builds create a circle from Settings too,
+  // not just onboarding — creation there mints the owner role
+  if (flagOn('circle')){
+    const sel = document.getElementById('spaceTypeSel');
+    if (sel && !sel.querySelector('option[value="circle"]')){
+      const o = document.createElement('option');
+      o.value = 'circle'; o.textContent = 'Support circle';
+      sel.appendChild(o);
+    }
+  }
+}
+
 /* ---------- cohorts + onboarding (v37) ----------
    Users self-select what they use the app for on first run. This segments them
    for the operator (cohort tracking) and drives a tailored explainer of which
@@ -1078,7 +1193,23 @@ const COHORTS = [
      ['Who did what', 'Every add and tick shows who and when.'],
      ['<span class="ic ic-bell" aria-hidden="true"></span> Daily digest', 'A once-a-day summary of what’s open and what the family did.']
    ],
-   actions: [{label: 'Create a family space', fn: () => openSpaceCreate('family')}]}
+   actions: [{label: 'Create a family space', fn: () => openSpaceCreate('family')}]},
+  // Cooee circle pack (v76, Phase 1a) — behind the 'circle' feature flag until
+  // the pilot hardening gate passes (build brief §Phase 5). Copy rule: the
+  // participant is always the grammatical subject.
+  {id: 'ndis-circle', ico: 'spark', title: 'Coordinating my own supports', flag: 'circle',
+   desc: 'I have a support circle — family and workers — who need to stay in step.',
+   features: [
+     ['<span class="ic ic-mic" aria-hidden="true"></span> Speak it once', 'Your voice note becomes tasks and notes your whole circle can act on.'],
+     ['<span class="ic ic-heart" aria-hidden="true"></span> About Me', 'How you like support to happen — the first thing every new worker sees.'],
+     ['<span class="ic ic-pill" aria-hidden="true"></span> Routines & medications', 'Every tick is a record; a miss is flagged for the next visit.'],
+     ['<span class="ic ic-scroll" aria-hidden="true"></span> Your record, owned by you', 'Append-only history you can read, print, and take with you any time.'],
+     ['<span class="ic ic-lock" aria-hidden="true"></span> You choose who sees what', 'Workers, family and viewers each see only what you decide.']
+   ],
+   actions: [{label: 'Create my Circle', fn: () => {
+     const s = OB_SPACE_FOR['ndis-circle'];
+     if (s) createFirstSpace(s);
+   }}]}
 ];
 const cohorts = () => store.get('cohorts', []);
 
@@ -1516,10 +1647,28 @@ Rules:
 - The user's existing tags, most used first: ${known.join(', ')}. STRONGLY prefer reusing these exact tags whenever they fit; only introduce a new tag when none of them applies.` : '') +
   (store.get('members', []).length ? `
 - Household members: ${store.get('members', []).join(', ')}. When a task is for or about one of them (e.g. "remind Lulu to…", "book the dentist for Emile"), include that member's name (lowercase) as one of its tags. Tasks for the speaker themselves need no name tag.
-- When the idea explicitly DELEGATES a task to a member ("remind Lulu to…", "tell Emile to…", "Lulu needs to…", "get Chris to…"), also set that task's "assignees" to those member names (lowercase). Leave assignees empty when the task is the speaker's own or for everyone.` : '') + `
+- When the idea explicitly DELEGATES a task to a member ("remind Lulu to…", "tell Emile to…", "Lulu needs to…", "get Chris to…"), also set that task's "assignees" to those member names (lowercase). Leave assignees empty when the task is the speaker's own or for everyone.` : '') +
+  circlePromptSection() + `
 - The top-level priority is the highest task priority.
 
 Idea: """${text}"""`;
+}
+
+// v79 (Cooee Phase 1d): when the capture is headed for a support circle, the
+// structuring prompt knows the circle's vocabulary — the participant, the
+// members, session/shift talk — and keeps observations out of the task list.
+function circlePromptSection(){
+  const sp = spacesList().find(s => s.hid === captureDestVal());
+  if (!sp || sp.type !== 'circle') return '';
+  const participant = capName((sp.circle && sp.circle.participant) || '') || 'the participant';
+  const names = spaceMembers(sp.hid).map(capName).filter(Boolean).slice(0, 12);
+  const goals = planGoals(sp.hid);
+  return `
+- This capture is going into "${sp.name}" — a support circle around ${participant}, who owns the record.${names.length ? ' People in the circle: ' + names.join(', ') + '.' : ''} "Session", "shift" or "visit" talk means a support session, not a meeting.
+- Observations about ${participant}'s wellbeing, mood, meals, sleep, or how a support went are journal material, NOT tasks — keep them in the summary and out of the tasks array. Only concrete follow-up actions become tasks ("book the OT review", "buy the picture cards"), each named for whoever must act and tagged with a life-area tag plus "support" when it concerns ${participant}'s supports.` +
+  (goals.length ? `
+- ${participant}'s plan goals: ${goals.map(g => `"${g}" (tag: ${goalTag(g)})`).join('; ')}. When a task clearly works toward one of these goals, include that goal's exact tag in its tags — progress groups under the goal in ${participant}'s Plan Review Pack. Never force a goal tag onto unrelated tasks.` : '') + `
+- Never produce surveillance-flavoured tasks (checking up on a worker, timing anyone). Coordination only.`;
 }
 
 async function apiErrMsg(res){
@@ -1745,6 +1894,13 @@ async function compressImage(file){
 }
 
 function pushReceipt(rc){
+  // circle receipts carry vis + authorUid like every circle write (v79/v80) —
+  // the scoped rules evaluate them and workers' filtered queries find them
+  const rcSp = rc.space && spacesList().find(s => s.hid === rc.space);
+  if (rcSp && rcSp.type === 'circle' && rcSp.managed){
+    rc.vis = rc.vis || 'circle';
+    if (managedUid && !rc.authorUid) rc.authorUid = managedUid;
+  }
   if (rc.space && spaceRt[rc.space] && spaceRt[rc.space].db){
     fbFs.setDoc(fbFs.doc(spaceRt[rc.space].db, 'households', rc.space, 'receipts', rc.id), rc)
       .catch(() => {});
@@ -1760,9 +1916,10 @@ function flushPendingReceipts(sp){
   if (!pend.length) return;
   const rest = [];
   pend.forEach(rc => {
-    if (rc.space === sp.hid)
+    if (rc.space === sp.hid){
+      if (rc.vis && !rc.authorUid && managedUid) rc.authorUid = managedUid;   // queued pre-sign-in
       fbFs.setDoc(fbFs.doc(spaceRt[sp.hid].db, 'households', sp.hid, 'receipts', rc.id), rc).catch(() => {});
-    else rest.push(rc);
+    } else rest.push(rc);
   });
   store.set('pendingRc', rest);
 }
@@ -1775,6 +1932,14 @@ function openExpense(td){
   document.getElementById('expAmount').value = td.amount || '';
   document.getElementById('expPhotoState').textContent = '';
   document.getElementById('expPhoto').value = '';
+  // v80: circle expenses offer the claim-ready extras (provider, support date)
+  const sp = td.space && spacesList().find(s => s.hid === td.space);
+  const circleExp = !!(sp && sp.type === 'circle');
+  document.getElementById('expCircleFields').style.display = circleExp ? '' : 'none';
+  if (circleExp){
+    document.getElementById('expProvider').value = td.provider || '';
+    document.getElementById('expDate').value = td.supportDate || todayStr();
+  }
   document.getElementById('expSheet').style.display = 'flex';
 }
 document.getElementById('expPhoto').addEventListener('change', async (e) => {
@@ -1794,7 +1959,9 @@ function syncReceipt(td, thumb){
   if (!td.space || !td.amount) return;
   pushReceipt({id: 'rc-' + td.id, taskId: td.id, ts: td.expenseAt || Date.now(),
     who: td.expenseBy || myName() || null, amount: td.amount,
-    note: td.text, space: td.space, thumb: thumb || null});
+    note: td.text, space: td.space, thumb: thumb || null,
+    // v80: claim-ready columns for circle ledgers (null elsewhere — unchanged)
+    provider: td.provider || null, supportDate: td.supportDate || null});
 }
 document.getElementById('expSave').addEventListener('click', () => {
   if (!expTask) return;
@@ -1803,6 +1970,10 @@ document.getElementById('expSave').addEventListener('click', () => {
   expTask.amount = amount;
   expTask.expenseBy = myName() || null;
   expTask.expenseAt = Date.now();
+  if (document.getElementById('expCircleFields').style.display !== 'none'){
+    expTask.provider = document.getElementById('expProvider').value.trim().slice(0, 80) || null;
+    expTask.supportDate = document.getElementById('expDate').value || null;
+  }
   const inSpace = !!expTask.space;
   if (inSpace) syncReceipt(expTask, expThumb);
   logEvent('expense', expTask, '$' + amount.toFixed(2));
@@ -1929,8 +2100,13 @@ if (!SR && !(navigator.mediaDevices && window.MediaRecorder)){
   micBtn.style.opacity = .4;
   micHint.innerHTML = 'Voice input isn\'t supported in this browser.<br>Use Chrome on Android — or just type below.';
 } else if (!SR){
-  // no online speech API, but offline recording is possible
-  micHint.innerHTML = 'Enable offline voice recognition in Settings,<br>then tap the mic to record.';
+  // v77: no browser speech engine (iOS Safari, Firefox) — but on managed
+  // builds the AI proxy transcribes recordings, so the mic Just Works with
+  // nothing to download. Self-hosted without a key keeps the offline option.
+  if (aiViaProxy() && navigator.mediaDevices && window.MediaRecorder)
+    micHint.innerHTML = 'Tap the mic and speak your idea.<br>Or type below.';
+  else
+    micHint.innerHTML = 'Enable on-device voice recognition in Settings,<br>then tap the mic to record.';
 } else {
   rec = new SR();
   rec.lang = navigator.language || 'en-AU';
@@ -1982,9 +2158,18 @@ if (!SR && !(navigator.mediaDevices && window.MediaRecorder)){
     // some devices won't share the mic between the recognizer and our
     // route-pinning stream — release the pin permanently and behave as before
     if (e.error === 'audio-capture'){ routePinBlocked = true; unpinAudioRoute(); }
+    const wasRecording = recording;
     stopRec();
-    if (e.error === 'not-allowed') toast('Microphone permission denied — allow it in site settings.');
-    else if (e.error !== 'aborted' && e.error !== 'no-speech') toast('Speech error: ' + e.error);
+    if (e.error === 'not-allowed'){ toast('Microphone permission denied — allow it in site settings.'); return; }
+    if (e.error === 'aborted' || e.error === 'no-speech') return;
+    // v77: the browser engine died mid-take (offline speech service, network,
+    // language) — if the AI proxy can transcribe, switch over seamlessly
+    if (wasRecording && aiViaProxy() && navigator.mediaDevices && window.MediaRecorder){
+      toast('Switched to cloud transcription — keep talking.');
+      startRecLocal('proxy');
+      return;
+    }
+    toast('Speech error: ' + e.error);
   };
   rec.onend = () => {
     if (recording){
@@ -2047,6 +2232,29 @@ function stopRec(){
 let mediaRec = null, mediaStream = null, segTimer = null;
 let asrQueue = Promise.resolve(), asrPendingN = 0;
 const SEG_MS = 5000;
+// v77: the segment recorder feeds one of two engines —
+//   'local' — on-device Whisper (explicit privacy opt-in, Settings download)
+//   'proxy' — the operator AI proxy (Gemini transcribes; nothing to install,
+//             works on every browser with a microphone incl. iOS Safari)
+let asrMode = 'local', asrErrToasted = false, voiceCapTimer = null;
+// free-tier cap per capture on the METERED path only (premium lever —
+// see MONETIZATION.md); flavors can override via FLAVOR.limits.voiceSeconds
+const voiceCapS = () => (APP_FLAVOR.limits || {}).voiceSeconds || 120;
+
+async function proxyTranscribe(blob){
+  const b64 = await new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(String(r.result).split(',')[1] || '');
+    r.onerror = rej;
+    r.readAsDataURL(blob);
+  });
+  if (!b64) return '';
+  const data = await geminiGenerate({contents: [{role: 'user', parts: [
+    {inlineData: {mimeType: blob.type || 'audio/webm', data: b64}},
+    {text: 'Transcribe this audio exactly as spoken, in its original language. Output ONLY the transcript text. If there is no speech, output nothing.'}
+  ]}]});
+  return geminiText(data).trim();
+}
 
 function asrDrain(){ return asrQueue; }
 
@@ -2064,20 +2272,32 @@ async function blobToAudio(blob){
 function queueSegment(blob){
   if (!blob || !blob.size) return;
   asrPendingN++; updateAsrHint();
+  const mode = asrMode;                          // capture at queue time
   asrQueue = asrQueue.then(async () => {
     try {
-      const audio = await blobToAudio(blob);
-      if (audio.length >= 16000 * 0.4){          // skip sub-0.4s fragments
-        const {text} = await aiCall('transcribe', {audio}, [audio.buffer]);
-        // Whisper marks non-speech with tokens like [BLANK_AUDIO] / [MUSIC] /
-        // (inaudible) — noise, not dictation; they must never reach the note
-        const clean = (text || '')
-          .replace(/\[[^\]]{0,60}\]|\((?:inaudible|silence|music|laughter|applause|coughing|no speech)[^)]*\)|♪+/gi, ' ')
-          .replace(/\s+/g, ' ').trim();
-        if (clean)
-          liveText.value = (liveText.value + ' ' + clean).replace(/\s+/g,' ').trim();
+      let text = '';
+      if (mode === 'proxy'){
+        text = await proxyTranscribe(blob);
+      } else {
+        const audio = await blobToAudio(blob);
+        if (audio.length >= 16000 * 0.4)         // skip sub-0.4s fragments
+          text = (await aiCall('transcribe', {audio}, [audio.buffer])).text;
       }
-    } catch (_) { /* one bad segment shouldn't kill the take */ }
+      // ASR engines mark non-speech with tokens like [BLANK_AUDIO] / [MUSIC] /
+      // (inaudible) — noise, not dictation; they must never reach the note
+      const clean = (text || '')
+        .replace(/\[[^\]]{0,60}\]|\((?:inaudible|silence|music|laughter|applause|coughing|no speech)[^)]*\)|♪+/gi, ' ')
+        .replace(/\s+/g, ' ').trim();
+      if (clean)
+        liveText.value = (liveText.value + ' ' + clean).replace(/\s+/g,' ').trim();
+    } catch (e) {
+      // one bad segment shouldn't kill the take — but a systemic proxy failure
+      // (signed out, offline, quota) deserves ONE honest toast per take
+      if (mode === 'proxy' && !asrErrToasted){
+        asrErrToasted = true;
+        toast('Transcription hiccup — ' + (e.message || 'check your connection') + '. Keep talking; your recording continues.');
+      }
+    }
     finally { asrPendingN--; updateAsrHint(); }
   });
 }
@@ -2096,7 +2316,9 @@ function startSegment(){
   segTimer = setTimeout(() => { try { mediaRec.stop(); } catch(_){} }, SEG_MS);
 }
 
-async function startRecLocal(){
+async function startRecLocal(mode){
+  asrMode = mode || 'local';
+  asrErrToasted = false;
   baseText = liveText.value.trim();
   try {
     mediaStream = await navigator.mediaDevices.getUserMedia({audio: true});
@@ -2109,10 +2331,22 @@ async function startRecLocal(){
   micBtn.textContent = '⏹';
   startRecTimer('local');
   startSegment();
+  // the metered (proxy) path caps a single capture on the free tier; the words
+  // already spoken are kept and transcribed — nothing is lost at the cap
+  if (asrMode === 'proxy'){
+    clearTimeout(voiceCapTimer);
+    voiceCapTimer = setTimeout(async () => {
+      if (!recording) return;
+      await stopRecLocal();
+      const m = Math.round(voiceCapS() / 60 * 10) / 10;
+      toast(`Paused at ${m} minute${m === 1 ? '' : 's'} — everything you said is kept. Longer captures are coming with Premium.`);
+    }, voiceCapS() * 1000);
+  }
 }
 
 async function stopRecLocal(){
   recording = false;
+  clearTimeout(voiceCapTimer);
   stopRecTimer();
   micBtn.classList.remove('recording');
   setIconLabel(micBtn, 'mic');
@@ -2147,7 +2381,7 @@ function updateAsrHint(){
      button). */
 async function finishVoiceCapture(){
   if (!recording){ await asrDrain(); return; }
-  if (useLocalASR()){
+  if (mediaStream || useLocalASR()){   // segment recorder live (local OR proxy mode)
     await stopRecLocal();
     await asrDrain();
     return;
@@ -2185,9 +2419,22 @@ function stopRecTimer(){
 function useLocalASR(){
   return store.get('localASR', false) && !!(navigator.mediaDevices && window.MediaRecorder);
 }
+// v77: the path of least resistance, in order —
+//   on-device Whisper only when the user explicitly chose it (privacy option);
+//   the browser's live engine where it exists (Android/desktop Chrome);
+//   otherwise the AI proxy transcribes recordings (iOS Safari, Firefox —
+//   nothing to download, nothing to install).
+function voiceMode(){
+  if (useLocalASR()) return 'local';
+  if (SR) return 'sr';
+  if (aiViaProxy() && navigator.mediaDevices && window.MediaRecorder) return 'proxy';
+  return 'none';
+}
 micBtn.addEventListener('click', () => {
-  if (useLocalASR()) return recording ? stopRecLocal() : startRecLocal();
-  return recording ? stopRec() : startRec();
+  const m = voiceMode();
+  if (m === 'local' || m === 'proxy') return recording ? stopRecLocal() : startRecLocal(m);
+  if (m === 'sr') return recording ? stopRec() : startRec();
+  toast('Voice input isn’t available in this browser — you can type instead.');
 });
 document.getElementById('clearBtn').addEventListener('click', () => {
   liveText.value = ''; baseText = '';
@@ -2512,7 +2759,9 @@ function noteSpace(){
   // old any-single-care-space fallback predated the chips and could show
   // "Save to journal" while the active chip pointed at a family space.)
   const sp = spacesList().find(s => s.hid === captureDestVal());
-  return sp && sp.type === 'care' ? sp : null;
+  // v79: circle viewers are read-only — don't offer a save the rules refuse
+  if (sp && sp.type === 'circle' && (sp.role || '') === 'viewer') return null;
+  return sp && (sp.type === 'care' || sp.type === 'circle') ? sp : null;
 }
 
 /* ---------- capture destination picker (v68) ----------
@@ -2602,6 +2851,8 @@ function journalReports(){
       `${sp.name} — who did what, and what’s coming up`, () => openFamilyReport(sp)]);
     if (sp.type === 'coparenting') cards.push(['scroll', 'Records summary',
       `${sp.name} — expenses and completions, neutral wording`, () => openCoparentReport(sp)]);
+    if (sp.type === 'circle') cards.push(['target', 'Plan Review Pack',
+      `${sp.name} — the last 12 weeks, grouped by plan goal`, () => openPlanPack(sp)]);
   });
   return cards;
 }
@@ -2862,13 +3113,35 @@ const SPACE_ACTIONS = {
     ['clipboard', 'Week report', sp => openFamilyReport(sp)],
     ['scroll', 'History & export', sp => openHistory(sp)],
     ['share', 'Invite', sp => shareSpaceInvite(sp)]
-  ]
+  ],
+  // Cooee circle pack (v76/v79): the participant's space. Reuses the
+  // care-pack profile/meds/journal primitives; built per-render because the
+  // session button flips Start↔End and viewers are read-only (write actions
+  // hidden — the rules refuse them anyway; the UI just doesn't tease them).
+  circle: (sp) => {
+    const acts = [
+      ['heart', 'About Me', s => openProfile(s)],
+      ['pill', 'Routines & meds', s => openMeds(s)]
+    ];
+    if ((sp.role || '') !== 'viewer'){
+      acts.push(['note', 'Add a note', () => { showView('capture'); toast('Speak or type, then tap “Save to journal”.'); }]);
+      const open = openSessionOn(sp.hid);
+      acts.push(['clock', open ? 'End support' : 'Start support',
+        s => open ? endSupportSession(s.hid) : startSupportSession(s)]);
+      acts.push(['alert', 'Report incident', s => openIncidentSheet(s)]);
+    }
+    acts.push(['target', 'Plan Review Pack', s => openPlanPack(s)]);   // read-only: viewers too
+    acts.push(['scroll', 'History & export', s => openHistory(s)]);
+    acts.push(['share', 'Invite', s => shareSpaceInvite(s)]);
+    return acts;
+  }
 };
 function renderSpaceBar(){
   const host = document.getElementById('spaceBar');
   if (!host) return;
   const sp = activeSpaceObj();
   let acts = sp && SPACE_ACTIONS[sp.type];
+  if (typeof acts === 'function') acts = acts(sp);   // v79: role/state-aware bars
   // v68: the personal view gets its own bar — the week-in-review report was
   // buried inside the collapsed Wins block and nobody found it
   if (!acts && (activeSpace === 'personal' || (!spacesList().length && todos.some(t => t.done))))
@@ -2894,7 +3167,7 @@ function renderSpaceHeader(){
   if (!t) return;
   const sp = activeSpaceObj();
   if (sp) setIconLabel(t, SPACE_ICON[sp.type] || 'users', sp.name);
-  else t.textContent = 'Idea → Todo';
+  else t.textContent = flavorName();
 }
 
 // v43: keep the ADHD toolkit reachable after the onboarding modal closes — a
@@ -3090,7 +3363,11 @@ function openTagSheet(td){
   const host = document.getElementById('tagChoices');
   host.innerHTML = '';
   const current = (td.tags || []).filter(t => t !== 'general' || (td.tags || []).length === 1);
-  const rest = allKnownTags().filter(t => !current.includes(t));
+  // v80: a circle task offers its plan-goal tags first — tagging work with a
+  // goal is how progress lands in the Plan Review Pack
+  const sp = td.space && spacesList().find(s => s.hid === td.space);
+  const goals = (sp && sp.type === 'circle') ? planGoals(sp.hid).map(goalTag).filter(Boolean) : [];
+  const rest = [...new Set([...goals, ...allKnownTags()])].filter(t => !current.includes(t));
   [...current, ...rest].forEach(t => host.appendChild(tagRow(t, current.includes(t))));
   enforceTagMax();
   document.getElementById('tagNew').value = '';
@@ -3640,8 +3917,10 @@ function setupModelButton(kind, btnId, statusId, storeKey, loadMsg, enabledLabel
   const refresh = () => {
     const on = store.get(storeKey, false);
     btn.textContent = on ? enabledLabel : disabledLabel;
-    btn.classList.toggle('primary', !on);
-    btn.classList.toggle('ghost', on);
+    // v77: on-device models are optional privacy modes now, not prerequisites —
+    // the download button stays quiet instead of shouting primary
+    btn.classList.remove('primary');
+    btn.classList.add('ghost');
     if (on && !status.textContent) setIconLabel(status, 'check', 'Enabled — model is cached on this device.');
   };
   refresh();
@@ -3692,7 +3971,7 @@ function setupModelButton(kind, btnId, statusId, storeKey, loadMsg, enabledLabel
 }
 setupModelButton('asr', 'asrBtn', 'asrStatus', 'localASR',
   'Preparing Whisper (speech recognition)…',
-  'Disable offline voice recognition', 'Enable offline voice recognition (~80 MB)');
+  'Turn off on-device voice recognition', 'Enable on-device voice recognition (~80 MB)');
 document.getElementById('modelsWipeBtn').addEventListener('click', async () => {
   if (!confirm('Delete the downloaded AI models from this device? You can re-download them later.')) return;
   store.set('localASR', false);
@@ -3896,20 +4175,25 @@ let careHandoffDismissed = false;
 function renderCareHandoff(){
   const host = document.getElementById('careHandoff');
   if (!host) return;
-  const cares = spacesList().filter(s => s.type === 'care')
+  const cares = spacesList().filter(s => s.type === 'care' || s.type === 'circle')
     .filter(s => activeSpace === 'all' || activeSpace === s.hid);
   if (!cares.length || careHandoffDismissed){ host.style.display = 'none'; host.innerHTML = ''; return; }
   const me = (myName() || '').toLowerCase();
   const evs = store.get('events', []).filter(e => (e.ts || 0) > prevSeenAt
       && cares.some(s => s.hid === e.space)
-      && ['note', 'missed', 'ticked', 'created'].includes(e.kind))
+      && ['note', 'missed', 'ticked', 'created', 'session-start', 'session-end', 'incident'].includes(e.kind))
     .sort((a, b) => a.ts - b.ts);
   const lineFor = (e) => {
     const clip = (s) => { s = String(s || ''); return s.length > 80 ? s.slice(0, 78) + '…' : s; };
+    const at = (ts) => new Date(ts).toLocaleTimeString(undefined, {hour: 'numeric', minute: '2-digit'});
     if (e.kind === 'note')    return '' + (capName(e.who) || 'A carer') + ' noted: “' + clip(e.text) + '”';
     if (e.kind === 'missed')  return '' + clip(e.text) + ' — not recorded' + (e.detail ? ' (' + e.detail + ')' : '');
     if (e.kind === 'ticked')  return '' + (capName(e.who) || 'Someone') + ' did “' + clip(e.text) + '”';
     if (e.kind === 'created') return '' + (capName(e.who) || 'Someone') + ' added “' + clip(e.text) + '”';
+    if (e.kind === 'session-start') return '' + (capName(e.who) || 'A worker') + ' started support at ' + at(e.ts);
+    if (e.kind === 'session-end')   return '' + (capName(e.who) || 'A worker') + ' ended support at ' + at(e.ts)
+      + (/automatically/.test(e.detail || '') ? ' (closed automatically)' : '');
+    if (e.kind === 'incident') return '' + (capName(e.who) || 'Someone') + ' reported an incident: “' + clip(e.text) + '”';
     return clip(e.text);
   };
   // don't echo the carer's own ticks/adds back to them; keep notes + missed always
@@ -4035,7 +4319,7 @@ let fbFs = null, fbInitApp = null, applyingRemote = false;
 const spaceRt = {};    // hid → {db, unsub, lastPush: {id → serialized core}}
 
 // icon-set names per space type (rendered via setIconLabel / ic-* classes)
-const SPACE_ICON = {family: 'users', coparenting: 'handshake', care: 'heart'};
+const SPACE_ICON = {family: 'users', coparenting: 'handshake', care: 'heart', circle: 'spark'};
 const spacesList = () => store.get('spaces', []);
 const spaceName = (hid) => { const sp = spacesList().find(s => s.hid === hid); return sp ? sp.name : null; };
 
@@ -4086,6 +4370,19 @@ function logEvent(kind, td, detail, whoOverride){
   const who = whoOverride !== undefined ? whoOverride : (myName() || null);
   const ev = {id: uid(), ts: Date.now(), who, kind,
               taskId: td.id, text: td.text, space: td.space || null, detail: detail || null};
+  // circle spaces (v79): stamp visibility + author UID so the role-scoped
+  // rules can enforce who reads this — and workers' filtered queries match it.
+  // td.vis lets a caller scope tighter (incidents are 'team': owner/co-admins
+  // + the author, never the wider circle).
+  const evSp = ev.space && spacesList().find(s => s.hid === ev.space);
+  if (evSp && evSp.type === 'circle' && evSp.managed){
+    ev.vis = td.vis || 'circle';
+    if (managedUid) ev.authorUid = managedUid;
+    if (Array.isArray(td.visUids) && td.visUids.length) ev.visUids = td.visUids;
+    // v80: circle events remember the task's tags so the Plan Review Pack can
+    // group history under plan goals even after the task itself is gone
+    if (Array.isArray(td.tags) && td.tags.length) ev.tags = td.tags.slice(0, 3);
+  }
   const evs = store.get('events', []);
   evs.push(ev);
   if (evs.length > 2000) evs.splice(0, evs.length - 2000);
@@ -4108,9 +4405,12 @@ function flushPendingEvents(sp){
   if (!pend.length) return;
   const rest = [];
   pend.forEach(ev => {
-    if (ev.space === sp.hid)
+    if (ev.space === sp.hid){
+      // a scoped event queued before sign-in finished gets its author UID now
+      // (the rules require an honest authorUid on team/assigned/private docs)
+      if (ev.vis && !ev.authorUid && managedUid) ev.authorUid = managedUid;
       fbFs.setDoc(fbFs.doc(spaceRt[sp.hid].db, 'households', sp.hid, 'events', ev.id), ev).catch(() => {});
-    else rest.push(ev);
+    } else rest.push(ev);
   });
   store.set('pendingEv', rest);
 }
@@ -4119,7 +4419,78 @@ const EVENT_LABEL = {created: 'added', edited: 'edited', ticked: 'ticked off',
   unticked: 'un-ticked', deleted: 'deleted', restored: 'restored',
   rescheduled: 'rescheduled', parked: 'parked for someday', moved: 'moved',
   missed: 'missed', note: 'noted', 'note-removed': 'removed the note',
-  expense: 'logged an expense on'};
+  'circle-owner': 'recorded', expense: 'logged an expense on',
+  'session-start': 'started a support session',
+  'session-end': 'ended a support session',
+  incident: 'reported an incident'};
+
+/* ---------- support session brackets (v79 — Cooee Phase 2) ----------
+   A generic bracket record: paired session-start / session-end events sharing
+   a bracket id (in taskId). What the same person ticks and notes between them
+   reads as "during this session" in history — a shift-change record, so the
+   next worker knows what happened. Deliberately NOT time-tracking: no
+   per-worker duration totals are computed anywhere, ever (ARCHITECTURE.md
+   non-goals). A bracket left open is closed at the next app start after 12
+   hours, with an honest "ended automatically" marker. */
+function openSessionOn(hid){ return (store.get('openSessions', {}) || {})[hid] || null; }
+function startSupportSession(sp){
+  const all = store.get('openSessions', {}) || {};
+  if (all[sp.hid]) return;
+  const ses = {sesId: 'ses-' + uid(), start: Date.now()};
+  all[sp.hid] = ses;
+  store.set('openSessions', all);
+  logEvent('session-start', {id: ses.sesId, text: 'support session', space: sp.hid});
+  track('feature_used', {feature: 'session_bracket'});
+  renderSpaceBar();
+  toast('Session started — what you tick and note now reads as part of it.');
+}
+function endSupportSession(hid, detail){
+  const all = store.get('openSessions', {}) || {};
+  const ses = all[hid];
+  if (!ses) return;
+  delete all[hid];
+  store.set('openSessions', all);
+  logEvent('session-end', {id: ses.sesId, text: 'support session', space: hid}, detail || null);
+  renderSpaceBar();
+  if (!detail) toast('Session ended — it’s in the circle’s record for the next person.');
+}
+// boot sweep: brackets forgotten open (phone died, worker forgot) self-close
+function autoCloseSessions(){
+  const all = store.get('openSessions', {}) || {};
+  Object.keys(all).forEach(hid => {
+    if (Date.now() - (all[hid].start || 0) > 12 * 3600000)
+      endSupportSession(hid, 'ended automatically — left open more than 12 hours');
+  });
+}
+
+/* ---------- plan goals (v80 — Cooee Phase 3) ----------
+   Per-circle list of what the supports work toward, in the participant's own
+   words. Each goal derives a short TAG (≤16 chars, the engine's tag limit);
+   tagging a task or note with it groups that work under the goal in the Plan
+   Review Pack. Stored on the household doc (`planGoals`) like profile and
+   custody — the rules already restrict circle household edits to
+   owner/co-admins. Coordination vocabulary only: goals are labels, never
+   budgets, never plan management. */
+function planGoals(hid){ return (store.get('planGoals', {}) || {})[hid] || []; }
+function setPlanGoals(hid, goals){
+  const m = store.get('planGoals', {}) || {};
+  m[hid] = goals;
+  store.set('planGoals', m);
+}
+// the goal's tag: lowercase, engine-legal, cut at a word boundary within 16
+function goalTag(label){
+  const s = String(label || '').toLowerCase().replace(/[^a-z0-9 -]/g, '').trim();
+  if (s.length <= 16) return s;
+  const cut = s.slice(0, 17);
+  const sp = cut.lastIndexOf(' ');
+  return (sp > 0 ? cut.slice(0, sp) : cut.slice(0, 16)).trim();
+}
+function syncPlanGoals(sp){
+  const rt = spaceRt[sp.hid];
+  if (rt && rt.db)
+    fbFs.setDoc(fbFs.doc(rt.db, 'households', sp.hid), {planGoals: planGoals(sp.hid)}, {merge: true})
+      .catch(() => toast('Couldn’t save goals to the circle — only the owner or a co-admin can edit them.'));
+}
 
 // joining/creating the FIRST space adopts existing shareable tasks into it,
 // matching the old "everything local syncs up" behaviour
@@ -4139,6 +4510,7 @@ function todoCore(td){
           energy: td.energy || null, minutes: td.minutes || null,
           someday: !!td.someday, carried: td.carried || 0, amount: td.amount || null,
           expenseBy: td.expenseBy || null, expenseAt: td.expenseAt || null,
+          provider: td.provider || null, supportDate: td.supportDate || null,   // v80 circle claims
           med: td.med || null};
 }
 function syncMsg(text){
@@ -4229,7 +4601,11 @@ async function restoreUserSpaces(){
 // on this device's managed spaces and restart their listeners under the new auth
 async function reMemberLocalSpaces(){
   for (const s of spacesList().filter(x => x.managed)){
-    try { await fbFs.setDoc(fbFs.doc(managedDb, 'households', s.hid), {members: {[managedUid]: myName() || 'member'}}, {merge: true}); } catch (_) {}
+    // circles keep role-map membership — a bare string write would demote us
+    const me = s.type === 'circle'
+      ? {name: myName() || 'member', role: s.role || 'worker'}
+      : (myName() || 'member');
+    try { await fbFs.setDoc(fbFs.doc(managedDb, 'households', s.hid), {members: {[managedUid]: me}}, {merge: true}); } catch (_) {}
     const rt = spaceRt[s.hid]; if (rt && rt.unsub) rt.unsub(); delete spaceRt[s.hid];
     await startSpaceSync(s);
   }
@@ -4447,11 +4823,12 @@ async function startSpaceSync(sp){
       if (d.custody){ setLocalCustody(sp.hid, d.custody); }
       if (d.profile){ setLocalProfile(sp.hid, d.profile); }
       if (Array.isArray(d.memberNames)){ setSpaceMembers(sp.hid, d.memberNames); }
+      if (Array.isArray(d.planGoals)){ setPlanGoals(sp.hid, d.planGoals); }   // v80
       renderTodos();
     }).catch(() => {});
   }
-  const col = fbFs.collection(rt.db, 'households', sp.hid, 'items');
-  rt.unsub = fbFs.onSnapshot(col, snap => {
+  const targets = readTargets(rt.db, sp, 'items');
+  const unsubs = targets.map(target => fbFs.onSnapshot(target, snap => {
     applyingRemote = true;
     snap.docChanges().forEach(ch => {
       const id = ch.doc.id;
@@ -4470,7 +4847,7 @@ async function startSpaceSync(sp){
       if (!local) todos.push({id, ...d, space: sp.hid});
       else if ((d.updated || 0) >= (local.updated || 0)) Object.assign(local, d, {space: sp.hid});
       const cur = todos.find(t => t.id === id);
-      rt.lastPush[id] = JSON.stringify(todoCore(cur));
+      rt.lastPush[id] = JSON.stringify(itemPayload(sp, cur));
       noteFamilyActivity(cur);
     });
     store.set('todos', todos);          // persist without re-triggering a push
@@ -4482,7 +4859,28 @@ async function startSpaceSync(sp){
   }, err => {
     syncMsg(' Sync error (' + sp.name + '): ' + err.message +
  (String(err.message).match(/permission/i) ? ' — check the Firestore rules step in the README.' : ''));
-  });
+  }));
+  rt.unsub = () => unsubs.forEach(u => { try { u(); } catch (_) {} });
+}
+
+// v79: which query shapes may this member run against a circle collection?
+// Workers and viewers CANNOT list unfiltered — the v78 rules only prove the
+// positive-filter shapes (COOEE-MAPPING §5 build-order note). Owner/co-admin,
+// and every non-circle space, keep the single unfiltered listener.
+// (A doc whose vis changes may briefly 'remove' from one shape before it
+// 'adds' via another; there is no vis-editing UI yet, so this cannot occur.)
+function scopedReader(sp){
+  return sp.type === 'circle' && sp.managed && ['worker', 'viewer'].includes(sp.role || '');
+}
+function readTargets(db, sp, colName){
+  const col = fbFs.collection(db, 'households', sp.hid, colName);
+  if (!scopedReader(sp) || !fbFs.query || !fbFs.where || !managedUid) return [col];
+  return [
+    fbFs.query(col, fbFs.where('vis', '==', 'circle')),
+    fbFs.query(col, fbFs.where('vis', '==', 'assigned'),
+                    fbFs.where('visUids', 'array-contains', managedUid)),
+    fbFs.query(col, fbFs.where('authorUid', '==', managedUid))
+  ];
 }
 
 async function startSync(){
@@ -4490,6 +4888,18 @@ async function startSync(){
     try { await startSpaceSync(sp); }
     catch (err) { syncMsg(' ' + sp.name + ': ' + err.message); }
   }
+}
+
+// circle items carry the fields the role-scoped rules key off (v79). Other
+// space types push todoCore untouched — no new fields, no regression surface.
+// authorUid is stamped once and then sticky: the rules refuse rewriting it,
+// so ticking someone else's task must carry THEIR stamp through unchanged.
+function itemPayload(sp, td){
+  if (sp.type !== 'circle' || !sp.managed) return todoCore(td);
+  if (!td.authorUid && managedUid) td.authorUid = managedUid;
+  return {...todoCore(td), vis: td.vis || 'circle',
+          ...(td.authorUid ? {authorUid: td.authorUid} : {}),
+          ...(Array.isArray(td.visUids) && td.visUids.length ? {visUids: td.visUids} : {})};
 }
 
 function syncPush(){
@@ -4501,12 +4911,12 @@ function syncPush(){
     todos.forEach(td => {
       if (td.scope === 'private' || (td.space || null) !== sp.hid) return;
       seen.add(td.id);
-      const core = JSON.stringify(todoCore(td));
+      const core = JSON.stringify(itemPayload(sp, td));
       if (rt.lastPush[td.id] !== core){
         td.updated = Date.now();
         rt.lastPush[td.id] = core;
         fbFs.setDoc(fbFs.doc(rt.db, 'households', sp.hid, 'items', td.id),
-          {...todoCore(td), updated: td.updated}, {merge: true})
+          {...itemPayload(sp, td), updated: td.updated}, {merge: true})
           .catch(err => syncMsg(' Sync error: ' + err.message));
       }
     });
@@ -4530,13 +4940,17 @@ function parseFbConfig(text){
   if (!apiKey || !projectId) throw new Error('could not find apiKey and projectId in that snippet');
   return {apiKey, projectId};
 }
-function inviteEncode(cfg, hid, name, type){
+function inviteEncode(cfg, hid, name, type, role){
   const sp = spacesList().find(s => s.hid === hid);
   const b64 = (o) => btoa(JSON.stringify(o)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const t = type || (sp && sp.type);
   if (sp && sp.managed)   // hosted service: no keys in the code at all
-    return 'ITODO2-' + b64({h: hid, n: name || sp.name, t: type || sp.type});
+    return 'ITODO2-' + b64({h: hid, n: name || sp.name, t,
+      // circle invites carry a role (Phase 1c); the rules only accept
+      // worker/viewer self-joins — elevation is an owner/co-admin act
+      ...(t === 'circle' ? {r: role || 'worker'} : {})});
   return 'ITODO1-' + b64({k: cfg.apiKey, p: cfg.projectId, h: hid,
-    n: name || (sp && sp.name) || undefined, t: type || (sp && sp.type) || undefined});
+    n: name || (sp && sp.name) || undefined, t: t || undefined});
 }
 function inviteDecode(code){
   const m = String(code).trim().match(/ITODO(1|2)-([A-Za-z0-9_-]+)/);
@@ -4545,7 +4959,9 @@ function inviteDecode(code){
   if (m[1] === '2'){
     if (!window.MANAGED) throw new Error('this invite is for the hosted service — update the app first');
     if (!j.h) throw new Error('invite code is incomplete');
-    return {managed: true, cfg: null, hid: j.h, name: j.n || 'Family', type: SPACE_ICON[j.t] ? j.t : 'family'};
+    return {managed: true, cfg: null, hid: j.h, name: j.n || 'Family', type: SPACE_ICON[j.t] ? j.t : 'family',
+      // clamp: a crafted code can never mint a privileged role (rules also refuse)
+      role: ['worker', 'viewer'].includes(j.r) ? j.r : 'worker'};
   }
   if (!j.k || !j.p || !j.h) throw new Error('invite code is incomplete');
   return {managed: false, cfg: {apiKey: j.k, projectId: j.p}, hid: j.h,
@@ -4615,15 +5031,16 @@ async function collectSpaceEvents(sp){
   store.get('events', []).filter(e => e.space === sp.hid).forEach(add);
   const rt = spaceRt[sp.hid];
   if (rt && rt.db){
-    await new Promise(res => {
+    // workers/viewers in a circle read via the allowed filtered shapes (v79)
+    await Promise.all(readTargets(rt.db, sp, 'events').map(target => new Promise(res => {
       let unsub = null, done = false;
       const finish = () => { if (!done){ done = true; if (unsub) unsub(); res(); } };
-      unsub = fbFs.onSnapshot(fbFs.collection(rt.db, 'households', sp.hid, 'events'), snap => {
+      unsub = fbFs.onSnapshot(target, snap => {
         snap.docChanges().forEach(ch => { if (ch.type !== 'removed') add({id: ch.doc.id, ...ch.doc.data()}); });
         finish();
       }, finish);
       setTimeout(finish, 5000);
-    });
+    })));
   }
   out.sort((a, b) => b.ts - a.ts);
   return out;
@@ -4665,6 +5082,10 @@ function renderHistory(){
     }
     const l = document.createElement('div');
     l.className = 'hist-line';
+    // v79: session brackets and incidents read as records, not task lines
+    const isSession = ev.kind === 'session-start' || ev.kind === 'session-end';
+    if (isSession) l.className += ' hist-session';
+    if (ev.kind === 'incident') l.className += ' hist-incident';
     const when = document.createElement('span');
     when.className = 'hwhen';
     when.textContent = new Date(ev.ts).toLocaleDateString(undefined, {day: 'numeric', month: 'short'}) +
@@ -4674,6 +5095,23 @@ function renderHistory(){
     const who = document.createElement('b');
     who.textContent = capName(ev.who) || 'someone';
     body.appendChild(who);
+    if (isSession){
+      let tail = ' ' + EVENT_LABEL[ev.kind];
+      if (ev.kind === 'session-end'){
+        // the session card: how much record the bracket holds (a shift-change
+        // summary — never a duration total)
+        const start = histEvents.find(e => e.kind === 'session-start' && e.taskId === ev.taskId);
+        if (start){
+          const n = histEvents.filter(e => e.ts >= start.ts && e.ts <= ev.ts
+            && (e.who || '') === (ev.who || '')
+            && ['ticked', 'note', 'created', 'incident', 'expense'].includes(e.kind)).length;
+          if (n) tail += ' — ' + n + (n === 1 ? ' entry' : ' entries') + ' during it';
+        }
+      }
+      body.appendChild(document.createTextNode(tail));
+    } else if (ev.kind === 'incident'){
+      body.appendChild(document.createTextNode(' reported an incident: “' + ev.text + '”'));
+    } else
     body.appendChild(document.createTextNode(' ' + (EVENT_LABEL[ev.kind] || ev.kind) + ' “' + ev.text + '”'));
     if (ev.detail){
       const d = document.createElement('span');
@@ -4881,6 +5319,159 @@ document.getElementById('briefPrint').addEventListener('click', () => {
 <body>${curReport.bodyHtml}</body></html>`);
   w.document.close(); w.focus(); w.print();
 });
+
+/* ---------- Plan Review Pack (v80 — Cooee Phase 3) ----------
+   The circle's answer to the doctor briefing: the last 12 weeks of the
+   participant-owned record, grouped by PLAN GOAL, ready to bring to a plan
+   review. Coordination record only — every render and print carries
+   "Participant-owned coordination record. Not medical, legal, or NDIS
+   advice." The participant is always the grammatical subject. Sessions are
+   listed as records (dates, who) — never totalled per worker. */
+const PACK_DAYS = 84;
+const PACK_DISCLAIMER = 'Participant-owned coordination record. Not medical, legal, or NDIS advice.';
+
+function planPackInput(sp){
+  const since = Date.now() - PACK_DAYS * 86400000;
+  const evs = histEvents.filter(e => e.ts >= since);
+  const removed = new Set(evs.filter(e => e.kind === 'note-removed').map(e => e.taskId));
+  const d = (ts) => new Date(ts).toLocaleDateString(undefined, {day: 'numeric', month: 'short'});
+  const t = (ts) => new Date(ts).toLocaleTimeString(undefined, {hour: 'numeric', minute: '2-digit'});
+  const line = (e) => d(e.ts) + ' — ' + (capName(e.who) || 'someone') + ': ' + e.text +
+    (e.detail ? ' (' + e.detail + ')' : '');
+  // which goal(s) an event belongs to: its stored tags (v80+), else the live
+  // task's tags, else (for notes) the goal tag appearing in the text
+  const tagsOf = (e) => {
+    if (Array.isArray(e.tags) && e.tags.length) return e.tags;
+    const td = todos.find(x => x.id === e.taskId);
+    if (td && Array.isArray(td.tags)) return td.tags;
+    return null;
+  };
+  const matchesGoal = (e, tag) => {
+    const tags = tagsOf(e);
+    if (tags) return tags.includes(tag);
+    return e.kind === 'note' && (e.text || '').toLowerCase().includes(tag);
+  };
+  const workLike = (e) => ['ticked', 'created', 'note'].includes(e.kind) && !removed.has(e.taskId);
+  const goals = planGoals(sp.hid).map(label => {
+    const tag = goalTag(label);
+    return {label, tag, lines: evs.filter(e => workLike(e) && matchesGoal(e, tag)).map(line)};
+  });
+  // support sessions: end events pair with their start by bracket id; open
+  // brackets still show — the record is honest about what's unfinished
+  const sessions = [];
+  evs.filter(e => e.kind === 'session-start').sort((a, b) => a.ts - b.ts).forEach(s => {
+    const end = evs.find(e => e.kind === 'session-end' && e.taskId === s.taskId);
+    sessions.push(d(s.ts) + ' — ' + (capName(s.who) || 'a worker') + ', ' + t(s.ts) +
+      (end ? ' to ' + t(end.ts) + (/automatically/.test(end.detail || '') ? ' (closed automatically)' : '') : ' — still open'));
+  });
+  const expenses = evs.filter(e => e.kind === 'expense').map(line);
+  const expTotal = evs.filter(e => e.kind === 'expense')
+    .reduce((a, e) => a + (parseFloat(String(e.detail || '').replace(/[^0-9.]/g, '')) || 0), 0);
+  return {
+    goals,
+    otherNotes: evs.filter(e => e.kind === 'note' && !removed.has(e.taskId)
+      && !goals.some(g => matchesGoal(e, g.tag))).map(line),
+    sessions,
+    incidents: evs.filter(e => e.kind === 'incident').map(line),
+    ticked: evs.filter(e => e.kind === 'ticked').map(line),
+    missed: evs.filter(e => e.kind === 'missed').map(e => d(e.ts) + ' — ' + e.text + ' — not recorded as done' +
+      (e.detail ? ' (' + e.detail + ')' : '')),
+    open: todos.filter(x => x.space === sp.hid && !x.done).map(x => x.text +
+      ((x.tags || []).some(tg => planGoals(sp.hid).map(goalTag).includes(tg)) ? ' (plan goal)' : '')),
+    expenses, expTotal
+  };
+}
+
+function localPlanPack(sp){
+  const inp = planPackInput(sp);
+  const who = capName((sp.circle && sp.circle.participant) || '') || (getProfile(sp.hid) || {}).name || sp.name;
+  const goalWork = inp.goals.reduce((a, g) => a + g.lines.length, 0);
+  const overview = `${who}'s coordination record over the last 12 weeks: ` +
+    `${inp.sessions.length} support session${inp.sessions.length === 1 ? '' : 's'} recorded, ` +
+    `${inp.ticked.length} task${inp.ticked.length === 1 ? '' : 's'} completed` +
+    (goalWork ? ` (${goalWork} entr${goalWork === 1 ? 'y' : 'ies'} under ${who}'s plan goals)` : '') +
+    (inp.missed.length ? `, ${inp.missed.length} routine${inp.missed.length === 1 ? '' : 's'} not recorded as done` : '') +
+    (inp.incidents.length ? `, ${inp.incidents.length} incident${inp.incidents.length === 1 ? '' : 's'} recorded` : '') +
+    (inp.expTotal ? `, $${inp.expTotal.toFixed(2)} in support-related expenses logged` : '') + '.';
+  return {overview, ...inp};
+}
+
+async function geminiPlanPack(sp){
+  const inp = planPackInput(sp);
+  const who = capName((sp.circle && sp.circle.participant) || '') || sp.name;
+  const schema = {type: 'OBJECT', properties: {
+    overview: {type: 'STRING'},
+    goalSummaries: {type: 'ARRAY', items: {type: 'OBJECT', properties: {
+      goal: {type: 'STRING'}, summary: {type: 'STRING'}}, required: ['goal', 'summary']}}
+  }, required: ['overview', 'goalSummaries']};
+  const data = await geminiGenerate({
+    contents: [{role: 'user', parts: [{text:
+`You prepare a plain-language summary for an NDIS participant's plan review, from their support circle's shared coordination record (last 12 weeks). ${who} owns this record and is always the grammatical subject — write "what ${who} worked toward", never what anyone did TO ${who} or monitored about them. Plain factual language: no diagnoses, no advice, no funding or claiming suggestions, no judging any worker. 2-3 sentences for the overview; for each plan goal with entries, 1-2 sentences on what the record shows.
+
+Plan goals and their recorded entries:
+${inp.goals.map(g => g.label + ':\n' + (g.lines.join('\n') || '(nothing recorded)')).join('\n\n')}
+
+Support sessions recorded: ${inp.sessions.length}. Tasks completed: ${inp.ticked.length}. Not recorded as done: ${inp.missed.length}. Incidents: ${inp.incidents.length}.
+
+Return JSON: {overview, goalSummaries: [{goal, summary}]}`}]}],
+    generationConfig: {responseMimeType: 'application/json', responseSchema: schema}
+  });
+  const j = JSON.parse(geminiText(data));
+  const pack = {overview: String(j.overview || '').trim(), ...inp};
+  (j.goalSummaries || []).forEach(gs => {
+    const g = pack.goals.find(x => x.label.toLowerCase() === String(gs.goal || '').toLowerCase());
+    if (g) g.summary = String(gs.summary || '').trim();
+  });
+  if (!pack.overview) throw new Error('empty overview');
+  return pack;
+}
+
+function planPackInner(sp, pk){
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+  const sec = (title, arr) => (arr && arr.length)
+    ? `<h2 style="font-size:14px;margin:16px 0 6px;">${title}</h2><ul style="margin:0;padding-left:20px;">${arr.map(x => '<li style="font-size:13px;line-height:1.55;">' + esc(x) + '</li>').join('')}</ul>` : '';
+  const goalBlocks = pk.goals.map(g =>
+    `<h2 style="font-size:14px;margin:16px 0 6px;">Goal: ${esc(g.label)}</h2>` +
+    (g.summary ? `<p style="font-size:13px;line-height:1.55;margin:0 0 4px;">${esc(g.summary)}</p>` : '') +
+    (g.lines.length
+      ? `<ul style="margin:0;padding-left:20px;">${g.lines.map(x => '<li style="font-size:13px;line-height:1.55;">' + esc(x) + '</li>').join('')}</ul>`
+      : `<p style="font-size:12px;color:#777;margin:0;">Nothing recorded under this goal yet — tag tasks and notes with “${esc(g.tag)}” and they’ll gather here.</p>`)
+  ).join('');
+  return `<h1 style="font-size:18px;margin:0 0 2px;">${esc(sp.name)} — Plan Review Pack</h1>` +
+    `<p style="color:#555;font-size:11px;margin:0 0 8px;">Covers the last 12 weeks · prepared ${new Date().toLocaleDateString()}. ${PACK_DISCLAIMER}</p>` +
+    `<p style="font-size:13px;line-height:1.55;">${esc(pk.overview)}</p>` +
+    goalBlocks +
+    sec('Journal notes (not under a goal)', pk.otherNotes) +
+    sec('Support sessions (as recorded)', pk.sessions) +
+    sec('Incidents recorded', pk.incidents) +
+    sec('Routines &amp; medications not recorded as done', pk.missed) +
+    sec('Open tasks going into the review', pk.open) +
+    (pk.expenses.length ? sec('Support-related expenses — $' + pk.expTotal.toFixed(2) + ' total (details in the ledger CSV)', pk.expenses) : '') +
+    `<p style="color:#555;font-size:11px;margin-top:14px;">${PACK_DISCLAIMER}</p>`;
+}
+
+async function openPlanPack(sp){
+  histSpace = sp;
+  histEvents = await collectSpaceEvents(sp);
+  const inp = planPackInput(sp);
+  if (!inp.sessions.length && !inp.ticked.length && !inp.otherNotes.length
+      && !inp.goals.some(g => g.lines.length) && !inp.open.length){
+    toast('Nothing to pack yet — record a session, a note, or tick a routine first, then the review pack has something to show.');
+    return;
+  }
+  openReport(sp.name + ' — Plan Review Pack',
+    aiEnabled() ? 'Reading 12 weeks of the record and grouping it by plan goal…'
+                : 'Reading 12 weeks of the record…',
+    async () => {
+      let pk = null;
+      if (aiEnabled()){
+        try { pk = await geminiPlanPack(sp); track('feature_used', {feature: 'plan_pack'}); }
+        catch (_) { /* fall through */ }
+      }
+      if (!pk) pk = localPlanPack(sp);
+      return planPackInner(sp, pk);
+    });
+}
 
 /* ---------- per-cohort reports (v66) ----------
    Same overlay, different question per cohort:
@@ -5493,15 +6084,19 @@ async function openLedger(sp){
   document.getElementById('ledgerOverlay').style.display = 'block';
   const rt = spaceRt[sp.hid];
   if (rt && rt.db){
-    await new Promise(res => {
+    // circle workers/viewers read receipts via the allowed filtered shapes (v80)
+    await Promise.all(readTargets(rt.db, sp, 'receipts').map(target => new Promise(res => {
       let unsub = null, done = false;
       const finish = () => { if (!done){ done = true; if (unsub) unsub(); res(); } };
-      unsub = fbFs.onSnapshot(fbFs.collection(rt.db, 'households', sp.hid, 'receipts'), snap => {
-        snap.docChanges().forEach(ch => { if (ch.type !== 'removed') ledgerRcs.push({id: ch.doc.id, ...ch.doc.data()}); });
+      unsub = fbFs.onSnapshot(target, snap => {
+        snap.docChanges().forEach(ch => {
+          if (ch.type !== 'removed' && !ledgerRcs.some(x => x.id === ch.doc.id))
+            ledgerRcs.push({id: ch.doc.id, ...ch.doc.data()});
+        });
         finish();
       }, finish);
       setTimeout(finish, 5000);
-    });
+    })));
   }
   // include anything still queued locally for this space
   store.get('pendingRc', []).filter(r => r.space === sp.hid).forEach(r => {
@@ -5512,7 +6107,8 @@ async function openLedger(sp){
   todos.filter(t => t.space === sp.hid && t.amount && t.scope !== 'private').forEach(t => {
     if (!ledgerRcs.some(x => x.taskId === t.id))
       ledgerRcs.push({id: 'rc-' + t.id, taskId: t.id, ts: t.expenseAt || t.createdAt || Date.now(),
-        who: t.expenseBy || t.createdBy || null, amount: t.amount, note: t.text, space: sp.hid, thumb: null});
+        who: t.expenseBy || t.createdBy || null, amount: t.amount, note: t.text, space: sp.hid, thumb: null,
+        provider: t.provider || null, supportDate: t.supportDate || null});
   });
   // one expense per task — dedupe by taskId, keeping the newest
   const byTask = {};
@@ -5610,13 +6206,25 @@ function renderLedger(){
 document.getElementById('ledgerClose').addEventListener('click', () => {
   document.getElementById('ledgerOverlay').style.display = 'none';
 });
+// v80: one row builder for the export. Circle ledgers add the claim-ready
+// columns a plan manager asks for — support date, provider/ABN, receipt ref.
+// Other space types export exactly the columns they always did.
+function ledgerCsvRows(sp, rcs){
+  const esc = (s) => '"' + String(s == null ? '' : s).replace(/"/g, '""') + '"';
+  const circle = sp && sp.type === 'circle';
+  const head = ['timestamp','date','who','task','amount','has_receipt',
+    ...(circle ? ['support_date','provider_abn','receipt_ref'] : [])];
+  const rows = [head.join(',')];
+  [...rcs].sort((a, b) => a.ts - b.ts).forEach(rc =>
+    rows.push([rc.ts, new Date(rc.ts).toLocaleDateString(), esc(rc.who || ''), esc(rc.note || ''),
+      (rc.amount || 0).toFixed(2), rc.thumb ? 'yes' : 'no',
+      ...(circle ? [esc(rc.supportDate || new Date(rc.ts).toLocaleDateString()),
+                    esc(rc.provider || ''), esc(rc.id || '')] : [])].join(',')));
+  return rows;
+}
 document.getElementById('ledgerCsvBtn').addEventListener('click', () => {
   if (!ledgerSpace) return;
-  const esc = (s) => '"' + String(s == null ? '' : s).replace(/"/g, '""') + '"';
-  const rows = [['timestamp','date','who','task','amount','has_receipt'].join(',')];
-  [...ledgerRcs].sort((a, b) => a.ts - b.ts).forEach(rc =>
-    rows.push([rc.ts, new Date(rc.ts).toLocaleDateString(), esc(rc.who || ''), esc(rc.note || ''),
-      (rc.amount || 0).toFixed(2), rc.thumb ? 'yes' : 'no'].join(',')));
+  const rows = ledgerCsvRows(ledgerSpace, ledgerRcs);
   const blob = new Blob([rows.join('\n')], {type: 'text/csv'});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -5741,8 +6349,184 @@ function guideSpaceSetup(sp){
   }
   if (sp.type === 'family') steps.push({label: 'Add people to delegate to',
     desc: 'Assign tasks to who they’re for.', fn: () => { editSpaceMembers(sp); return true; }});
+  if (sp.type === 'circle'){
+    // Cooee Phase 1b. Order matters: ownership is settled before anything else.
+    steps.unshift({label: 'Who is this circle for?',
+      desc: 'You, or someone you support — this sets who owns the record. You can change it later.',
+      fn: () => openCircleOwner(sp)});
+    steps.push({label: 'Record About Me', desc: 'How you like support to happen — every new worker sees it first.',
+      fn: () => { openProfile(sp); return true; }});
+    steps.push({label: 'Add routines & medications', desc: 'Timed, repeating tasks — every tick becomes part of your record.',
+      fn: () => { openMeds(sp); return true; }});
+    steps.push({label: 'Add your plan goals', desc: 'What the supports work toward — progress groups under them in the Plan Review Pack.',
+      fn: () => openGoalsSheet(sp)});
+  }
   setIconLabel(document.getElementById('setupTitle'), SPACE_ICON[sp.type] || 'users', '“' + sp.name + '” is ready');
   document.getElementById('setupIntro').textContent = 'A couple of quick things to make it work for you:';
+  guideRender(steps, done);
+}
+
+/* ---------- circle ownership (v76 — Cooee invariant 1) ----------
+   The participant is the tenant. A circle may be set up BY a substitute
+   decision-maker / POA — recorded as acting on the participant's behalf,
+   never silently owning the record. Plain language, changeable later,
+   every change appended to the history. Role enforcement (rules) is
+   Phase 1c; this records the declaration. */
+let circleOwnerResolve = null, circleOwnerSp = null;
+function openCircleOwner(sp){
+  circleOwnerSp = sp;
+  document.getElementById('circleOwnerSheet').style.display = 'flex';
+  return new Promise(res => { circleOwnerResolve = res; });
+}
+function closeCircleOwner(v){
+  document.getElementById('circleOwnerSheet').style.display = 'none';
+  const r = circleOwnerResolve; circleOwnerResolve = null;
+  if (r) r(v);
+}
+async function setCircleOwner(mode){
+  const sp = circleOwnerSp;
+  if (!sp) return;
+  document.getElementById('circleOwnerSheet').style.display = 'none';   // sub-inputs go on top
+  const reopen = () => { document.getElementById('circleOwnerSheet').style.display = 'flex'; };
+  let participant = myName();
+  if (mode === 'self' && !participant){
+    const v = await askInput({title: 'Your name', placeholder: 'Shown on your record'});
+    if (!v){ reopen(); return; }
+    setMyName(v); participant = myName();
+  }
+  if (mode === 'nominee'){
+    const v = await askInput({title: 'The participant’s name',
+      placeholder: 'Who this circle supports',
+      hint: 'You’ll be recorded as their decision-maker.'});
+    if (v === null || !v.trim()){ reopen(); return; }
+    participant = capName(v.trim().slice(0, 24));
+    if (!myName()){
+      const n = await askInput({title: 'Your name', placeholder: 'Shown as their decision-maker'});
+      if (n) setMyName(n);
+    }
+  }
+  sp.circle = {participant, mode,
+    nominee: mode === 'nominee' ? (myName() || null) : null,
+    setAt: Date.now(), setBy: myName() || null};
+  store.set('spaces', spacesList().map(s => s.hid === sp.hid ? sp : s));
+  // TODO Phase 1c: persist onto the household doc alongside roles, guarded by rules
+  logEvent('circle-owner', {id: 'circle-owner-' + Date.now().toString(36),
+    text: mode === 'nominee'
+      ? `${participant} owns this record — ${myName() || 'someone'} is acting as their decision-maker`
+      : `${participant} owns this record`,
+    space: sp.hid});
+  toast(mode === 'nominee'
+    ? `${participant} owns this circle — you’re recorded as acting on their behalf`
+    : 'This circle is yours — you own the record');
+  closeCircleOwner(true);
+}
+document.getElementById('circleForMe').addEventListener('click', () => setCircleOwner('self'));
+document.getElementById('circleForOther').addEventListener('click', () => setCircleOwner('nominee'));
+document.getElementById('circleOwnerCancel').addEventListener('click', () => closeCircleOwner(false));
+
+/* ---------- incident capture (v79 — Cooee Phase 2) ----------
+   A structured note: what / when / who was present / action taken. Scoped
+   'team' — the author and the circle's owners see it; the wider circle does
+   not. Append-only like every event (tombstone-only deletion). The sheet says
+   plainly that it does NOT notify the NDIS Commission or anyone outside. */
+let incidentSp = null;
+function openIncidentSheet(sp){
+  incidentSp = sp;
+  // voice-fillable: whatever was just dictated in the capture box seeds "what
+  // happened", so the flow is speak → review → structure
+  const live = document.getElementById('liveText');
+  const what = document.getElementById('incWhat');
+  if (live && live.value.trim() && !what.value.trim()) what.value = live.value.trim();
+  const now = new Date();
+  now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+  document.getElementById('incWhen').value = now.toISOString().slice(0, 16);
+  document.getElementById('incidentSheet').style.display = 'flex';
+  what.focus();
+}
+function closeIncidentSheet(){
+  document.getElementById('incidentSheet').style.display = 'none';
+  ['incWhat', 'incWho', 'incAction'].forEach(id => { document.getElementById(id).value = ''; });
+  incidentSp = null;
+}
+document.getElementById('incSave').addEventListener('click', () => {
+  const sp = incidentSp;
+  const what = document.getElementById('incWhat').value.trim();
+  if (!sp) return;
+  if (!what){ toast('Say what happened first — plain words are fine.'); return; }
+  const when = document.getElementById('incWhen').value;
+  const who = document.getElementById('incWho').value.trim();
+  const action = document.getElementById('incAction').value.trim();
+  const detail = [
+    when ? 'when: ' + new Date(when).toLocaleString(undefined,
+      {day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit'}) : '',
+    who ? 'present: ' + who : '',
+    action ? 'action taken: ' + action : 'no action recorded yet'
+  ].filter(Boolean).join('; ');
+  logEvent('incident', {id: 'inc-' + uid(), text: what.slice(0, 600), space: sp.hid, vis: 'team'}, detail);
+  track('feature_used', {feature: 'incident'});
+  closeIncidentSheet();
+  toast('Recorded — visible to you and the circle’s owners.');
+});
+document.getElementById('incCancel').addEventListener('click', closeIncidentSheet);
+
+/* ---------- plan goals sheet (v80) ---------- */
+let goalsSp = null;
+function renderGoalsList(){
+  const host = document.getElementById('goalsList');
+  host.innerHTML = '';
+  const goals = goalsSp ? planGoals(goalsSp.hid) : [];
+  if (!goals.length){
+    host.innerHTML = '<p class="side-note">No goals yet — add the first one below.</p>';
+    return;
+  }
+  goals.forEach(g => {
+    const row = document.createElement('div');
+    row.className = 'goal-row';
+    const txt = document.createElement('span');
+    txt.textContent = g;
+    const tag = document.createElement('span');
+    tag.className = 'gtag';
+    tag.textContent = '#' + goalTag(g);
+    const x = document.createElement('button');
+    x.setAttribute('aria-label', 'Remove goal: ' + g);
+    setIconLabel(x, 'x');
+    x.addEventListener('click', () => {
+      setPlanGoals(goalsSp.hid, planGoals(goalsSp.hid).filter(v => v !== g));
+      syncPlanGoals(goalsSp);
+      renderGoalsList();
+    });
+    row.appendChild(txt); row.appendChild(tag); row.appendChild(x);
+    host.appendChild(row);
+  });
+}
+function openGoalsSheet(sp){
+  goalsSp = sp;
+  renderGoalsList();
+  document.getElementById('goalNew').value = '';
+  document.getElementById('goalsSheet').style.display = 'flex';
+  return true;
+}
+function closeGoalsSheet(){ document.getElementById('goalsSheet').style.display = 'none'; goalsSp = null; }
+function addGoal(){
+  const field = document.getElementById('goalNew');
+  const v = field.value.trim().slice(0, 60);
+  if (!v || !goalsSp){ field.value = ''; return; }
+  const goals = planGoals(goalsSp.hid);
+  if (goals.length >= 10){ toast('Ten goals is the ceiling — retire one first.'); return; }
+  if (!goals.some(g => g.toLowerCase() === v.toLowerCase())){
+    setPlanGoals(goalsSp.hid, [...goals, v]);
+    syncPlanGoals(goalsSp);
+  }
+  field.value = '';
+  renderGoalsList();
+}
+document.getElementById('goalAdd').addEventListener('click', addGoal);
+document.getElementById('goalNew').addEventListener('keydown', e => {
+  if (e.key === 'Enter'){ e.preventDefault(); addGoal(); }
+});
+document.getElementById('goalsDone').addEventListener('click', closeGoalsSheet);
+
+function guideRender(steps, done){
   const host = document.getElementById('setupSteps');
   const render = () => {
     host.innerHTML = '';
@@ -5796,11 +6580,17 @@ document.getElementById('joinBtn').addEventListener('click', async () => {
     document.getElementById('inviteInput').value = '';
     if (inv.managed){
       await ensureManaged();
-      // become a member BEFORE the listener starts, or the rules reject reads
+      // become a member BEFORE the listener starts, or the rules reject reads.
+      // Circle membership carries a role (Phase 1c) — everyone else stays the
+      // legacy name string.
+      const me = inv.type === 'circle'
+        ? {name: myName() || 'member', role: inv.role || 'worker'}
+        : (myName() || 'member');
       await fbFs.setDoc(fbFs.doc(managedDb, 'households', inv.hid),
-        {members: {[managedUid]: myName() || 'member'}}, {merge: true});
+        {members: {[managedUid]: me}}, {merge: true});
     }
-    if (await addSpace({hid: inv.hid, name: inv.name, type: inv.type, cfg: inv.cfg, managed: !!inv.managed}))
+    if (await addSpace({hid: inv.hid, name: inv.name, type: inv.type, cfg: inv.cfg, managed: !!inv.managed,
+        ...(inv.type === 'circle' ? {role: inv.role || 'worker'} : {})}))
       toast(`Joined "${inv.name}" `);
   } catch (err) {
     syncMsg(' ' + err.message);
@@ -5813,9 +6603,14 @@ document.getElementById('createManagedBtn').addEventListener('click', async () =
     const type = document.getElementById('spaceTypeSel').value || 'family';
     await ensureManaged();
     const hid = 'hh-' + uid() + Math.random().toString(36).slice(2, 10);
+    // creating a circle makes you its owner (role map, Phase 1c) — other
+    // space types keep the legacy name string
+    const meCreate = type === 'circle'
+      ? {name: myName() || 'member', role: 'owner'}
+      : (myName() || 'member');
     await fbFs.setDoc(fbFs.doc(managedDb, 'households', hid),
-      {created: Date.now(), name, type, members: {[managedUid]: myName() || 'member'}});
-    const sp = {hid, name, type, cfg: null, managed: true};
+      {created: Date.now(), name, type, members: {[managedUid]: meCreate}});
+    const sp = {hid, name, type, cfg: null, managed: true, ...(type === 'circle' ? {role: 'owner'} : {})};
     if (!await addSpace(sp)) return;
     document.getElementById('spaceNameInput').value = '';
     guideSpaceSetup(sp);
@@ -5914,6 +6709,9 @@ document.addEventListener('keydown', (e) => {
     ['onboarding', () => dismissOnboarding()],
     ['scopeSheet', () => closeScopeSheet()],
     ['inputSheet', () => closeInput(null)],
+    ['circleOwnerSheet', () => closeCircleOwner(false)],
+    ['incidentSheet', () => closeIncidentSheet()],
+    ['goalsSheet', () => closeGoalsSheet()],
     ['tagSheet', () => closeTagSheet()],
     ['dateSheet', () => { document.getElementById('dateSheet').style.display = 'none'; dateTask = null; }],
     ['repeatSheet', () => { document.getElementById('repeatSheet').style.display = 'none'; repeatTask = null; }],
@@ -5962,8 +6760,9 @@ document.addEventListener('keydown', (e) => {
 let obSelected = new Set();
 function renderObChips(){
   const host = document.getElementById('obChips');
+  const offered = visibleCohorts();
   host.innerHTML = '';
-  COHORTS.forEach(c => {
+  offered.forEach(c => {
     const b = document.createElement('button');
     b.className = 'ob-chip';
     b.type = 'button';
@@ -6073,7 +6872,9 @@ const OB_SPACE_FOR = {
   caregiving:  {type: 'care', ico: 'heart', t: 'Care-team space',
     d: 'A shared profile, meds and journal for the person you care for.', name: 'Care team'},
   family:      {type: 'family', ico: 'family', t: 'Family space',
-    d: 'One list that syncs to everyone at home.', name: 'Family'}
+    d: 'One list that syncs to everyone at home.', name: 'Family'},
+  'ndis-circle': {type: 'circle', ico: 'spark', t: 'Circle',
+    d: 'Your support circle — family and workers, on the same page.', name: 'My Circle'}
 };
 function renderObSpaces(){
   const host = document.getElementById('obSpaceChoices');
@@ -6102,6 +6903,13 @@ function renderObSpaces(){
 // per-type setup checklist. Managed builds create in one tap; self-hosted opens
 // the Firebase walkthrough (advanced path) since it needs a project config.
 async function createFirstSpace(s){
+  // Circle spaces are managed-only: role-scoped visibility is enforced by
+  // Firestore rules bound to Auth UIDs, which self-hosted spaces don't have
+  // (COOEE-MAPPING.md §3.4).
+  if (s.type === 'circle' && !window.MANAGED){
+    toast('Circles run on the hosted service so roles can be enforced — not available self-hosted.');
+    return;
+  }
   const raw = await askInput({title: 'Name this space',
     value: s.name, placeholder: 'e.g. ' + s.name, hint: 'Everyone who joins sees this name.'});
   if (raw === null) return; // cancelled — stay on the choose-a-space step
@@ -6110,9 +6918,12 @@ async function createFirstSpace(s){
     try {
       await ensureManaged();
       const hid = 'hh-' + uid() + Math.random().toString(36).slice(2, 10);
+      const meFirst = s.type === 'circle'
+        ? {name: myName() || 'member', role: 'owner'}
+        : (myName() || 'member');
       await fbFs.setDoc(fbFs.doc(managedDb, 'households', hid),
-        {created: Date.now(), name: finalName, type: s.type, members: {[managedUid]: myName() || 'member'}});
-      const sp = {hid, name: finalName, type: s.type, cfg: null, managed: true};
+        {created: Date.now(), name: finalName, type: s.type, members: {[managedUid]: meFirst}});
+      const sp = {hid, name: finalName, type: s.type, cfg: null, managed: true, ...(s.type === 'circle' ? {role: 'owner'} : {})};
       if (!await addSpace(sp)) return;
       finishOnboarding();
       guideSpaceSetup(sp);
@@ -6178,6 +6989,8 @@ function refreshCohortSetting(){
 }
 
 /* ---------- init ---------- */
+applyFlavor();   // product name/theme from the deploy's flavor config (v76)
+autoCloseSessions();   // v79: support sessions forgotten open >12h self-close, honestly marked
 // v75 one-time normalization: names stored lowercase by older versions (and by
 // voice extraction) become capitalized. Events are left untouched — the
 // append-only record isn't rewritten; its names are capitalized at display.
