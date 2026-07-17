@@ -141,6 +141,14 @@ exports.ai = onRequest(
     // a failed upstream call must not eat the user's quota — refund it
     if (r.status >= 400)
       ref.set({[field]: admin.firestore.FieldValue.increment(-1)}, {merge: true}).catch(() => {});
+    // Google's own 429 talks about "your plan and billing details" — that is a
+    // message for the OPERATOR (the shared key is out of capacity), not for
+    // the person dictating. Translate it; log the real one for the operator.
+    if (r.status === 429){
+      console.error('UPSTREAM GEMINI QUOTA HIT (operator key at capacity):', (await r.text()).slice(0, 300));
+      res.status(503).json({error: {message: 'the shared AI service is at capacity right now — it retries itself in a moment', transient: true}});
+      return;
+    }
     const text = await r.text();
     res.status(r.status).set('content-type', 'application/json').send(text);
   } catch (e){

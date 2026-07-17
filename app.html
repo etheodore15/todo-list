@@ -737,7 +737,7 @@
       <input type="file" id="importFile" accept=".json,application/json" style="display:none">
       <button class="btn ghost" id="wipeBtn">Delete all data</button>
     </div>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v83<br><span id="envInfo"></span></p>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v84<br><span id="envInfo"></span></p>
   </section>
 </main>
 
@@ -2349,10 +2349,12 @@ function startSegment(){
    the model re-hears them with more context, and nothing is ever clipped at
    a boundary because there are no boundaries. The pass on stop is the
    authoritative final. */
-let liveChunks = [], liveTickTimer = null, liveTake = 0, liveBusy = false;
+let liveChunks = [], liveTickTimer = null, liveTake = 0, liveBusy = false, liveBackoff = 1;
 function liveTickDelay(){
   const t = (Date.now() - recStartedAt) / 1000;
-  return Math.max(4000, Math.min(15000, t * 250));   // 4s → 15s as the take grows
+  // failures back the ticks off (2×, 4×… capped) so a service at capacity
+  // isn't hammered every 4s; a success resets to the normal pace
+  return Math.min(30000, Math.max(4000, Math.min(15000, t * 250)) * liveBackoff);
 }
 function scheduleLiveTick(){
   clearTimeout(liveTickTimer);
@@ -2360,7 +2362,7 @@ function scheduleLiveTick(){
 }
 function startLiveProxy(){
   if (!mediaStream) return;
-  liveChunks = []; liveTake++; liveBusy = false;
+  liveChunks = []; liveTake++; liveBusy = false; liveBackoff = 1;
   mediaRec = new MediaRecorder(mediaStream);
   mediaRec.ondataavailable = (e) => { if (e.data.size) liveChunks.push(e.data); };
   mediaRec.start(1000);
@@ -2378,14 +2380,17 @@ async function liveTranscribe(isFinal){
   try {
     const text = await proxyTranscribe(blob);
     if (take !== liveTake) return;                   // a newer take owns the box now
+    liveBackoff = 1;
     const clean = stripAsrNoise(text);
     if (clean || isFinal)
       liveText.value = ((baseText ? baseText + ' ' : '') + clean).replace(/\s+/g, ' ').trim();
   } catch (e){
+    liveBackoff = Math.min(8, liveBackoff * 2);
     // one honest toast per take; the recording itself never stops for this
     if (!asrErrToasted){
       asrErrToasted = true;
-      toast('Transcription hiccup — ' + (e.message || 'check your connection') + '. Keep talking; your recording continues.');
+      const msg = String(e.message || 'check your connection').replace(/^API \d+: /, '');
+      toast('Transcription hiccup — ' + msg + '. Keep talking; your recording continues.');
     }
   } finally {
     liveBusy = false;
