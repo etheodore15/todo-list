@@ -47,6 +47,11 @@ async function resolveModel(key, force){
   return cachedModel;
 }
 const FREE_DAILY = parseInt(process.env.FREE_DAILY || '30', 10);   // AI calls per user per day
+// v82: voice transcription segments meter SEPARATELY. A dictation is many
+// small calls (one per ~15s segment) — charged against the shared pool it
+// emptied FREE_DAILY in seconds of speech (live-user report). 120 segments
+// ≈ 30 minutes of dictation a day on the free tier.
+const VOICE_DAILY = parseInt(process.env.VOICE_DAILY || '120', 10);
 const ALLOW_ORIGIN = process.env.ALLOW_ORIGIN || '*';
 // Region must be known during firebase-tools' source-analysis pass, which runs
 // BEFORE .env files load and without the deploy shell's env — but it always
@@ -78,23 +83,35 @@ exports.ai = onRequest(
   try { uid = (await admin.auth().verifyIdToken(m[1])).uid; }
   catch (e){ res.status(401).json({error: {message: 'invalid auth token'}}); return; }
 
-  // 2. per-user daily quota (atomic increment in a transaction)
+  // 2. per-user daily quotas — voice segments and AI calls are separate pools
+  const body = req.body && typeof req.body === 'object' ? req.body : {};
+  const isVoice = Array.isArray(body.contents) && body.contents.some((c) =>
+    Array.isArray(c && c.parts) && c.parts.some((p) =>
+      p && p.inlineData && /^audio\//.test(p.inlineData.mimeType || '')));
+  const field = isVoice ? 'voice' : 'count';
   const day = new Date().toISOString().slice(0, 10);
   const ref = admin.firestore().doc(`aiQuota/${uid}`);
   try {
     const allowed = await admin.firestore().runTransaction(async (tx) => {
       const snap = await tx.get(ref);
       const d = snap.exists ? snap.data() : {};
-      const used = d.day === day ? (d.count || 0) : 0;
-      if (used >= FREE_DAILY) return false;
-      tx.set(ref, {day, count: used + 1, updated: Date.now()}, {merge: true});
+      const sameDay = d.day === day;               // a new day resets BOTH pools
+      const count = sameDay ? (d.count || 0) : 0;
+      const voice = sameDay ? (d.voice || 0) : 0;
+      if ((isVoice ? voice : count) >= (isVoice ? VOICE_DAILY : FREE_DAILY)) return false;
+      tx.set(ref, {day, count: count + (isVoice ? 0 : 1), voice: voice + (isVoice ? 1 : 0),
+                   updated: Date.now()}, {merge: true});
       return true;
     });
-    if (!allowed){ res.status(429).json({error: {message: 'daily AI limit reached'}}); return; }
+    if (!allowed){
+      res.status(429).json({error: {message: isVoice
+        ? 'daily voice limit reached — resets tomorrow'
+        : 'daily AI limit reached — resets tomorrow'}});
+      return;
+    }
   } catch (e){ res.status(500).json({error: {message: 'quota check failed'}}); return; }
 
   // 3. forward to Gemini with the operator's key + chosen model
-  const body = req.body && typeof req.body === 'object' ? req.body : {};
   // audio rides inside contents as inline base64 — cap the payload so a
   // client can't relay arbitrarily large uploads through the operator's key
   // (~4 MB ≈ several minutes of compressed speech; the app's own free-tier
@@ -121,9 +138,13 @@ exports.ai = onRequest(
       model = await resolveModel(GEMINI_KEY, true);
       r = await call(model);
     }
+    // a failed upstream call must not eat the user's quota — refund it
+    if (r.status >= 400)
+      ref.set({[field]: admin.firestore.FieldValue.increment(-1)}, {merge: true}).catch(() => {});
     const text = await r.text();
     res.status(r.status).set('content-type', 'application/json').send(text);
   } catch (e){
+    ref.set({[field]: admin.firestore.FieldValue.increment(-1)}, {merge: true}).catch(() => {});
     res.status(502).json({error: {message: 'upstream error: ' + e.message}});
   }
 });
