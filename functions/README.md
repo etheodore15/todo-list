@@ -20,7 +20,9 @@ you've done the P1 managed-backend setup (see `../OPERATORS.md`).
    ```
    firebase functions:secrets:set GEMINI_KEY        # paste your AIza… key
    # optional overrides (defaults shown):
-   #   GEMINI_MODEL = gemini-2.5-flash
+   #   GEMINI_MODEL = (unset — the function auto-discovers the newest flash
+   #                   model the key can use and re-discovers if one retires;
+   #                   set this only to PIN a specific model)
    #   FREE_DAILY   = 30      (AI calls per user per day)
    #   ALLOW_ORIGIN = *       (lock to https://etheodore15.github.io in prod)
    ```
