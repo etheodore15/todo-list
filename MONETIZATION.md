@@ -28,7 +28,7 @@ retrofitted. Last updated: v77.*
 |---|---|---|---|---|
 | Cloud voice transcription length | 120 s per capture (`FLAVOR.limits.voiceSeconds`) | Extended/unlimited captures | Yes (~0.2¢/min Gemini) | **Enforced v77** (metered proxy path only; browser speech & on-device Whisper uncapped — they cost us nothing) |
 | AI calls per day (structuring, breakdowns, briefings, tone check) | 30/day/user (proxy `FREE_DAILY`) | Higher/unlimited + faster model | Yes | Enforced since proxy deploy; premium tier = raised quota per uid |
-| Plan Review Pack (Cooee) | — | $19/mo · $190/yr per circle (workers always free) | Marginal | Priced in brief §8; gate at export polish, not at record access (principle 1: the raw history stays exportable free) |
+| Plan Review Pack (Cooee) | Built v80: pack composes free (12 weeks, goal-grouped, AI overview rides the shared AI quota) | $19/mo · $190/yr per circle (workers always free): longer periods, polished export, concierge | Marginal | **Shipped free-tier v80** — the free pack is the demo that sells the subscription; gate at period depth + export polish, never at record access (principle 1) |
 | Report history depth | Current period (7d/28d windows) | Any period, quarter/annual packs | No | Future lever — cheap to build on the composer framework |
 | Spaces per account | Unlimited today | Cap free at ~2–3 spaces if needed | Storage only | Hold — don't constrain growth loops early; spaces ARE the viral mechanism |
 | Members per space | Unlimited | — | No | Never gate: invites are the distribution engine |

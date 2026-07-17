@@ -6,7 +6,7 @@ to them would require. Everything below describes working software unless marked
 otherwise. Landing page: https://etheodore15.github.io/todo-list/*
 
 *This is a **living document** — it is amended with every release so it never
-drifts from the shipped product. Last updated: v79.*
+drifts from the shipped product. Last updated: v80.*
 
 > **Caveat:** the product is in active development. Some features are new and may
 > behave unpredictably; the AI layer currently runs on a built-in heuristic for
@@ -154,6 +154,15 @@ back (Journal)**. Three sections:
   the space. Workers/viewers sync circles through the rules-proven filtered
   queries; the AI structuring prompt speaks circle vocabulary (participant,
   members, session talk, observations-are-not-tasks)
+- **Plan goals & the Plan Review Pack** (v80): the circle records what the
+  supports work toward, in the participant's words; each goal derives a tag
+  the AI and the tag picker offer, and tagged work groups under its goal in
+  the Plan Review Pack — 12 weeks of the record (goal progress, support
+  sessions, incidents, adherence, open tasks, expenses) ready for a plan
+  review, AI-summarised with a local fallback. Every render carries
+  "Participant-owned coordination record. Not medical, legal, or NDIS
+  advice." Circle expenses add provider/ABN + support date, and the ledger
+  CSV gains support_date / provider_abn / receipt_ref columns
 
 ### Co-parenting pack
 - **Custody days**: whose day it is (supports alternating weeks), shown on

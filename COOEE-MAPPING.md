@@ -133,7 +133,17 @@ v75. Purpose: flag divergences BEFORE writing code. References are to
    for later sessions: per-item vis *picker* (today everything defaults
    `vis:'circle'`, incidents `'team'`) — lands with the Phase 4 consent &
    visibility screen; invite expiry/rate-limit (Phase 5).
-5. Session 6: Phase 3 plan goals + Plan Review Pack + expense export columns
+5. ~~Session 6: Phase 3 plan goals + Plan Review Pack + expense export
+   columns~~ ✅ v80 — `planGoals` on the household doc (owner/co-admin edits,
+   already rules-enforced), `goalTag()` derives the ≤16-char engine tag;
+   goals feed `circlePromptSection` + lead the tag picker + join circle
+   setup. Pack: `openPlanPack` on the v66 composer framework (12 weeks,
+   goal-grouped, AI overview via `geminiPlanPack` with `localPlanPack`
+   fallback), disclaimer on every render, sessions as records with no
+   per-worker totals. Circle receipts carry provider/supportDate +
+   vis/authorUid; `ledgerCsvRows()` adds the three claim columns for
+   circles only. Free-tier pack shipped; premium = period depth + export
+   polish (MONETIZATION.md).
 6. Session 7: Phase 4 About Me / accessibility / consent screen; Phase 5
    hardening checklist. Natural home for **profile pictures** (ROADMAP A7):
    the circle roster + consent screen is where a face beside each

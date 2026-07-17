@@ -188,9 +188,13 @@
   .sheet .btn{width:100%; margin-bottom:8px; text-align:left;}
   /* v79: labelled-field sheets (incident report) + session/incident history lines */
   .fld-label{display:block; font-size:.72rem; color:var(--muted); margin:10px 0 4px;}
-  #incidentSheet input, #incidentSheet textarea{width:100%; background:var(--bg);
+  #incidentSheet input, #incidentSheet textarea, #goalsSheet input{width:100%; background:var(--bg);
     border:1px solid var(--border); border-radius:10px; color:var(--text);
     padding:9px 10px; font-size:.85rem; font-family:inherit; box-sizing:border-box;}
+  .goal-row{display:flex; align-items:center; gap:10px; padding:8px 4px; font-size:.9rem;}
+  .goal-row .gtag{color:var(--muted); font-size:.72rem;}
+  .goal-row button{margin-left:auto; background:none; border:none; color:var(--muted);
+    cursor:pointer; font-size:1rem; padding:4px 8px;}
   .sheet-btns{margin-top:14px;}
   .hist-line.hist-session{border-left:3px solid var(--accent); padding-left:9px;}
   .hist-line.hist-incident{border-left:3px solid #d83a4e; padding-left:9px;}
@@ -733,7 +737,7 @@
       <input type="file" id="importFile" accept=".json,application/json" style="display:none">
       <button class="btn ghost" id="wipeBtn">Delete all data</button>
     </div>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v79<br><span id="envInfo"></span></p>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v80<br><span id="envInfo"></span></p>
   </section>
 </main>
 
@@ -943,6 +947,23 @@
   </div>
 </div>
 
+<div id="goalsSheet" class="sheet-overlay" role="dialog" aria-modal="true" aria-label="Plan goals" style="display:none;">
+  <div class="sheet">
+    <h3><span class="ic ic-target" aria-hidden="true"></span> Plan goals</h3>
+    <p class="side-note" style="margin:2px 0 10px;">What the supports work toward, in your words.
+      Notes and tasks tagged with a goal group under it in the Plan Review Pack.
+      Coordination only — this isn’t plan management or advice.</p>
+    <div id="goalsList"></div>
+    <div style="display:flex; gap:8px; margin-top:10px;">
+      <input id="goalNew" placeholder="e.g. Cooking for myself" autocomplete="off" style="flex:1;">
+      <button class="btn ghost" id="goalAdd" style="width:auto; margin:0;">Add</button>
+    </div>
+    <div class="sheet-btns">
+      <button class="btn primary" id="goalsDone">Done</button>
+    </div>
+  </div>
+</div>
+
 <div id="dateSheet" class="sheet-overlay" role="dialog" aria-modal="true" aria-label="When" style="display:none;">
   <div class="sheet">
     <h3><span class="ic ic-calendar" aria-hidden="true"></span> When?</h3>
@@ -989,6 +1010,16 @@
       <span class="ic ic-camera" aria-hidden="true"></span> Add receipt photo <span id="expPhotoState" style="color:var(--ok)"></span>
       <input id="expPhoto" type="file" accept="image/*" capture="environment" style="display:none;">
     </label>
+    <div id="expCircleFields" style="display:none;">
+      <!-- v80: circle expenses feed a claim-ready CSV — provider + support date
+           are the columns plan managers ask for. Optional, plain language. -->
+      <label class="fld-label" for="expProvider">Provider (and ABN if you know it)</label>
+      <input id="expProvider" placeholder="e.g. Sunshine OT — ABN 12 345 678 901" autocomplete="off"
+        style="width:100%; background:var(--bg); border:1px solid var(--border); border-radius:10px; color:var(--text); padding:9px 10px; font-size:.85rem; margin-bottom:8px; box-sizing:border-box;">
+      <label class="fld-label" for="expDate">Date of the support (if not today)</label>
+      <input id="expDate" type="date"
+        style="width:100%; background:var(--bg); border:1px solid var(--border); border-radius:10px; color:var(--text); padding:9px 10px; font-size:.85rem; margin-bottom:10px; box-sizing:border-box;">
+    </div>
     <button class="btn primary" id="expSave">Save expense</button>
     <button class="btn ghost" id="expCancel">Cancel</button>
   </div>
@@ -1631,9 +1662,12 @@ function circlePromptSection(){
   if (!sp || sp.type !== 'circle') return '';
   const participant = capName((sp.circle && sp.circle.participant) || '') || 'the participant';
   const names = spaceMembers(sp.hid).map(capName).filter(Boolean).slice(0, 12);
+  const goals = planGoals(sp.hid);
   return `
 - This capture is going into "${sp.name}" — a support circle around ${participant}, who owns the record.${names.length ? ' People in the circle: ' + names.join(', ') + '.' : ''} "Session", "shift" or "visit" talk means a support session, not a meeting.
-- Observations about ${participant}'s wellbeing, mood, meals, sleep, or how a support went are journal material, NOT tasks — keep them in the summary and out of the tasks array. Only concrete follow-up actions become tasks ("book the OT review", "buy the picture cards"), each named for whoever must act and tagged with a life-area tag plus "support" when it concerns ${participant}'s supports.
+- Observations about ${participant}'s wellbeing, mood, meals, sleep, or how a support went are journal material, NOT tasks — keep them in the summary and out of the tasks array. Only concrete follow-up actions become tasks ("book the OT review", "buy the picture cards"), each named for whoever must act and tagged with a life-area tag plus "support" when it concerns ${participant}'s supports.` +
+  (goals.length ? `
+- ${participant}'s plan goals: ${goals.map(g => `"${g}" (tag: ${goalTag(g)})`).join('; ')}. When a task clearly works toward one of these goals, include that goal's exact tag in its tags — progress groups under the goal in ${participant}'s Plan Review Pack. Never force a goal tag onto unrelated tasks.` : '') + `
 - Never produce surveillance-flavoured tasks (checking up on a worker, timing anyone). Coordination only.`;
 }
 
@@ -1860,6 +1894,13 @@ async function compressImage(file){
 }
 
 function pushReceipt(rc){
+  // circle receipts carry vis + authorUid like every circle write (v79/v80) —
+  // the scoped rules evaluate them and workers' filtered queries find them
+  const rcSp = rc.space && spacesList().find(s => s.hid === rc.space);
+  if (rcSp && rcSp.type === 'circle' && rcSp.managed){
+    rc.vis = rc.vis || 'circle';
+    if (managedUid && !rc.authorUid) rc.authorUid = managedUid;
+  }
   if (rc.space && spaceRt[rc.space] && spaceRt[rc.space].db){
     fbFs.setDoc(fbFs.doc(spaceRt[rc.space].db, 'households', rc.space, 'receipts', rc.id), rc)
       .catch(() => {});
@@ -1875,9 +1916,10 @@ function flushPendingReceipts(sp){
   if (!pend.length) return;
   const rest = [];
   pend.forEach(rc => {
-    if (rc.space === sp.hid)
+    if (rc.space === sp.hid){
+      if (rc.vis && !rc.authorUid && managedUid) rc.authorUid = managedUid;   // queued pre-sign-in
       fbFs.setDoc(fbFs.doc(spaceRt[sp.hid].db, 'households', sp.hid, 'receipts', rc.id), rc).catch(() => {});
-    else rest.push(rc);
+    } else rest.push(rc);
   });
   store.set('pendingRc', rest);
 }
@@ -1890,6 +1932,14 @@ function openExpense(td){
   document.getElementById('expAmount').value = td.amount || '';
   document.getElementById('expPhotoState').textContent = '';
   document.getElementById('expPhoto').value = '';
+  // v80: circle expenses offer the claim-ready extras (provider, support date)
+  const sp = td.space && spacesList().find(s => s.hid === td.space);
+  const circleExp = !!(sp && sp.type === 'circle');
+  document.getElementById('expCircleFields').style.display = circleExp ? '' : 'none';
+  if (circleExp){
+    document.getElementById('expProvider').value = td.provider || '';
+    document.getElementById('expDate').value = td.supportDate || todayStr();
+  }
   document.getElementById('expSheet').style.display = 'flex';
 }
 document.getElementById('expPhoto').addEventListener('change', async (e) => {
@@ -1909,7 +1959,9 @@ function syncReceipt(td, thumb){
   if (!td.space || !td.amount) return;
   pushReceipt({id: 'rc-' + td.id, taskId: td.id, ts: td.expenseAt || Date.now(),
     who: td.expenseBy || myName() || null, amount: td.amount,
-    note: td.text, space: td.space, thumb: thumb || null});
+    note: td.text, space: td.space, thumb: thumb || null,
+    // v80: claim-ready columns for circle ledgers (null elsewhere — unchanged)
+    provider: td.provider || null, supportDate: td.supportDate || null});
 }
 document.getElementById('expSave').addEventListener('click', () => {
   if (!expTask) return;
@@ -1918,6 +1970,10 @@ document.getElementById('expSave').addEventListener('click', () => {
   expTask.amount = amount;
   expTask.expenseBy = myName() || null;
   expTask.expenseAt = Date.now();
+  if (document.getElementById('expCircleFields').style.display !== 'none'){
+    expTask.provider = document.getElementById('expProvider').value.trim().slice(0, 80) || null;
+    expTask.supportDate = document.getElementById('expDate').value || null;
+  }
   const inSpace = !!expTask.space;
   if (inSpace) syncReceipt(expTask, expThumb);
   logEvent('expense', expTask, '$' + amount.toFixed(2));
@@ -2795,6 +2851,8 @@ function journalReports(){
       `${sp.name} — who did what, and what’s coming up`, () => openFamilyReport(sp)]);
     if (sp.type === 'coparenting') cards.push(['scroll', 'Records summary',
       `${sp.name} — expenses and completions, neutral wording`, () => openCoparentReport(sp)]);
+    if (sp.type === 'circle') cards.push(['target', 'Plan Review Pack',
+      `${sp.name} — the last 12 weeks, grouped by plan goal`, () => openPlanPack(sp)]);
   });
   return cards;
 }
@@ -3072,6 +3130,7 @@ const SPACE_ACTIONS = {
         s => open ? endSupportSession(s.hid) : startSupportSession(s)]);
       acts.push(['alert', 'Report incident', s => openIncidentSheet(s)]);
     }
+    acts.push(['target', 'Plan Review Pack', s => openPlanPack(s)]);   // read-only: viewers too
     acts.push(['scroll', 'History & export', s => openHistory(s)]);
     acts.push(['share', 'Invite', s => shareSpaceInvite(s)]);
     return acts;
@@ -3304,7 +3363,11 @@ function openTagSheet(td){
   const host = document.getElementById('tagChoices');
   host.innerHTML = '';
   const current = (td.tags || []).filter(t => t !== 'general' || (td.tags || []).length === 1);
-  const rest = allKnownTags().filter(t => !current.includes(t));
+  // v80: a circle task offers its plan-goal tags first — tagging work with a
+  // goal is how progress lands in the Plan Review Pack
+  const sp = td.space && spacesList().find(s => s.hid === td.space);
+  const goals = (sp && sp.type === 'circle') ? planGoals(sp.hid).map(goalTag).filter(Boolean) : [];
+  const rest = [...new Set([...goals, ...allKnownTags()])].filter(t => !current.includes(t));
   [...current, ...rest].forEach(t => host.appendChild(tagRow(t, current.includes(t))));
   enforceTagMax();
   document.getElementById('tagNew').value = '';
@@ -4316,6 +4379,9 @@ function logEvent(kind, td, detail, whoOverride){
     ev.vis = td.vis || 'circle';
     if (managedUid) ev.authorUid = managedUid;
     if (Array.isArray(td.visUids) && td.visUids.length) ev.visUids = td.visUids;
+    // v80: circle events remember the task's tags so the Plan Review Pack can
+    // group history under plan goals even after the task itself is gone
+    if (Array.isArray(td.tags) && td.tags.length) ev.tags = td.tags.slice(0, 3);
   }
   const evs = store.get('events', []);
   evs.push(ev);
@@ -4397,6 +4463,35 @@ function autoCloseSessions(){
   });
 }
 
+/* ---------- plan goals (v80 — Cooee Phase 3) ----------
+   Per-circle list of what the supports work toward, in the participant's own
+   words. Each goal derives a short TAG (≤16 chars, the engine's tag limit);
+   tagging a task or note with it groups that work under the goal in the Plan
+   Review Pack. Stored on the household doc (`planGoals`) like profile and
+   custody — the rules already restrict circle household edits to
+   owner/co-admins. Coordination vocabulary only: goals are labels, never
+   budgets, never plan management. */
+function planGoals(hid){ return (store.get('planGoals', {}) || {})[hid] || []; }
+function setPlanGoals(hid, goals){
+  const m = store.get('planGoals', {}) || {};
+  m[hid] = goals;
+  store.set('planGoals', m);
+}
+// the goal's tag: lowercase, engine-legal, cut at a word boundary within 16
+function goalTag(label){
+  const s = String(label || '').toLowerCase().replace(/[^a-z0-9 -]/g, '').trim();
+  if (s.length <= 16) return s;
+  const cut = s.slice(0, 17);
+  const sp = cut.lastIndexOf(' ');
+  return (sp > 0 ? cut.slice(0, sp) : cut.slice(0, 16)).trim();
+}
+function syncPlanGoals(sp){
+  const rt = spaceRt[sp.hid];
+  if (rt && rt.db)
+    fbFs.setDoc(fbFs.doc(rt.db, 'households', sp.hid), {planGoals: planGoals(sp.hid)}, {merge: true})
+      .catch(() => toast('Couldn’t save goals to the circle — only the owner or a co-admin can edit them.'));
+}
+
 // joining/creating the FIRST space adopts existing shareable tasks into it,
 // matching the old "everything local syncs up" behaviour
 function adoptOrphans(hid){
@@ -4415,6 +4510,7 @@ function todoCore(td){
           energy: td.energy || null, minutes: td.minutes || null,
           someday: !!td.someday, carried: td.carried || 0, amount: td.amount || null,
           expenseBy: td.expenseBy || null, expenseAt: td.expenseAt || null,
+          provider: td.provider || null, supportDate: td.supportDate || null,   // v80 circle claims
           med: td.med || null};
 }
 function syncMsg(text){
@@ -4727,6 +4823,7 @@ async function startSpaceSync(sp){
       if (d.custody){ setLocalCustody(sp.hid, d.custody); }
       if (d.profile){ setLocalProfile(sp.hid, d.profile); }
       if (Array.isArray(d.memberNames)){ setSpaceMembers(sp.hid, d.memberNames); }
+      if (Array.isArray(d.planGoals)){ setPlanGoals(sp.hid, d.planGoals); }   // v80
       renderTodos();
     }).catch(() => {});
   }
@@ -5222,6 +5319,159 @@ document.getElementById('briefPrint').addEventListener('click', () => {
 <body>${curReport.bodyHtml}</body></html>`);
   w.document.close(); w.focus(); w.print();
 });
+
+/* ---------- Plan Review Pack (v80 — Cooee Phase 3) ----------
+   The circle's answer to the doctor briefing: the last 12 weeks of the
+   participant-owned record, grouped by PLAN GOAL, ready to bring to a plan
+   review. Coordination record only — every render and print carries
+   "Participant-owned coordination record. Not medical, legal, or NDIS
+   advice." The participant is always the grammatical subject. Sessions are
+   listed as records (dates, who) — never totalled per worker. */
+const PACK_DAYS = 84;
+const PACK_DISCLAIMER = 'Participant-owned coordination record. Not medical, legal, or NDIS advice.';
+
+function planPackInput(sp){
+  const since = Date.now() - PACK_DAYS * 86400000;
+  const evs = histEvents.filter(e => e.ts >= since);
+  const removed = new Set(evs.filter(e => e.kind === 'note-removed').map(e => e.taskId));
+  const d = (ts) => new Date(ts).toLocaleDateString(undefined, {day: 'numeric', month: 'short'});
+  const t = (ts) => new Date(ts).toLocaleTimeString(undefined, {hour: 'numeric', minute: '2-digit'});
+  const line = (e) => d(e.ts) + ' — ' + (capName(e.who) || 'someone') + ': ' + e.text +
+    (e.detail ? ' (' + e.detail + ')' : '');
+  // which goal(s) an event belongs to: its stored tags (v80+), else the live
+  // task's tags, else (for notes) the goal tag appearing in the text
+  const tagsOf = (e) => {
+    if (Array.isArray(e.tags) && e.tags.length) return e.tags;
+    const td = todos.find(x => x.id === e.taskId);
+    if (td && Array.isArray(td.tags)) return td.tags;
+    return null;
+  };
+  const matchesGoal = (e, tag) => {
+    const tags = tagsOf(e);
+    if (tags) return tags.includes(tag);
+    return e.kind === 'note' && (e.text || '').toLowerCase().includes(tag);
+  };
+  const workLike = (e) => ['ticked', 'created', 'note'].includes(e.kind) && !removed.has(e.taskId);
+  const goals = planGoals(sp.hid).map(label => {
+    const tag = goalTag(label);
+    return {label, tag, lines: evs.filter(e => workLike(e) && matchesGoal(e, tag)).map(line)};
+  });
+  // support sessions: end events pair with their start by bracket id; open
+  // brackets still show — the record is honest about what's unfinished
+  const sessions = [];
+  evs.filter(e => e.kind === 'session-start').sort((a, b) => a.ts - b.ts).forEach(s => {
+    const end = evs.find(e => e.kind === 'session-end' && e.taskId === s.taskId);
+    sessions.push(d(s.ts) + ' — ' + (capName(s.who) || 'a worker') + ', ' + t(s.ts) +
+      (end ? ' to ' + t(end.ts) + (/automatically/.test(end.detail || '') ? ' (closed automatically)' : '') : ' — still open'));
+  });
+  const expenses = evs.filter(e => e.kind === 'expense').map(line);
+  const expTotal = evs.filter(e => e.kind === 'expense')
+    .reduce((a, e) => a + (parseFloat(String(e.detail || '').replace(/[^0-9.]/g, '')) || 0), 0);
+  return {
+    goals,
+    otherNotes: evs.filter(e => e.kind === 'note' && !removed.has(e.taskId)
+      && !goals.some(g => matchesGoal(e, g.tag))).map(line),
+    sessions,
+    incidents: evs.filter(e => e.kind === 'incident').map(line),
+    ticked: evs.filter(e => e.kind === 'ticked').map(line),
+    missed: evs.filter(e => e.kind === 'missed').map(e => d(e.ts) + ' — ' + e.text + ' — not recorded as done' +
+      (e.detail ? ' (' + e.detail + ')' : '')),
+    open: todos.filter(x => x.space === sp.hid && !x.done).map(x => x.text +
+      ((x.tags || []).some(tg => planGoals(sp.hid).map(goalTag).includes(tg)) ? ' (plan goal)' : '')),
+    expenses, expTotal
+  };
+}
+
+function localPlanPack(sp){
+  const inp = planPackInput(sp);
+  const who = capName((sp.circle && sp.circle.participant) || '') || (getProfile(sp.hid) || {}).name || sp.name;
+  const goalWork = inp.goals.reduce((a, g) => a + g.lines.length, 0);
+  const overview = `${who}'s coordination record over the last 12 weeks: ` +
+    `${inp.sessions.length} support session${inp.sessions.length === 1 ? '' : 's'} recorded, ` +
+    `${inp.ticked.length} task${inp.ticked.length === 1 ? '' : 's'} completed` +
+    (goalWork ? ` (${goalWork} entr${goalWork === 1 ? 'y' : 'ies'} under ${who}'s plan goals)` : '') +
+    (inp.missed.length ? `, ${inp.missed.length} routine${inp.missed.length === 1 ? '' : 's'} not recorded as done` : '') +
+    (inp.incidents.length ? `, ${inp.incidents.length} incident${inp.incidents.length === 1 ? '' : 's'} recorded` : '') +
+    (inp.expTotal ? `, $${inp.expTotal.toFixed(2)} in support-related expenses logged` : '') + '.';
+  return {overview, ...inp};
+}
+
+async function geminiPlanPack(sp){
+  const inp = planPackInput(sp);
+  const who = capName((sp.circle && sp.circle.participant) || '') || sp.name;
+  const schema = {type: 'OBJECT', properties: {
+    overview: {type: 'STRING'},
+    goalSummaries: {type: 'ARRAY', items: {type: 'OBJECT', properties: {
+      goal: {type: 'STRING'}, summary: {type: 'STRING'}}, required: ['goal', 'summary']}}
+  }, required: ['overview', 'goalSummaries']};
+  const data = await geminiGenerate({
+    contents: [{role: 'user', parts: [{text:
+`You prepare a plain-language summary for an NDIS participant's plan review, from their support circle's shared coordination record (last 12 weeks). ${who} owns this record and is always the grammatical subject — write "what ${who} worked toward", never what anyone did TO ${who} or monitored about them. Plain factual language: no diagnoses, no advice, no funding or claiming suggestions, no judging any worker. 2-3 sentences for the overview; for each plan goal with entries, 1-2 sentences on what the record shows.
+
+Plan goals and their recorded entries:
+${inp.goals.map(g => g.label + ':\n' + (g.lines.join('\n') || '(nothing recorded)')).join('\n\n')}
+
+Support sessions recorded: ${inp.sessions.length}. Tasks completed: ${inp.ticked.length}. Not recorded as done: ${inp.missed.length}. Incidents: ${inp.incidents.length}.
+
+Return JSON: {overview, goalSummaries: [{goal, summary}]}`}]}],
+    generationConfig: {responseMimeType: 'application/json', responseSchema: schema}
+  });
+  const j = JSON.parse(geminiText(data));
+  const pack = {overview: String(j.overview || '').trim(), ...inp};
+  (j.goalSummaries || []).forEach(gs => {
+    const g = pack.goals.find(x => x.label.toLowerCase() === String(gs.goal || '').toLowerCase());
+    if (g) g.summary = String(gs.summary || '').trim();
+  });
+  if (!pack.overview) throw new Error('empty overview');
+  return pack;
+}
+
+function planPackInner(sp, pk){
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+  const sec = (title, arr) => (arr && arr.length)
+    ? `<h2 style="font-size:14px;margin:16px 0 6px;">${title}</h2><ul style="margin:0;padding-left:20px;">${arr.map(x => '<li style="font-size:13px;line-height:1.55;">' + esc(x) + '</li>').join('')}</ul>` : '';
+  const goalBlocks = pk.goals.map(g =>
+    `<h2 style="font-size:14px;margin:16px 0 6px;">Goal: ${esc(g.label)}</h2>` +
+    (g.summary ? `<p style="font-size:13px;line-height:1.55;margin:0 0 4px;">${esc(g.summary)}</p>` : '') +
+    (g.lines.length
+      ? `<ul style="margin:0;padding-left:20px;">${g.lines.map(x => '<li style="font-size:13px;line-height:1.55;">' + esc(x) + '</li>').join('')}</ul>`
+      : `<p style="font-size:12px;color:#777;margin:0;">Nothing recorded under this goal yet — tag tasks and notes with “${esc(g.tag)}” and they’ll gather here.</p>`)
+  ).join('');
+  return `<h1 style="font-size:18px;margin:0 0 2px;">${esc(sp.name)} — Plan Review Pack</h1>` +
+    `<p style="color:#555;font-size:11px;margin:0 0 8px;">Covers the last 12 weeks · prepared ${new Date().toLocaleDateString()}. ${PACK_DISCLAIMER}</p>` +
+    `<p style="font-size:13px;line-height:1.55;">${esc(pk.overview)}</p>` +
+    goalBlocks +
+    sec('Journal notes (not under a goal)', pk.otherNotes) +
+    sec('Support sessions (as recorded)', pk.sessions) +
+    sec('Incidents recorded', pk.incidents) +
+    sec('Routines &amp; medications not recorded as done', pk.missed) +
+    sec('Open tasks going into the review', pk.open) +
+    (pk.expenses.length ? sec('Support-related expenses — $' + pk.expTotal.toFixed(2) + ' total (details in the ledger CSV)', pk.expenses) : '') +
+    `<p style="color:#555;font-size:11px;margin-top:14px;">${PACK_DISCLAIMER}</p>`;
+}
+
+async function openPlanPack(sp){
+  histSpace = sp;
+  histEvents = await collectSpaceEvents(sp);
+  const inp = planPackInput(sp);
+  if (!inp.sessions.length && !inp.ticked.length && !inp.otherNotes.length
+      && !inp.goals.some(g => g.lines.length) && !inp.open.length){
+    toast('Nothing to pack yet — record a session, a note, or tick a routine first, then the review pack has something to show.');
+    return;
+  }
+  openReport(sp.name + ' — Plan Review Pack',
+    aiEnabled() ? 'Reading 12 weeks of the record and grouping it by plan goal…'
+                : 'Reading 12 weeks of the record…',
+    async () => {
+      let pk = null;
+      if (aiEnabled()){
+        try { pk = await geminiPlanPack(sp); track('feature_used', {feature: 'plan_pack'}); }
+        catch (_) { /* fall through */ }
+      }
+      if (!pk) pk = localPlanPack(sp);
+      return planPackInner(sp, pk);
+    });
+}
 
 /* ---------- per-cohort reports (v66) ----------
    Same overlay, different question per cohort:
@@ -5834,15 +6084,19 @@ async function openLedger(sp){
   document.getElementById('ledgerOverlay').style.display = 'block';
   const rt = spaceRt[sp.hid];
   if (rt && rt.db){
-    await new Promise(res => {
+    // circle workers/viewers read receipts via the allowed filtered shapes (v80)
+    await Promise.all(readTargets(rt.db, sp, 'receipts').map(target => new Promise(res => {
       let unsub = null, done = false;
       const finish = () => { if (!done){ done = true; if (unsub) unsub(); res(); } };
-      unsub = fbFs.onSnapshot(fbFs.collection(rt.db, 'households', sp.hid, 'receipts'), snap => {
-        snap.docChanges().forEach(ch => { if (ch.type !== 'removed') ledgerRcs.push({id: ch.doc.id, ...ch.doc.data()}); });
+      unsub = fbFs.onSnapshot(target, snap => {
+        snap.docChanges().forEach(ch => {
+          if (ch.type !== 'removed' && !ledgerRcs.some(x => x.id === ch.doc.id))
+            ledgerRcs.push({id: ch.doc.id, ...ch.doc.data()});
+        });
         finish();
       }, finish);
       setTimeout(finish, 5000);
-    });
+    })));
   }
   // include anything still queued locally for this space
   store.get('pendingRc', []).filter(r => r.space === sp.hid).forEach(r => {
@@ -5853,7 +6107,8 @@ async function openLedger(sp){
   todos.filter(t => t.space === sp.hid && t.amount && t.scope !== 'private').forEach(t => {
     if (!ledgerRcs.some(x => x.taskId === t.id))
       ledgerRcs.push({id: 'rc-' + t.id, taskId: t.id, ts: t.expenseAt || t.createdAt || Date.now(),
-        who: t.expenseBy || t.createdBy || null, amount: t.amount, note: t.text, space: sp.hid, thumb: null});
+        who: t.expenseBy || t.createdBy || null, amount: t.amount, note: t.text, space: sp.hid, thumb: null,
+        provider: t.provider || null, supportDate: t.supportDate || null});
   });
   // one expense per task — dedupe by taskId, keeping the newest
   const byTask = {};
@@ -5951,13 +6206,25 @@ function renderLedger(){
 document.getElementById('ledgerClose').addEventListener('click', () => {
   document.getElementById('ledgerOverlay').style.display = 'none';
 });
+// v80: one row builder for the export. Circle ledgers add the claim-ready
+// columns a plan manager asks for — support date, provider/ABN, receipt ref.
+// Other space types export exactly the columns they always did.
+function ledgerCsvRows(sp, rcs){
+  const esc = (s) => '"' + String(s == null ? '' : s).replace(/"/g, '""') + '"';
+  const circle = sp && sp.type === 'circle';
+  const head = ['timestamp','date','who','task','amount','has_receipt',
+    ...(circle ? ['support_date','provider_abn','receipt_ref'] : [])];
+  const rows = [head.join(',')];
+  [...rcs].sort((a, b) => a.ts - b.ts).forEach(rc =>
+    rows.push([rc.ts, new Date(rc.ts).toLocaleDateString(), esc(rc.who || ''), esc(rc.note || ''),
+      (rc.amount || 0).toFixed(2), rc.thumb ? 'yes' : 'no',
+      ...(circle ? [esc(rc.supportDate || new Date(rc.ts).toLocaleDateString()),
+                    esc(rc.provider || ''), esc(rc.id || '')] : [])].join(',')));
+  return rows;
+}
 document.getElementById('ledgerCsvBtn').addEventListener('click', () => {
   if (!ledgerSpace) return;
-  const esc = (s) => '"' + String(s == null ? '' : s).replace(/"/g, '""') + '"';
-  const rows = [['timestamp','date','who','task','amount','has_receipt'].join(',')];
-  [...ledgerRcs].sort((a, b) => a.ts - b.ts).forEach(rc =>
-    rows.push([rc.ts, new Date(rc.ts).toLocaleDateString(), esc(rc.who || ''), esc(rc.note || ''),
-      (rc.amount || 0).toFixed(2), rc.thumb ? 'yes' : 'no'].join(',')));
+  const rows = ledgerCsvRows(ledgerSpace, ledgerRcs);
   const blob = new Blob([rows.join('\n')], {type: 'text/csv'});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -6091,7 +6358,8 @@ function guideSpaceSetup(sp){
       fn: () => { openProfile(sp); return true; }});
     steps.push({label: 'Add routines & medications', desc: 'Timed, repeating tasks — every tick becomes part of your record.',
       fn: () => { openMeds(sp); return true; }});
-    // plan-goal tags join this checklist in Phase 3
+    steps.push({label: 'Add your plan goals', desc: 'What the supports work toward — progress groups under them in the Plan Review Pack.',
+      fn: () => openGoalsSheet(sp)});
   }
   setIconLabel(document.getElementById('setupTitle'), SPACE_ICON[sp.type] || 'users', '“' + sp.name + '” is ready');
   document.getElementById('setupIntro').textContent = 'A couple of quick things to make it work for you:';
@@ -6200,6 +6468,63 @@ document.getElementById('incSave').addEventListener('click', () => {
   toast('Recorded — visible to you and the circle’s owners.');
 });
 document.getElementById('incCancel').addEventListener('click', closeIncidentSheet);
+
+/* ---------- plan goals sheet (v80) ---------- */
+let goalsSp = null;
+function renderGoalsList(){
+  const host = document.getElementById('goalsList');
+  host.innerHTML = '';
+  const goals = goalsSp ? planGoals(goalsSp.hid) : [];
+  if (!goals.length){
+    host.innerHTML = '<p class="side-note">No goals yet — add the first one below.</p>';
+    return;
+  }
+  goals.forEach(g => {
+    const row = document.createElement('div');
+    row.className = 'goal-row';
+    const txt = document.createElement('span');
+    txt.textContent = g;
+    const tag = document.createElement('span');
+    tag.className = 'gtag';
+    tag.textContent = '#' + goalTag(g);
+    const x = document.createElement('button');
+    x.setAttribute('aria-label', 'Remove goal: ' + g);
+    setIconLabel(x, 'x');
+    x.addEventListener('click', () => {
+      setPlanGoals(goalsSp.hid, planGoals(goalsSp.hid).filter(v => v !== g));
+      syncPlanGoals(goalsSp);
+      renderGoalsList();
+    });
+    row.appendChild(txt); row.appendChild(tag); row.appendChild(x);
+    host.appendChild(row);
+  });
+}
+function openGoalsSheet(sp){
+  goalsSp = sp;
+  renderGoalsList();
+  document.getElementById('goalNew').value = '';
+  document.getElementById('goalsSheet').style.display = 'flex';
+  return true;
+}
+function closeGoalsSheet(){ document.getElementById('goalsSheet').style.display = 'none'; goalsSp = null; }
+function addGoal(){
+  const field = document.getElementById('goalNew');
+  const v = field.value.trim().slice(0, 60);
+  if (!v || !goalsSp){ field.value = ''; return; }
+  const goals = planGoals(goalsSp.hid);
+  if (goals.length >= 10){ toast('Ten goals is the ceiling — retire one first.'); return; }
+  if (!goals.some(g => g.toLowerCase() === v.toLowerCase())){
+    setPlanGoals(goalsSp.hid, [...goals, v]);
+    syncPlanGoals(goalsSp);
+  }
+  field.value = '';
+  renderGoalsList();
+}
+document.getElementById('goalAdd').addEventListener('click', addGoal);
+document.getElementById('goalNew').addEventListener('keydown', e => {
+  if (e.key === 'Enter'){ e.preventDefault(); addGoal(); }
+});
+document.getElementById('goalsDone').addEventListener('click', closeGoalsSheet);
 
 function guideRender(steps, done){
   const host = document.getElementById('setupSteps');
@@ -6386,6 +6711,7 @@ document.addEventListener('keydown', (e) => {
     ['inputSheet', () => closeInput(null)],
     ['circleOwnerSheet', () => closeCircleOwner(false)],
     ['incidentSheet', () => closeIncidentSheet()],
+    ['goalsSheet', () => closeGoalsSheet()],
     ['tagSheet', () => closeTagSheet()],
     ['dateSheet', () => { document.getElementById('dateSheet').style.display = 'none'; dateTask = null; }],
     ['repeatSheet', () => { document.getElementById('repeatSheet').style.display = 'none'; repeatTask = null; }],
