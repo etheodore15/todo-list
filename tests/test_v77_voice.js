@@ -124,7 +124,7 @@ const { chromium } = require('playwright');
   // ---------- 5. proxy failure surfaces one honest toast, take continues ----------
   const E = await mkPage({noSR: true, proxyFail: true});
   await E.page.click('#micBtn');
-  await E.page.waitForTimeout(6500);
+  await E.page.waitForTimeout(16500);   // v82: proxy segments close at 15s now
   check('v77: proxy failure → one kind toast, recording keeps going',
     /Transcription hiccup/.test(await E.page.locator('#toast').textContent()) &&
     await E.page.evaluate(() => recording === true));

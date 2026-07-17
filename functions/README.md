@@ -23,7 +23,9 @@ you've done the P1 managed-backend setup (see `../OPERATORS.md`).
    #   GEMINI_MODEL = (unset — the function auto-discovers the newest flash
    #                   model the key can use and re-discovers if one retires;
    #                   set this only to PIN a specific model)
-   #   FREE_DAILY   = 30      (AI calls per user per day)
+   #   FREE_DAILY   = 30      (AI calls per user per day — summaries etc.)
+   #   VOICE_DAILY  = 120     (voice transcription segments per user per day,
+   #                           metered separately: ~30 min of dictation)
    #   ALLOW_ORIGIN = *       (lock to https://etheodore15.github.io in prod)
    ```
    In `firebase.json`, bind the secret to the function (see the snippet below),

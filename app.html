@@ -737,7 +737,7 @@
       <input type="file" id="importFile" accept=".json,application/json" style="display:none">
       <button class="btn ghost" id="wipeBtn">Delete all data</button>
     </div>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v81<br><span id="envInfo"></span></p>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v82<br><span id="envInfo"></span></p>
   </section>
 </main>
 
@@ -1722,7 +1722,12 @@ async function geminiGenerate(body, isRetry){
       headers: {'content-type': 'application/json', 'authorization': 'Bearer ' + token},
       body: JSON.stringify(body)
     });
-    if (res.status === 429) throw new Error('daily AI limit reached — resets tomorrow, or add your own key in Settings');
+    if (res.status === 429){
+      // the proxy says WHICH pool ran dry (voice vs AI) — pass its words through
+      const m = await apiErrMsg(res);
+      throw new Error(m ? m.slice(2) + ' — or add your own key in Settings' :
+        'daily AI limit reached — resets tomorrow, or add your own key in Settings');
+    }
     if (!res.ok) throw new Error('API ' + res.status + (await apiErrMsg(res)));
     track('ai_call');
     return res.json();
@@ -2231,7 +2236,10 @@ function stopRec(){
    lands. A tiny audio gap between segments is the trade-off for streaming. */
 let mediaRec = null, mediaStream = null, segTimer = null;
 let asrQueue = Promise.resolve(), asrPendingN = 0;
-const SEG_MS = 5000;
+// v82: proxy segments are 15s — one metered call per 15s instead of per 5s
+// (a dictation no longer drains the quota), and 3× fewer segment boundaries
+// for words to be clipped at. Whisper keeps 5s chunks (phone memory).
+const segMs = () => asrMode === 'proxy' ? 15000 : 5000;
 // v77: the segment recorder feeds one of two engines —
 //   'local' — on-device Whisper (explicit privacy opt-in, Settings download)
 //   'proxy' — the operator AI proxy (Gemini transcribes; nothing to install,
@@ -2249,11 +2257,21 @@ async function proxyTranscribe(blob){
     r.readAsDataURL(blob);
   });
   if (!b64) return '';
+  // v82: structured output — the transcript rides inside JSON, so a model
+  // that answers with an apology or error sentence can never pose as
+  // dictation (a live-user report: transcripts ending in “error occurred”)
   const data = await geminiGenerate({contents: [{role: 'user', parts: [
     {inlineData: {mimeType: blob.type || 'audio/webm', data: b64}},
-    {text: 'Transcribe this audio exactly as spoken, in its original language. Output ONLY the transcript text. If there is no speech, output nothing.'}
-  ]}]});
-  return geminiText(data).trim();
+    {text: 'Transcribe this audio exactly as spoken, in its original language. Return JSON: {"transcript": "…"}. transcript holds ONLY the spoken words — empty string if there is no speech. Never put apologies, notes, or error messages in transcript.'}
+  ]}], generationConfig: {responseMimeType: 'application/json',
+    responseSchema: {type: 'OBJECT', properties: {transcript: {type: 'STRING'}}, required: ['transcript']}}});
+  const raw = geminiText(data).trim();
+  try { return String(JSON.parse(raw).transcript || '').trim(); }
+  catch (_){
+    // a misbehaving model may still answer plain text — accept real words,
+    // but never let its error sentence read as something the user said
+    return /^(sorry|error|an error|i (cannot|can['’]t)|unable)/i.test(raw) ? '' : raw;
+  }
 }
 
 function asrDrain(){ return asrQueue; }
@@ -2313,7 +2331,7 @@ function startSegment(){
   };
   mediaRec.start();
   clearTimeout(segTimer);
-  segTimer = setTimeout(() => { try { mediaRec.stop(); } catch(_){} }, SEG_MS);
+  segTimer = setTimeout(() => { try { mediaRec.stop(); } catch(_){} }, segMs());
 }
 
 async function startRecLocal(mode){
