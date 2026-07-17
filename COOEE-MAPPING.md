@@ -135,6 +135,10 @@ v75. Purpose: flag divergences BEFORE writing code. References are to
    visibility screen; invite expiry/rate-limit (Phase 5).
 5. Session 6: Phase 3 plan goals + Plan Review Pack + expense export columns
 6. Session 7: Phase 4 About Me / accessibility / consent screen; Phase 5
-   hardening checklist
+   hardening checklist. Natural home for **profile pictures** (ROADMAP A7):
+   the circle roster + consent screen is where a face beside each
+   name/role pays off most (accessible carer/participant identification),
+   and where photo consent is declared — participant controls their own
+   image; photo + name always together, never photo alone
 7. Session 8: Cooee landing page + Pages deploy workflow to the dedicated
    repo + custom-domain wiring
