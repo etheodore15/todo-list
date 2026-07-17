@@ -19,7 +19,33 @@ const admin = require('firebase-admin');
 admin.initializeApp();
 
 const geminiKey = defineSecret('GEMINI_KEY');
-const MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+// Model selection (v81): hardcoded names rot — Google retires models for new
+// keys ("gemini-2.5-flash is no longer available to new users", July 2026).
+// Unless GEMINI_MODEL pins one, discover the newest general-purpose flash
+// model this key can use (same filter the client applies to pasted keys),
+// cache it for the life of the warm instance, and rediscover once on a 404.
+const MODEL_OVERRIDE = process.env.GEMINI_MODEL || '';
+let cachedModel = null;
+function chooseModel(models){
+  const cands = (models || [])
+    .filter((m) => (m.supportedGenerationMethods || []).includes('generateContent'))
+    .map((m) => String(m.name || '').replace(/^models\//, ''))
+    .filter((n) => /^gemini-\d+(\.\d+)?-flash/.test(n) && !/preview|exp|image|tts|live|audio|thinking|8b/.test(n));
+  cands.sort((a, b) => {
+    const v = (n) => parseFloat((n.match(/^gemini-(\d+(?:\.\d+)?)/) || [0, 0])[1]);
+    return v(b) - v(a) || a.length - b.length;   // newest version, then plainest name
+  });
+  return cands[0] || 'gemini-flash-latest';      // Google's rolling alias as the last resort
+}
+async function resolveModel(key, force){
+  if (MODEL_OVERRIDE) return MODEL_OVERRIDE;
+  if (cachedModel && !force) return cachedModel;
+  const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models?pageSize=100',
+    {headers: {'x-goog-api-key': key}});
+  if (!r.ok) throw new Error('model discovery failed: ' + r.status);
+  cachedModel = chooseModel((await r.json()).models);
+  return cachedModel;
+}
 const FREE_DAILY = parseInt(process.env.FREE_DAILY || '30', 10);   // AI calls per user per day
 const ALLOW_ORIGIN = process.env.ALLOW_ORIGIN || '*';
 // Region must be known during firebase-tools' source-analysis pass, which runs
@@ -84,10 +110,17 @@ exports.ai = onRequest(
     systemInstruction: body.systemInstruction
   };
   try {
-    const r = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`,
+    const call = async (model) => fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
       {method: 'POST', headers: {'content-type': 'application/json', 'x-goog-api-key': GEMINI_KEY},
        body: JSON.stringify(forward)});
+    let model = await resolveModel(GEMINI_KEY);
+    let r = await call(model);
+    if (r.status === 404 && !MODEL_OVERRIDE){
+      // the cached (or first-guess) model was retired mid-flight — rediscover once
+      model = await resolveModel(GEMINI_KEY, true);
+      r = await call(model);
+    }
     const text = await r.text();
     res.status(r.status).set('content-type', 'application/json').send(text);
   } catch (e){

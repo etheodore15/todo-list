@@ -737,7 +737,7 @@
       <input type="file" id="importFile" accept=".json,application/json" style="display:none">
       <button class="btn ghost" id="wipeBtn">Delete all data</button>
     </div>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v80<br><span id="envInfo"></span></p>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v81<br><span id="envInfo"></span></p>
   </section>
 </main>
 
@@ -1765,7 +1765,7 @@ function chooseGeminiModel(models){
     const v = n => parseFloat((n.match(/^gemini-(\d+(?:\.\d+)?)/) || [0, 0])[1]);
     return v(b) - v(a) || a.length - b.length;   // newest version, then plainest name
   });
-  return cands[0] || 'gemini-2.5-flash';
+  return cands[0] || 'gemini-flash-latest';   // Google's rolling alias — never rots
 }
 
 async function geminiModel(key){
@@ -7049,13 +7049,15 @@ if (!store.get('onboarded', false) && !todos.length && !ideas.length && !spacesL
   document.getElementById('envInfo').textContent = `Running in ${browser} — ${standalone ? 'installed app ' : 'browser tab (not installed)'}`;
 })();
 
-// Firefox on Android has no Web Speech API and no WebGPU — warn instead of
-// letting voice input and on-device AI fail confusingly.
-if (/firefox/i.test(navigator.userAgent)){
+// Firefox has no Web Speech API — before v77 that meant no voice here at all.
+// On managed builds the cloud path covers it, so voice works fine in Firefox;
+// only warn when this build genuinely has no way to transcribe (self-hosted
+// with no proxy and no on-device opt-in).
+if (/firefox/i.test(navigator.userAgent) && voiceMode() === 'none'){
   const warn = document.createElement('div');
   warn.className = 'browser-warn';
-  warn.innerHTML = '<span class="ic ic-alert" aria-hidden="true"></span> You\'re viewing this in <b>Firefox</b>, which doesn\'t support voice input or on-device AI. ' +
-    'For the full app: open this page in <b>Chrome</b>, then menu (⋮) → <b>Add to Home screen</b> → <b>Install</b>.';
+  warn.innerHTML = '<span class="ic ic-alert" aria-hidden="true"></span> <b>Firefox</b> has no built-in speech engine, and this build has no transcription service, so the mic can\'t transcribe here. ' +
+    'Typing works fully. For voice: open this page in <b>Chrome</b> (menu (⋮) → <b>Add to Home screen</b>), or turn on on-device voice in Settings.';
   document.getElementById('view-capture').prepend(warn);
 }
 
