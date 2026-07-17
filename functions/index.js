@@ -69,6 +69,14 @@ exports.ai = onRequest(
 
   // 3. forward to Gemini with the operator's key + chosen model
   const body = req.body && typeof req.body === 'object' ? req.body : {};
+  // audio rides inside contents as inline base64 — cap the payload so a
+  // client can't relay arbitrarily large uploads through the operator's key
+  // (~4 MB ≈ several minutes of compressed speech; the app's own free-tier
+  // capture cap sits well under this)
+  if (JSON.stringify(body).length > 4 * 1024 * 1024){
+    res.status(413).json({error: {message: 'audio too long for one request'}});
+    return;
+  }
   // never let the client pick the model/key; strip anything unexpected
   const forward = {
     contents: body.contents,

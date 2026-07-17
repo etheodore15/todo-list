@@ -6,7 +6,7 @@ to them would require. Everything below describes working software unless marked
 otherwise. Landing page: https://etheodore15.github.io/todo-list/*
 
 *This is a **living document** — it is amended with every release so it never
-drifts from the shipped product. Last updated: v74.*
+drifts from the shipped product. Last updated: v77.*
 
 > **Caveat:** the product is in active development. Some features are new and may
 > behave unpredictably; the AI layer currently runs on a built-in heuristic for
@@ -35,10 +35,13 @@ solves that once; each new cohort is mostly a new surface on the same engine.
 
 **Capture → Structure → Share.**
 
-1. **Capture** — tap the mic and brain-dump. Live transcription (words appear
-   as you speak) via the browser speech engine, or a fully offline on-device
-   Whisper model (opt-in download) that transcribes in near-real-time 5-second
-   segments. Typing works everywhere. A one-line "quick add" exists for
+1. **Capture** — tap the mic and brain-dump. Voice works out of the box on
+   every device, no download: live transcription (words appear as you speak)
+   via the browser speech engine where it exists (Android/desktop Chrome),
+   and elsewhere (iOS Safari, Firefox) recordings transcribe in near-real-time
+   5-second segments through the operator AI proxy. A fully private on-device
+   Whisper model remains as an opt-in download (nothing leaves the phone;
+   works offline). Typing works everywhere. A one-line "quick add" exists for
    pre-formed tasks. An **"Add to" destination row** on the capture screen
    (Private + every space the user belongs to) shows — and lets the user
    change — where the capture will land before saving; the pick sticks for
