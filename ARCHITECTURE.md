@@ -68,7 +68,10 @@ From the build brief §2, plus the founder's clarification on decision-makers:
 2. **The participant sees everything about themselves.** No data about the
    participant can be scoped away from the owner role — including when a
    nominee operates the account. Enforced in Firestore security rules, not
-   just UI.
+   just UI. *(Shipped v78: `firestore.rules` role-scopes circle docs; every
+   visibility branch grants the owner/co-admin team; the 80-check emulator
+   matrix in `tests/rules/` gates CI via `rules-test.yml`. Any change to
+   scoping must extend that matrix first.)*
 3. **No surveillance features.** No GPS, no clock-in verification, no
    per-worker timing analytics, no productivity dashboards. If a task seems to
    need one, stop and flag it.
