@@ -1,0 +1,58 @@
+# Read-only Firestore audit: where did user-created things actually land?
+#
+# Answers, per household (space): type, members, item / event / receipt counts,
+# events broken down by kind (created / note / expense / …), items whose
+# `space` field disagrees with the household they're stored under, and the
+# last-activity time. Plus totals for cohorts and users docs.
+#
+# Prints COUNTS AND TRUNCATED IDENTIFIERS ONLY — never task text, note text,
+# amounts, or member names. The repo (and so this log) is public; content
+# stays out. Uses the same service-account secrets as deploy-backend.
+name: db-audit
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Which project(s) to audit'
+        type: choice
+        options: [ideatodo, cooee, both]
+        default: ideatodo
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - flavor: ideatodo
+            project: todo-list-50050
+            sa_secret: FIREBASE_SERVICE_ACCOUNT
+          - flavor: cooee
+            project: cooee-dbde6
+            sa_secret: FIREBASE_SERVICE_ACCOUNT_COOEE
+    steps:
+      - name: Skip if not targeted
+        id: gate
+        env:
+          TARGET: ${{ inputs.target }}
+        run: |
+          if [ "$TARGET" != "both" ] && [ "$TARGET" != "${{ matrix.flavor }}" ]; then
+            echo "run=false" >> "$GITHUB_OUTPUT"; echo "not targeted — skipping"; else
+            echo "run=true" >> "$GITHUB_OUTPUT"; fi
+      - uses: actions/checkout@v4
+        if: steps.gate.outputs.run == 'true'
+      - uses: actions/setup-node@v4
+        if: steps.gate.outputs.run == 'true'
+        with: {node-version: 20}
+      - name: Audit ${{ matrix.flavor }} (${{ matrix.project }})
+        if: steps.gate.outputs.run == 'true'
+        env:
+          SA_JSON: ${{ secrets[matrix.sa_secret] }}
+          PROJECT: ${{ matrix.project }}
+        run: |
+          if [ -z "$SA_JSON" ]; then echo "::notice::${{ matrix.sa_secret }} not set — skipping"; exit 0; fi
+          echo "$SA_JSON" > "$RUNNER_TEMP/sa.json"
+          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/sa.json"
+          (cd functions && npm install --omit=dev --silent)
+          NODE_PATH=functions/node_modules node .github/workflows/db-audit.js
