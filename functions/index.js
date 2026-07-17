@@ -22,7 +22,12 @@ const geminiKey = defineSecret('GEMINI_KEY');
 const MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
 const FREE_DAILY = parseInt(process.env.FREE_DAILY || '30', 10);   // AI calls per user per day
 const ALLOW_ORIGIN = process.env.ALLOW_ORIGIN || '*';
-const REGION = process.env.FN_REGION || 'us-central1';             // set per project by the deploy
+// Region must be known during firebase-tools' source-analysis pass, which runs
+// BEFORE .env files load and without the deploy shell's env — but it always
+// sets GCLOUD_PROJECT. Map project → region here (cooee is AU-resident by
+// design; the only AU-exit is the Gemini API call itself).
+const REGION = process.env.FN_REGION ||
+  ({'cooee-dbde6': 'australia-southeast1'}[process.env.GCLOUD_PROJECT] || 'us-central1');
 
 const cors = (res) => {
   res.set('Access-Control-Allow-Origin', ALLOW_ORIGIN);
