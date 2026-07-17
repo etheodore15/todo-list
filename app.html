@@ -737,7 +737,7 @@
       <input type="file" id="importFile" accept=".json,application/json" style="display:none">
       <button class="btn ghost" id="wipeBtn">Delete all data</button>
     </div>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v82<br><span id="envInfo"></span></p>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v83<br><span id="envInfo"></span></p>
   </section>
 </main>
 
@@ -2236,10 +2236,11 @@ function stopRec(){
    lands. A tiny audio gap between segments is the trade-off for streaming. */
 let mediaRec = null, mediaStream = null, segTimer = null;
 let asrQueue = Promise.resolve(), asrPendingN = 0;
-// v82: proxy segments are 15s — one metered call per 15s instead of per 5s
-// (a dictation no longer drains the quota), and 3× fewer segment boundaries
-// for words to be clipped at. Whisper keeps 5s chunks (phone memory).
-const segMs = () => asrMode === 'proxy' ? 15000 : 5000;
+// v83: only Whisper chops the take into fixed chunks (5s — phone memory).
+// The proxy path records ONE continuous take and transcribes it cumulatively
+// (startLiveProxy below): words appear near-live, and nothing is ever clipped
+// at a segment boundary because there are no segments.
+const SEG_MS = 5000;
 // v77: the segment recorder feeds one of two engines —
 //   'local' — on-device Whisper (explicit privacy opt-in, Settings download)
 //   'proxy' — the operator AI proxy (Gemini transcribes; nothing to install,
@@ -2301,11 +2302,7 @@ function queueSegment(blob){
         if (audio.length >= 16000 * 0.4)         // skip sub-0.4s fragments
           text = (await aiCall('transcribe', {audio}, [audio.buffer])).text;
       }
-      // ASR engines mark non-speech with tokens like [BLANK_AUDIO] / [MUSIC] /
-      // (inaudible) — noise, not dictation; they must never reach the note
-      const clean = (text || '')
-        .replace(/\[[^\]]{0,60}\]|\((?:inaudible|silence|music|laughter|applause|coughing|no speech)[^)]*\)|♪+/gi, ' ')
-        .replace(/\s+/g, ' ').trim();
+      const clean = stripAsrNoise(text);
       if (clean)
         liveText.value = (liveText.value + ' ' + clean).replace(/\s+/g,' ').trim();
     } catch (e) {
@@ -2320,6 +2317,14 @@ function queueSegment(blob){
   });
 }
 
+// ASR engines mark non-speech with tokens like [BLANK_AUDIO] / [MUSIC] /
+// (inaudible) — noise, not dictation; it must never reach the note
+function stripAsrNoise(text){
+  return (text || '')
+    .replace(/\[[^\]]{0,60}\]|\((?:inaudible|silence|music|laughter|applause|coughing|no speech)[^)]*\)|♪+/gi, ' ')
+    .replace(/\s+/g, ' ').trim();
+}
+
 function startSegment(){
   if (!mediaStream) return;
   const chunks = [];
@@ -2331,7 +2336,62 @@ function startSegment(){
   };
   mediaRec.start();
   clearTimeout(segTimer);
-  segTimer = setTimeout(() => { try { mediaRec.stop(); } catch(_){} }, segMs());
+  segTimer = setTimeout(() => { try { mediaRec.stop(); } catch(_){} }, SEG_MS);
+}
+
+/* ---------- live cloud transcription (v83) ----------
+   Accessibility requirement: words appear NEAR REAL TIME as they're spoken,
+   on every browser. The recorder streams 1s chunks into one continuous take
+   (chunks only decode from the start, so the blob-so-far is always a valid
+   recording). An adaptive tick — 4s apart early, stretching to 15s on long
+   takes — transcribes the WHOLE take so far and REPLACES the take's text
+   with each richer result: early words show up fast, then self-correct as
+   the model re-hears them with more context, and nothing is ever clipped at
+   a boundary because there are no boundaries. The pass on stop is the
+   authoritative final. */
+let liveChunks = [], liveTickTimer = null, liveTake = 0, liveBusy = false;
+function liveTickDelay(){
+  const t = (Date.now() - recStartedAt) / 1000;
+  return Math.max(4000, Math.min(15000, t * 250));   // 4s → 15s as the take grows
+}
+function scheduleLiveTick(){
+  clearTimeout(liveTickTimer);
+  liveTickTimer = setTimeout(() => liveTranscribe(false), liveTickDelay());
+}
+function startLiveProxy(){
+  if (!mediaStream) return;
+  liveChunks = []; liveTake++; liveBusy = false;
+  mediaRec = new MediaRecorder(mediaStream);
+  mediaRec.ondataavailable = (e) => { if (e.data.size) liveChunks.push(e.data); };
+  mediaRec.start(1000);
+  scheduleLiveTick();
+}
+async function liveTranscribe(isFinal){
+  const take = liveTake;
+  if (!liveChunks.length || (liveBusy && !isFinal)){
+    if (recording && !isFinal) scheduleLiveTick();   // nothing yet / still busy — come back
+    return;
+  }
+  liveBusy = true;
+  if (isFinal){ asrPendingN++; updateAsrHint(); }
+  const blob = new Blob(liveChunks, {type: liveChunks[0].type});
+  try {
+    const text = await proxyTranscribe(blob);
+    if (take !== liveTake) return;                   // a newer take owns the box now
+    const clean = stripAsrNoise(text);
+    if (clean || isFinal)
+      liveText.value = ((baseText ? baseText + ' ' : '') + clean).replace(/\s+/g, ' ').trim();
+  } catch (e){
+    // one honest toast per take; the recording itself never stops for this
+    if (!asrErrToasted){
+      asrErrToasted = true;
+      toast('Transcription hiccup — ' + (e.message || 'check your connection') + '. Keep talking; your recording continues.');
+    }
+  } finally {
+    liveBusy = false;
+    if (isFinal){ asrPendingN--; updateAsrHint(); }
+    else if (recording && take === liveTake) scheduleLiveTick();
+  }
 }
 
 async function startRecLocal(mode){
@@ -2348,7 +2408,7 @@ async function startRecLocal(mode){
   micBtn.classList.add('recording');
   micBtn.textContent = '⏹';
   startRecTimer('local');
-  startSegment();
+  if (asrMode === 'proxy') startLiveProxy(); else startSegment();
   // the metered (proxy) path caps a single capture on the free tier; the words
   // already spoken are kept and transcribed — nothing is lost at the cap
   if (asrMode === 'proxy'){
@@ -2364,14 +2424,17 @@ async function startRecLocal(mode){
 
 async function stopRecLocal(){
   recording = false;
+  const wasProxy = asrMode === 'proxy';
   clearTimeout(voiceCapTimer);
   stopRecTimer();
   micBtn.classList.remove('recording');
   setIconLabel(micBtn, 'mic');
   clearTimeout(segTimer);
+  clearTimeout(liveTickTimer);
   if (mediaRec){
     const r = mediaRec; mediaRec = null;
-    // keep startSegment's onstop (it queues the final chunk), then resolve
+    // keep any onstop (Whisper queues its final chunk there), then resolve;
+    // the live path's tail chunk lands via ondataavailable before onstop
     await new Promise(res => {
       const prev = r.onstop;
       r.onstop = (e) => { try { prev && prev(e); } catch(_){} res(); };
@@ -2379,6 +2442,12 @@ async function stopRecLocal(){
     });
   }
   if (mediaStream){ mediaStream.getTracks().forEach(t => t.stop()); mediaStream = null; }
+  if (wasProxy){
+    // let any in-flight tick settle (bounded), so the FINAL pass runs alone
+    // and nothing stale can land after it
+    for (let i = 0; i < 30 && liveBusy; i++) await new Promise(r => setTimeout(r, 100));
+    await liveTranscribe(true);               // the authoritative final pass
+  }
   updateAsrHint();
 }
 

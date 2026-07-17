@@ -26,7 +26,7 @@ retrofitted. Last updated: v77.*
 
 | Lever | Free tier (today) | Premium | Costs us? | Status |
 |---|---|---|---|---|
-| Cloud voice transcription length | 120 s per capture (`FLAVOR.limits.voiceSeconds`) + 120 segments/day (`VOICE_DAILY` ≈ 30 min of dictation) | Extended/unlimited captures, higher daily minutes | Yes (~0.2¢/min Gemini) | **Enforced v77, repriced v82**: voice meters in its own daily pool (a dictation was draining `FREE_DAILY` in seconds); failed calls refund |
+| Cloud voice transcription length | 120 s per capture (`FLAVOR.limits.voiceSeconds`) + 120 voice calls/day (`VOICE_DAILY`) | Extended/unlimited captures, higher daily minutes | Yes (~0.2¢/min Gemini) | **Enforced v77, repriced v82, live v83**: voice meters in its own daily pool; failed calls refund. v83 live ticks are adaptive (4s→15s apart), ≈10–15 calls per 2-min capture → ~8–12 solid captures/day free |
 | AI calls per day (structuring, breakdowns, briefings, tone check) | 30/day/user (proxy `FREE_DAILY`; voice excluded v82) | Higher/unlimited + faster model | Yes | Enforced since proxy deploy; premium tier = raised quota per uid |
 | Plan Review Pack (Cooee) | Built v80: pack composes free (12 weeks, goal-grouped, AI overview rides the shared AI quota) | $19/mo · $190/yr per circle (workers always free): longer periods, polished export, concierge | Marginal | **Shipped free-tier v80** — the free pack is the demo that sells the subscription; gate at period depth + export polish, never at record access (principle 1) |
 | Report history depth | Current period (7d/28d windows) | Any period, quarter/annual packs | No | Future lever — cheap to build on the composer framework |
