@@ -97,22 +97,26 @@ const FAKE_FS = `
   check('v82: plain-text replies with real words still land (old-proxy compat)',
     plain.trim() === 'water the ferns near the back door');
 
-  // ---------- 3. 15-second segments on the metered path ----------
+  // ---------- 3. quota economics: adaptive ticks, not a call every 5s ----------
+  // (v83 made the proxy path LIVE — cumulative ticks starting at 4s apart,
+  //  stretching to 15s — so this section now proves the tick pacing.)
   const C = await mk(reply({transcript: 'segment test'}));
-  check('v82: proxy mode records in 15s segments; whisper keeps 5s', await C.p.evaluate(() => {
-    asrMode = 'proxy';
-    const p = segMs();
-    asrMode = 'local';
-    const l = segMs();
-    return p === 15000 && l === 5000;
+  check('v82/v83: tick spacing adapts — 4s early, 15s on long takes', await C.p.evaluate(() => {
+    const now = Date.now();
+    recStartedAt = now;                    // fresh take → fastest tick
+    const early = liveTickDelay();
+    recStartedAt = now - 120000;           // two minutes in → slowest tick
+    const late = liveTickDelay();
+    recStartedAt = now;
+    return early === 4000 && late === 15000;
   }));
+  check('v82/v83: whisper keeps its 5s chunks', await C.p.evaluate(() => SEG_MS === 5000));
   await C.p.click('#micBtn');
-  await C.p.waitForTimeout(6500);                 // past the OLD 5s boundary…
-  check('v82: at 6.5s nothing has been posted yet — the segment is still open',
-    C.proxyHits.length === 0 && await C.p.evaluate(() => recording === true));
-  await C.p.click('#micBtn');
+  await C.p.waitForTimeout(2000);
+  await C.p.click('#micBtn');              // a 2s take stops before the first 4s tick
   for (let i = 0; i < 16 && !C.proxyHits.length; i++) await C.p.waitForTimeout(500);
-  check('v82: stopping flushes the take as one call', C.proxyHits.length === 1);
+  check('v82/v83: a short take costs exactly one metered call (the final pass)',
+    C.proxyHits.length === 1);
 
   // ---------- 4. the voice-pool 429 message reaches the user ----------
   const D = await mk({ status: 429, contentType: 'application/json',
