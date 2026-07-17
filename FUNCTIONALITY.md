@@ -6,7 +6,7 @@ to them would require. Everything below describes working software unless marked
 otherwise. Landing page: https://etheodore15.github.io/todo-list/*
 
 *This is a **living document** — it is amended with every release so it never
-drifts from the shipped product. Last updated: v78.*
+drifts from the shipped product. Last updated: v79.*
 
 > **Caveat:** the product is in active development. Some features are new and may
 > behave unpredictably; the AI layer currently runs on a built-in heuristic for
@@ -144,6 +144,16 @@ back (Journal)**. Three sections:
   assigned / private) never hides anything from the owner; viewers are
   read-only; invites can only mint worker or viewer (elevation is an
   owner/co-admin act). Proven by an 80-check emulator matrix gating CI
+- **Circle worker flows** (v79): support **session brackets** — a worker taps
+  Start/End support and everything they tick and note in between reads as
+  part of that session in history and handoff (auto-closes after 12h with an
+  honest marker; deliberately no per-worker duration totals — not
+  time-tracking). **Incident reports** — structured what/when/who/action,
+  voice-fillable from the capture box, visible to the author and the circle's
+  owners only, append-only, with plain copy that it notifies nobody outside
+  the space. Workers/viewers sync circles through the rules-proven filtered
+  queries; the AI structuring prompt speaks circle vocabulary (participant,
+  members, session talk, observations-are-not-tasks)
 
 ### Co-parenting pack
 - **Custody days**: whose day it is (supports alternating weeks), shown on

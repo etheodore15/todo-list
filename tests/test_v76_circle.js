@@ -86,7 +86,8 @@ window.FLAVOR = {id:'cooee', name:'Cooee', cohorts:['ndis-circle','adhd'],
     localStorage.setItem('spaces', JSON.stringify([
       {hid:'hh-cir', name:'My Circle', type:'circle', cfg:{apiKey:'k',projectId:'p'}}]));
   });
-  const circActs = await D.evaluate(() => SPACE_ACTIONS.circle.map(a => a[1]));
+  // v79: circle action bars are built per-render (role/session aware)
+  const circActs = await D.evaluate(() => SPACE_ACTIONS.circle(spacesList()[0]).map(a => a[1]));
   check('v76: circle action bar — About Me / meds / note / history / invite',
     circActs.includes('About Me') && circActs.includes('Routines & meds') &&
     circActs.includes('History & export') && circActs.includes('Invite'));

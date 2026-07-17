@@ -122,8 +122,17 @@ v75. Purpose: flag divergences BEFORE writing code. References are to
    shapes: `where('vis','==','circle')`, `where('vis','==','assigned') +
    array-contains visUids`, `where('authorUid','==',uid)`. Owner/co-admin
    (and non-circle spaces) keep the existing unfiltered onSnapshot.
-4. Session 5: Phase 1d prompt + Phase 2 worker flows (brackets, handoff,
-   incident capture) + the scoped-sync merge described above
+4. ~~Session 5: Phase 1d prompt + Phase 2 worker flows (brackets, handoff,
+   incident capture) + the scoped-sync merge described above~~ ✅ v79 —
+   circle writes stamp `vis` + `authorUid` (items via `itemPayload`, events
+   in `logEvent`); workers/viewers listen via `readTargets()` = the three
+   proven shapes; session brackets (`session-start`/`session-end` events
+   paired by bracket id, 12h auto-close, no duration totals); incident
+   events (`vis:'team'`, structured detail, non-notifying copy); circle
+   section in the structuring prompt (`circlePromptSection`). Still open
+   for later sessions: per-item vis *picker* (today everything defaults
+   `vis:'circle'`, incidents `'team'`) — lands with the Phase 4 consent &
+   visibility screen; invite expiry/rate-limit (Phase 5).
 5. Session 6: Phase 3 plan goals + Plan Review Pack + expense export columns
 6. Session 7: Phase 4 About Me / accessibility / consent screen; Phase 5
    hardening checklist
