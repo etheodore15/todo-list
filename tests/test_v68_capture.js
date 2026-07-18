@@ -145,7 +145,9 @@ export function onSnapshot(col, cb){ cb({docChanges: () => []}); return () => {}
 
   // ---------- 6. v69 regression: family default + care space also present ----------
   // Bug: the chips defaulted to the family space but "Save to journal" still
-  // showed (old single-care fallback). The journal save must track the chips.
+  // showed (old single-care fallback). The journal save must track the chips —
+  // v85: every space has a journal now, so the button must NAME the active
+  // chip's space rather than disappearing for non-care destinations.
   const C = await mk(() => {
     localStorage.setItem('onboarded', 'true');
     localStorage.setItem('spaces', JSON.stringify([
@@ -155,12 +157,13 @@ export function onSnapshot(col, cb){ cb({docChanges: () => []}); return () => {}
   });
   check('v69: default chip is the family space',
     /Home/.test(await C.locator('#destChips .fchip.active').textContent()));
-  check('v69: NO journal button while the destination is the family space',
-    !(await C.locator('#saveNoteBtn').isVisible()));
+  check('v85: journal save offered for the family space, named for it',
+    await C.locator('#saveNoteBtn').isVisible()
+    && /Home journal/.test(await C.locator('#saveNoteBtn').textContent()));
   await C.locator('#destChips .fchip', { hasText: "Mum's care" }).click();
   await C.waitForTimeout(100);
-  check('v69: picking the care chip brings the journal save back',
-    await C.locator('#saveNoteBtn').isVisible());
+  check('v69: picking the care chip retargets the journal save',
+    /Mum's care journal/.test(await C.locator('#saveNoteBtn').textContent()));
   await C.locator('#destChips .fchip', { hasText: 'Private' }).click();
   await C.waitForTimeout(100);
   check('v69: switching to Private hides it again',

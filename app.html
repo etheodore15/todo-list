@@ -737,7 +737,7 @@
       <input type="file" id="importFile" accept=".json,application/json" style="display:none">
       <button class="btn ghost" id="wipeBtn">Delete all data</button>
     </div>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v84<br><span id="envInfo"></span></p>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v85<br><span id="envInfo"></span></p>
   </section>
 </main>
 
@@ -2792,15 +2792,26 @@ async function structureIdea(idea){
     else if (task.date && task.date > t) scheduled.push(fmtDay(task.date));
     added++;
   });
+  const destSp = spacesList().find(s => s.hid === dest);
+  // v85: the destination chip is a promise. If the capture was aimed at a
+  // space and nothing became a task, the note itself is saved to that space's
+  // journal — before this, only extracted TASKS ever travelled, so
+  // "ADD TO: <space>" looked like it shared the note but silently kept it
+  // private on the device. (Circle viewers are read-only; rules would refuse.)
+  if (!added && !skipped && destSp && !(destSp.type === 'circle' && (destSp.role || '') === 'viewer')){
+    idea.sharedTo = [...new Set([...(idea.sharedTo || []), destSp.hid])];
+    logEvent('note', {id: 'note-' + idea.id, text: idea.raw.slice(0, 600), space: destSp.hid});
+    track('feature_used', {feature: 'note_autoshare'});
+  }
   saveIdeas(); saveTodos(); updateBadge(); renderProcStrip();
   renderTodos();   // keep the (possibly hidden) list fresh; showView also re-renders on switch
   if (document.getElementById('view-ideas').classList.contains('active')) renderIdeas();
 
-  const destSp = spacesList().find(s => s.hid === dest);
   const msg = added
     ? `${added} task${added===1?'':'s'} live${destSp ? ` in “${destSp.name}”` : ' on Today'}${scheduled.length ? ` (${scheduled.join(', ')})` : ''}${delegated.length ? ` (→ ${delegated.join('; ')})` : ''}${skipped ? ` (${skipped} already listed)` : ''}`
     : (skipped ? 'Those tasks are already on your list'
-               : 'Saved to your Journal — no to-dos detected, your note is kept');
+               : destSp ? `No to-dos detected — saved to the ${destSp.name} journal instead`
+                        : 'Saved to your Journal — no to-dos detected, your note is kept');
   if (added){
     toast(msg, () => { if (destSp) activeSpace = destSp.hid; showView('today'); renderTodos(); }, 'View');
   } else if (skipped){
@@ -2847,13 +2858,15 @@ saveIdeaBtn.addEventListener('click', async () => {
    doctor briefing) and keeps a private copy in Ideas. */
 function noteSpace(){
   // v69: the destination chips are the single source of truth — the journal
-  // save is offered only when the EFFECTIVE destination is a care space. (The
-  // old any-single-care-space fallback predated the chips and could show
-  // "Save to journal" while the active chip pointed at a family space.)
+  // save follows the EFFECTIVE destination, never a fallback guess.
+  // v85: offered for EVERY space type, not just care/circle. Family and
+  // co-parenting spaces have journals too (their notes now feed the week
+  // report / records summary), and hiding the button here was how a note
+  // aimed at a family space ended up stranded on the device.
   const sp = spacesList().find(s => s.hid === captureDestVal());
   // v79: circle viewers are read-only — don't offer a save the rules refuse
   if (sp && sp.type === 'circle' && (sp.role || '') === 'viewer') return null;
-  return sp && (sp.type === 'care' || sp.type === 'circle') ? sp : null;
+  return sp || null;
 }
 
 /* ---------- capture destination picker (v68) ----------
@@ -2895,13 +2908,15 @@ function refreshCaptureMode(){
   const ideaBtn = document.getElementById('saveIdeaBtn');
   const lt = document.getElementById('liveText');
   // task creation is always the primary action (v68); the journal save is the
-  // secondary option offered alongside it when a care space is the destination
+  // secondary option offered alongside it when any space is the destination
   ideaBtn.classList.add('primary'); ideaBtn.classList.remove('ghost');
   ideaBtn.textContent = 'Summarize & Add';
   if (sp){
     noteBtn.style.display = '';
     setIconLabel(noteBtn, 'note', `Save to ${sp.name} journal`);
-    lt.setAttribute('placeholder', 'Speak or type — pull out tasks, or save it as a care observation…');
+    lt.setAttribute('placeholder', sp.type === 'care'
+      ? 'Speak or type — pull out tasks, or save it as a care observation…'
+      : `Speak or type — pull out tasks, or save the note to the ${sp.name} journal…`);
   } else {
     noteBtn.style.display = 'none';
     lt.setAttribute('placeholder', 'Your transcribed idea appears here… you can also just type.');
@@ -2940,9 +2955,9 @@ function journalReports(){
     if (sp.type === 'care') cards.push(['stethoscope', 'Doctor briefing',
       `${sp.name} — the last 4 weeks, ready for the visit`, () => openBriefing(sp)]);
     if (sp.type === 'family') cards.push(['users', 'Week report',
-      `${sp.name} — who did what, and what’s coming up`, () => openFamilyReport(sp)]);
+      `${sp.name} — who did what, notes, and what’s coming up`, () => openFamilyReport(sp)]);
     if (sp.type === 'coparenting') cards.push(['scroll', 'Records summary',
-      `${sp.name} — expenses and completions, neutral wording`, () => openCoparentReport(sp)]);
+      `${sp.name} — expenses, completions and notes, neutral wording`, () => openCoparentReport(sp)]);
     if (sp.type === 'circle') cards.push(['target', 'Plan Review Pack',
       `${sp.name} — the last 12 weeks, grouped by plan goal`, () => openPlanPack(sp)]);
   });
@@ -3024,11 +3039,14 @@ function renderIdeas(){
     const rawEl = card.querySelector('.raw');
     rawEl.textContent = idea.raw;
     rawEl.addEventListener('click', () => rawEl.classList.toggle('open'));
-    // C2c: opt-in care journal — ideas stay private unless shared to a care space.
+    // C2c: opt-in journal — ideas stay private unless shared to a space.
     // v73: a misdirected share can be taken back — the journal stops showing the
-    // note (and the doctor briefing excludes it), but the append-only record
-    // keeps BOTH entries: the share and the removal.
-    store.get('spaces', []).filter(s => s.type === 'care').forEach(sp => {
+    // note (and the reports exclude it), but the append-only record keeps BOTH
+    // entries: the share and the removal.
+    // v85: buttons for EVERY space (was care-only), so a note that landed in
+    // the wrong place can be redirected after the fact. Circle viewers are
+    // read-only by the rules, so they get no button.
+    spacesList().filter(s => s.type !== 'circle' || (s.role || '') !== 'viewer').forEach(sp => {
       const shared = (idea.sharedTo || []).includes(sp.hid);
       const b = document.createElement('button');
       b.className = 'chip share-note';
@@ -5582,6 +5600,20 @@ const repHead = (title, sub) =>
   `<p style="color:#555;font-size:11px;margin:0 0 8px;">${repEsc(sub)}</p>`;
 const repWhen = ts => ts ? new Date(ts).toLocaleDateString(undefined, {weekday:'short', day:'numeric', month:'short'}) : '';
 const repMeta = s => ` <span style="color:#777;font-size:12px;">— ${s}</span>`;
+// v85: journal notes on the record — used by the family week report and the
+// co-parenting records summary (care keeps its doctor briefing). A note whose
+// share was taken back is excluded — the note-removed event pairs via taskId,
+// the same contract the doctor briefing uses.
+const repNotes = (evs, cap) => {
+  const removed = new Set(evs.filter(e => e.kind === 'note-removed').map(e => e.taskId));
+  return evs.filter(e => e.kind === 'note' && !removed.has(e.taskId))
+    .sort((a, b) => b.ts - a.ts).slice(0, cap)
+    .map(e => {
+      const txt = String(e.text || '');
+      return '“' + repEsc(txt.length > 160 ? txt.slice(0, 157) + '…' : txt) + '”' +
+        repMeta(`${repEsc(capName(e.who) || 'someone')} · ${repWhen(e.ts)}`);
+    });
+};
 
 function weekReflectionHtml(){
   const now = Date.now(), wk = 7 * 86400000;
@@ -5637,6 +5669,7 @@ function familyReportHtml(sp){
     repSec('Finished — the detail', done.slice().sort((a, b) => b.doneAt - a.doneAt).slice(0, 12).map(t =>
       repEsc(t.text) + repMeta(`${repEsc(capName(t.doneBy) || 'someone')} · ${repWhen(t.doneAt)}`))) +
     repSec('Who added what', Object.entries(added).sort((a, b) => b[1] - a[1]).map(([w, n]) => `${repEsc(w)} added ${n}`)) +
+    repSec('Notes this week', repNotes(evs, 8)) +
     repSec('Coming up', upcoming) +
     repSec('Still open', open.filter(t => !t.date || t.date <= todayStr()).slice(0, 10).map(t =>
       repEsc(t.text) + ((t.assignees || []).length ? repMeta('for ' + repEsc(t.assignees.map(capName).join(', '))) : '')));
@@ -5675,6 +5708,7 @@ function coparentReportHtml(sp){
           repEsc(t.text) + ` — $${t.amount.toFixed(2)}` + repMeta(`paid by ${repEsc(capName(t.expenseBy) || 'unattributed')} · ${repWhen(t.expenseAt)}`)))
         .concat(Object.entries(paid).map(([w, a]) => `${repEsc(w)} paid $${a.toFixed(2)}`))
         .concat(balance ? [balance] : [])) : '') +
+    repSec('Notes on the record (as written)', repNotes(evs, 10)) +
     `<p style="font-size:11px;color:#555;margin-top:12px;">The balance line assumes a 50/50 split. The full, unedited history can be exported as CSV or PDF from the History screen.</p>`;
 }
 
@@ -5688,16 +5722,18 @@ function openReflection(){
   openReport('My week in review', 'Adding up your week…', () => weekReflectionHtml());
 }
 function openFamilyReport(sp){
-  if (!todos.some(t => t.space === sp.hid)){
-    toast('Nothing to report yet — add some tasks to the space first.');
+  // v85: a space can hold journal notes before it holds any tasks
+  if (!todos.some(t => t.space === sp.hid) && !store.get('events', []).some(e => e.space === sp.hid)){
+    toast('Nothing to report yet — add some tasks or notes to the space first.');
     return;
   }
   track('feature_used', {feature: 'family_report'});
   openReport(sp.name + ' — week report', 'Adding up the household’s week…', () => familyReportHtml(sp));
 }
 function openCoparentReport(sp){
-  if (!todos.some(t => t.space === sp.hid)){
-    toast('Nothing to summarise yet — shared tasks and expenses will appear here.');
+  // v85: a space can hold journal notes before it holds any tasks
+  if (!todos.some(t => t.space === sp.hid) && !store.get('events', []).some(e => e.space === sp.hid)){
+    toast('Nothing to summarise yet — shared tasks, expenses and notes will appear here.');
     return;
   }
   track('feature_used', {feature: 'coparent_report'});

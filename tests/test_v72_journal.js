@@ -153,15 +153,16 @@ export function onSnapshot(col, cb){ cb({docChanges: () => []}); return () => {}
   await E.waitForTimeout(300);
   await E.locator('.card .share-note', { hasText: "Share to Mum's care" }).click();
   await E.waitForTimeout(200);
+  // v85: every space gets a share chip, so scope the locator to the care one
   check('v73: shared chip now offers removal',
-    /in Mum's care journal · remove/.test(await E.locator('.card .share-note').textContent()));
+    /in Mum's care journal · remove/.test(await E.locator('.card .share-note', { hasText: "Mum's care" }).textContent()));
   check('v73: the share itself is in the record', await E.evaluate(() =>
     JSON.parse(localStorage.getItem('events')).some(e => e.kind === 'note' && /plumber/.test(e.text))));
   check('v73: briefing would include the note before removal', await E.evaluate(async () => {
     histEvents = await collectSpaceEvents(spacesList()[0]);
     return briefingInput(spacesList()[0]).notes.length === 1;
   }));
-  await E.locator('.card .share-note').click();   // take it back
+  await E.locator('.card .share-note', { hasText: "Mum's care" }).click();   // take it back
   await E.waitForTimeout(200);
   check('v73: removal logged as its own append-only entry', await E.evaluate(() =>
     JSON.parse(localStorage.getItem('events')).some(e => e.kind === 'note-removed')));
@@ -171,7 +172,7 @@ export function onSnapshot(col, cb){ cb({docChanges: () => []}); return () => {}
     return n && r && n.taskId === r.taskId;
   }));
   check('v73: chip returns to offering the share',
-    /Share to Mum's care/.test(await E.locator('.card .share-note').textContent()));
+    /Share to Mum's care/.test(await E.locator('.card .share-note', { hasText: "Mum's care" }).textContent()));
   check('v73: the briefing excludes the removed note', await E.evaluate(async () => {
     histEvents = await collectSpaceEvents(spacesList()[0]);
     return briefingInput(spacesList()[0]).notes.length === 0;
