@@ -741,7 +741,7 @@
       <input type="file" id="importFile" accept=".json,application/json" style="display:none">
       <button class="btn ghost" id="wipeBtn">Delete all data</button>
     </div>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v90<br><span id="envInfo"></span></p>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v91<br><span id="envInfo"></span></p>
   </section>
 </main>
 
@@ -1440,6 +1440,19 @@ function parseTaskTime(text){
 // order — "levodopa at 7am 1pm and 7pm" → ['07:00','13:00','19:00']. Only
 // unambiguous (am/pm-marked) times count; bare "at 7 and 1" stays single via
 // parseTaskTime. Used to fan a multi-dose routine into one task per dose.
+// v91 (persona study #7): a spoken dollar amount is an EXPENSE, not
+// decoration. The FIRST amount in the clause is the cost ("I paid $180 for
+// the carpet cleaner, everyone owes me $36" → $180). $38 · $42.50 ·
+// "38 dollars" · "40 bucks" all count.
+function parseAmount(text){
+  const t = String(text).toLowerCase().replace(/,(?=\d{3}\b)/g, '');
+  const m = t.match(/\$ ?(\d{1,6}(?:\.\d{1,2})?)\b/) ||
+            t.match(/\b(\d{1,6}(?:\.\d{1,2})?) ?(?:dollars|bucks)\b/);
+  if (!m) return null;
+  const v = Math.round(parseFloat(m[1]) * 100) / 100;
+  return v >= 0.01 && v <= 100000 ? v : null;
+}
+
 function allTaskTimes(text){
   const t = normSpokenTimes(text);
   const out = [];
@@ -2940,14 +2953,21 @@ async function structureIdea(idea){
   let added = 0, skipped = 0;
   const delegated = [];
   const scheduled = [];
+  let expensed = 0;
   doseTasks.forEach((task, i) => {
     if (existing.has(dupKey(task.text, task.time))){ skipped++; return; }   // already on the list
+    // v91 (persona study #7): "$38 school photos" becomes a ledger-ready
+    // expense at capture time — the duplicate-payment problem is solved by
+    // the record existing, not by re-typing the number into a sheet later
+    const amt = parseAmount(task.text);
     todos.push({id: idea.id + '-' + i, text: task.text, priority: task.priority, tags: task.tags || [],
       assignees: (task.assignees || []).map(capName), done:false, date: task.date || t, recur: task.recur || null,
       energy: task.energy || detectEnergy(task.text), minutes: task.minutes || null,
       time: task.time || null,
+      ...(amt ? {amount: amt, expenseBy: myName() || null, expenseAt: Date.now()} : {}),
       space: dest, ideaId: idea.id, createdBy: myName() || null, createdAt: Date.now()});
     logEvent('created', todos[todos.length - 1]);
+    if (amt && dest){ expensed += amt; syncReceipt(todos[todos.length - 1]); }
     if ((task.assignees || []).length) delegated.push(task.assignees.map(capName).join(', '));
     if (task.recur) scheduled.push(recurLabel(task.recur).replace('↻ ', '↻'));
     else if (task.date && task.date > t) scheduled.push(fmtDay(task.date));
@@ -2961,7 +2981,7 @@ async function structureIdea(idea){
   // private on the device. (Circle viewers are read-only; rules would refuse.)
   if (!added && !skipped && destSp && !(destSp.type === 'circle' && (destSp.role || '') === 'viewer')){
     idea.sharedTo = [...new Set([...(idea.sharedTo || []), destSp.hid])];
-    logEvent('note', {id: 'note-' + idea.id, text: idea.raw.slice(0, 600), space: destSp.hid});
+    logEvent('note', {id: 'note-' + idea.id, text: noteShareText(idea.raw), space: destSp.hid});
     track('feature_used', {feature: 'note_autoshare'});
   }
   saveIdeas(); saveTodos(); updateBadge(); renderProcStrip();
@@ -2971,8 +2991,9 @@ async function structureIdea(idea){
   // v87 (persona study #10): if the engine heard more than it kept, SAY SO —
   // the raw transcript is safe in the Journal either way
   const overflow = result.dropped ? ` — ${result.dropped} more didn’t fit, the full note is in your Journal` : '';
+  const moneyNote = expensed && destSp ? ` · $${expensed.toFixed(2)} logged to the ledger` : '';
   const msg = added
-    ? `${added} task${added===1?'':'s'} live${destSp ? ` in “${destSp.name}”` : ' on Today'}${scheduled.length ? ` (${[...new Set(scheduled)].join(', ')})` : ''}${delegated.length ? ` (→ ${delegated.join('; ')})` : ''}${skipped ? ` (${skipped} already listed)` : ''}${overflow}`
+    ? `${added} task${added===1?'':'s'} live${destSp ? ` in “${destSp.name}”` : ' on Today'}${scheduled.length ? ` (${[...new Set(scheduled)].join(', ')})` : ''}${delegated.length ? ` (→ ${delegated.join('; ')})` : ''}${skipped ? ` (${skipped} already listed)` : ''}${moneyNote}${overflow}`
     : (skipped ? 'Those tasks are already on your list'
                : destSp ? `No to-dos detected — saved to the ${destSp.name} journal instead`
                         : 'Saved to your Journal — no to-dos detected, your note is kept');
@@ -3120,7 +3141,7 @@ document.getElementById('saveNoteBtn').addEventListener('click', async () => {
   const idea = {id: uid(), raw, summary: raw.length > 120 ? raw.slice(0, 117) + '…' : raw,
     priority: 'low', engine: 'note', ts: Date.now(), sharedTo: [sp.hid]};
   ideas.unshift(idea); saveIdeas();
-  logEvent('note', {id: 'note-' + idea.id, text: raw.slice(0, 600), space: sp.hid});
+  logEvent('note', {id: 'note-' + idea.id, text: noteShareText(raw), space: sp.hid});
   track('feature_used', {feature: 'care_note'});
   liveText.value = ''; baseText = '';
   // show WHERE it went — the journal lives behind "History & briefing", which
@@ -3245,12 +3266,12 @@ function renderIdeas(){
       } else setIconLabel(b, 'share', `Share to ${sp.name}`);
       b.addEventListener('click', () => {
         if (shared){
-          logEvent('note-removed', {id: 'note-' + idea.id, text: idea.raw.slice(0, 600), space: sp.hid});
+          logEvent('note-removed', {id: 'note-' + idea.id, text: noteShareText(idea.raw, true), space: sp.hid});
           idea.sharedTo = (idea.sharedTo || []).filter(h => h !== sp.hid);
           saveIdeas(); renderIdeas();
           toast(`Removed from the ${sp.name} journal — the record keeps both entries`, () => openHistory(sp), 'View');
         } else {
-          logEvent('note', {id: 'note-' + idea.id, text: idea.raw.slice(0, 600), space: sp.hid});
+          logEvent('note', {id: 'note-' + idea.id, text: noteShareText(idea.raw), space: sp.hid});
           idea.sharedTo = [...(idea.sharedTo || []), sp.hid];
           saveIdeas(); renderIdeas();
           toast(`Shared to the ${sp.name} journal`, () => openHistory(sp), 'View');
@@ -3313,6 +3334,8 @@ let easyOnly = false;      // easy-wins filter: only low-energy tasks
 let activeSpace = 'all';   // 'all' | 'personal' | space hid
 
 function inActiveSpace(td){
+  // v91: an archived space's tasks rest with it — out of every daily view
+  if (td.space && spacesAll().some(s => s.hid === td.space && s.archived)) return false;
   if (activeSpace === 'all') return true;
   if (activeSpace === 'personal') return (td.space || null) === null;
   return td.space === activeSpace;
@@ -4200,10 +4223,13 @@ async function quickAdd(){
                      : (parseTaskDate(text) || todayStr());
   const energy = detectEnergy(text);
   const tags = detectTags(text);
+  const amt = parseAmount(text);   // v91: "$38 school photos" typed in is an expense too
   todos.push({id: uid(), text, priority: detectPriority(text), tags, done:false,
     date, recur, time: parseTaskTime(text), energy, minutes: ENERGY_MIN[energy], space: spaceForTask,
+    ...(amt ? {amount: amt, expenseBy: myName() || null, expenseAt: Date.now()} : {}),
     ideaId:null, createdBy: myName() || null, createdAt: Date.now()});
   logEvent('created', todos[todos.length - 1]);
+  if (amt && spaceForTask) syncReceipt(todos[todos.length - 1]);
   saveTodos(); inp.value=''; renderTodos();
   // Always confirm, and warn if a live filter would hide the task just added —
   // otherwise it looks like nothing happened (silent no-op).
@@ -4632,7 +4658,12 @@ const spaceRt = {};    // hid → {db, unsub, lastPush: {id → serialized core}
 
 // icon-set names per space type (rendered via setIconLabel / ic-* classes)
 const SPACE_ICON = {family: 'users', coparenting: 'handshake', care: 'heart', circle: 'spark'};
-const spacesList = () => store.get('spaces', []);
+const spacesAll = () => store.get('spaces', []);
+// v91 (persona study #14): archived spaces leave the daily UI everywhere this
+// list feeds — capture chips, filters, reports, banners, sync — but stay on
+// the device read-only under Settings → Spaces. Care seasons END; recovery
+// should feel like graduation, not deletion.
+const spacesList = () => spacesAll().filter(s => !s.archived);
 const spaceName = (hid) => { const sp = spacesList().find(s => s.hid === hid); return sp ? sp.name : null; };
 
 // per-space member lists (synced on the household doc); fall back to the global
@@ -4675,6 +4706,17 @@ function syncLegacyMirror(){
    space, pushed to that space's append-only `events` subcollection so every
    member sees the same history. Deletes leave tombstone events even though
    the task list tidies. */
+// v91 (persona study #4): a shared note must never SILENTLY diverge from the
+// local copy — a clinically dense GP-review note used to lose its tail at 600
+// chars with nobody told. Generous cap; an honest toast on the rare hit.
+const NOTE_CAP = 2000;
+function noteShareText(raw, quiet){
+  raw = String(raw || '');
+  if (raw.length > NOTE_CAP && !quiet)
+    toast(`Long note — the first ${NOTE_CAP} characters were shared; the full text stays in your Notes.`);
+  return raw.slice(0, NOTE_CAP);
+}
+
 function logEvent(kind, td, detail, whoOverride){
   // whoOverride lets system-generated events (e.g. a nightly rollover marking a
   // dose missed) record who: null instead of falsely stamping whoever's device
@@ -4736,7 +4778,8 @@ const EVENT_LABEL = {created: 'added', edited: 'edited', ticked: 'ticked off',
   'session-end': 'ended a support session',
   incident: 'reported an incident',
   'prn-gap': 'updated the PRN gap:',
-  split: 'changed the cost split:'};
+  split: 'changed the cost split:',
+  archived: 'closed the space:', unarchived: 'reopened the space:'};
 
 /* ---------- support session brackets (v79 — Cooee Phase 2) ----------
    A generic bracket record: paired session-start / session-end events sharing
@@ -4832,9 +4875,11 @@ function syncMsg(text){
   if (el) el.textContent = text;
 }
 function refreshSyncUI(){
-  const spaces = spacesList();
-  document.getElementById('syncSetup').style.display = spaces.length ? 'none' : '';
-  document.getElementById('syncActive').style.display = spaces.length ? '' : 'none';
+  const active = spacesList(), all = spacesAll();
+  // v91: someone whose ONLY space is archived still needs the Spaces section —
+  // that row is their door back to the record (and out of it)
+  document.getElementById('syncSetup').style.display = active.length ? 'none' : '';
+  document.getElementById('syncActive').style.display = all.length ? '' : 'none';
   renderSpacesList();
 }
 
@@ -4892,7 +4937,7 @@ function isSignedIn(){ return !!managedUid && !accountAnon && !!accountEmail; }
 // self-hosted config, which already travels in invite codes)
 async function syncUserSpaces(){
   if (!managedUid || !fbFs || !fbFs.setDoc) return;
-  const spaces = spacesList().map(s => ({hid: s.hid, name: s.name, type: s.type, managed: !!s.managed, cfg: s.cfg || null}));
+  const spaces = spacesAll().map(s => ({hid: s.hid, name: s.name, type: s.type, managed: !!s.managed, cfg: s.cfg || null, archived: !!s.archived}));
   try { await fbFs.setDoc(fbFs.doc(managedDb, 'users', managedUid), {spaces, updated: Date.now()}, {merge: true}); } catch (_) {}
 }
 async function restoreUserSpaces(){
@@ -4904,7 +4949,7 @@ async function restoreUserSpaces(){
   let added = 0;
   for (const s of d.spaces){
     if (!spacesList().some(x => x.hid === s.hid)){
-      await addSpace({hid: s.hid, name: s.name, type: s.type, cfg: s.cfg || null, managed: !!s.managed});
+      await addSpace({hid: s.hid, name: s.name, type: s.type, cfg: s.cfg || null, managed: !!s.managed, ...(s.archived ? {archived: true} : {})});
       added++;
     }
   }
@@ -5285,7 +5330,7 @@ function inviteDecode(code){
 }
 
 async function addSpace(sp){
-  const spaces = spacesList();
+  const spaces = spacesAll();
   if (spaces.some(s => s.hid === sp.hid)){ toast('Already a member of that space.'); return false; }
   spaces.push(sp);
   store.set('spaces', spaces);
@@ -5306,7 +5351,7 @@ function leaveSpace(hid){
   const rt = spaceRt[hid];
   if (rt && rt.unsub) rt.unsub();
   delete spaceRt[hid];
-  store.set('spaces', spacesList().filter(s => s.hid !== hid));
+  store.set('spaces', spacesAll().filter(s => s.hid !== hid));
   todos.forEach(td => { if (td.space === hid) td.space = null; });   // keep them, personal now
   store.set('todos', todos);
   if (activeSpace === hid) activeSpace = 'all';
@@ -6766,17 +6811,88 @@ async function editSpaceMembers(sp){
   toast(list.length ? `${sp.name} members: ${list.join(', ')}` : `${sp.name} uses your global member list`);
 }
 
+/* ---------- space lifecycle (v91 — persona study #14) ----------
+   Rehab windows close, placements move on, someone dies. Archiving ends the
+   season with dignity: the record stays on this device, read-only, out of the
+   daily UI, and the closure itself is an append-only entry the whole space
+   can see. "Export & remove" is the foster-carer obligation — the record
+   leaves as a CSV, then leaves THIS device (other members keep theirs). */
+function setSpaceArchived(hid, archived){
+  store.set('spaces', spacesAll().map(s => s.hid === hid ? {...s, archived: !!archived} : s));
+}
+function archiveSpace(sp){
+  if (!confirm(`Archive “${sp.name}”? Its tasks and record are kept on this device, read-only — it just leaves the daily views. You can reopen it any time.`)) return;
+  // announce the closure IN the record while sync is still live
+  logEvent('archived', {id: 'arch-' + sp.hid, text: `“${sp.name}” archived — season closed`, space: sp.hid});
+  setSpaceArchived(sp.hid, true);
+  if (activeSpace === sp.hid) activeSpace = 'all';
+  refreshSyncUI(); renderTodos(); updateBadge();
+  track('feature_used', {feature: 'archive_space'});
+  toast(`“${sp.name}” archived — find it any time under Settings → Spaces.`);
+}
+function unarchiveSpace(sp){
+  setSpaceArchived(sp.hid, false);
+  logEvent('unarchived', {id: 'arch-' + sp.hid, text: `“${sp.name}” reopened`, space: sp.hid});
+  const fresh = spacesAll().find(s => s.hid === sp.hid);
+  if (fresh) startSpaceSync(fresh);
+  refreshSyncUI(); renderTodos(); updateBadge();
+  toast(`“${sp.name}” is active again.`);
+}
+async function exportAndRemoveSpace(sp){
+  const v = await askInput({title: `Remove “${sp.name}” from this device`,
+    placeholder: sp.name,
+    hint: 'The full record downloads as a CSV first, then the space, its tasks and its local history are removed from THIS device only — other members keep their copies. Type the space name to confirm.'});
+  if (v === null) return;
+  if (v.trim().toLowerCase() !== sp.name.trim().toLowerCase()){ toast('The name didn’t match — nothing was removed.'); return; }
+  const evs = store.get('events', []).filter(e => e.space === sp.hid);
+  const blob = new Blob([auditCsv(evs, sp.name)], {type: 'text/csv'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = sp.name.replace(/\W+/g, '-').toLowerCase() + '-record.csv';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  const rt = spaceRt[sp.hid];
+  if (rt && rt.unsub) rt.unsub();
+  delete spaceRt[sp.hid];
+  todos = todos.filter(t => t.space !== sp.hid); saveTodos();
+  store.set('events', store.get('events', []).filter(e => e.space !== sp.hid));
+  store.set('spaces', spacesAll().filter(s => s.hid !== sp.hid));
+  refreshSyncUI(); renderTodos(); updateBadge();
+  toast(`“${sp.name}” exported and removed from this device.`);
+}
+
 function renderSpacesList(){
   const el = document.getElementById('spacesList');
   if (!el) return;
   el.innerHTML = '';
-  spacesList().forEach((sp, i) => {
+  spacesAll().forEach((sp, i) => {
     const row = document.createElement('div');
     row.className = 'space-row';
     const label = document.createElement('div');
     label.className = 'space-label';
-    setIconLabel(label, SPACE_ICON[sp.type] || 'users', sp.name);
+    setIconLabel(label, SPACE_ICON[sp.type] || 'users', sp.name + (sp.archived ? ' (archived)' : ''));
     row.appendChild(label);
+    if (sp.archived){
+      // v91: the closed season — read the record, reopen it, or export & go
+      row.style.opacity = '.75';
+      const hist = document.createElement('button');
+      hist.className = 'btn ghost';
+      setIconLabel(hist, 'scroll', 'History & export');
+      hist.addEventListener('click', () => openHistory(sp));
+      row.appendChild(hist);
+      const re = document.createElement('button');
+      re.className = 'btn ghost unarchive-btn';
+      setIconLabel(re, 'refresh', 'Reopen');
+      re.addEventListener('click', () => unarchiveSpace(sp));
+      row.appendChild(re);
+      const rm = document.createElement('button');
+      rm.className = 'btn ghost remove-space-btn';
+      setIconLabel(rm, 'download', 'Export & remove');
+      rm.addEventListener('click', () => exportAndRemoveSpace(sp));
+      row.appendChild(rm);
+      el.appendChild(row);
+      return;
+    }
     const share = document.createElement('button');
     share.className = 'btn primary';
     if (i === 0) share.id = 'shareInviteBtn';
@@ -6812,6 +6928,12 @@ function renderSpacesList(){
       prof.addEventListener('click', () => openProfile(sp));
       row.appendChild(prof);
     }
+    const arch = document.createElement('button');
+    arch.className = 'btn ghost archive-btn';
+    setIconLabel(arch, 'scroll', 'Archive');
+    arch.title = 'Close the season — keep the record, leave the daily views';
+    arch.addEventListener('click', () => archiveSpace(sp));
+    row.appendChild(arch);
     const leave = document.createElement('button');
     leave.className = 'btn ghost';
     if (i === 0) leave.id = 'leaveHhBtn';
@@ -6928,7 +7050,7 @@ async function setCircleOwner(mode){
   sp.circle = {participant, mode,
     nominee: mode === 'nominee' ? (myName() || null) : null,
     setAt: Date.now(), setBy: myName() || null};
-  store.set('spaces', spacesList().map(s => s.hid === sp.hid ? sp : s));
+  store.set('spaces', spacesAll().map(s => s.hid === sp.hid ? sp : s));
   // TODO Phase 1c: persist onto the household doc alongside roles, guarded by rules
   logEvent('circle-owner', {id: 'circle-owner-' + Date.now().toString(36),
     text: mode === 'nominee'
@@ -6982,7 +7104,7 @@ document.getElementById('incSave').addEventListener('click', () => {
     who ? 'present: ' + who : '',
     action ? 'action taken: ' + action : 'no action recorded yet'
   ].filter(Boolean).join('; ');
-  logEvent('incident', {id: 'inc-' + uid(), text: what.slice(0, 600), space: sp.hid, vis: 'team'}, detail);
+  logEvent('incident', {id: 'inc-' + uid(), text: noteShareText(what, true), space: sp.hid, vis: 'team'}, detail);
   track('feature_used', {feature: 'incident'});
   closeIncidentSheet();
   toast('Recorded — visible to you and the circle’s owners.');
