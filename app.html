@@ -460,6 +460,9 @@
   /* setup sheet sits BELOW the sheets its steps open, so custody/profile/meds
      stack on top and reveal the checklist again when closed */
   #setupSheet{z-index:58;}
+  /* v90: the generic input sheet can be launched from INSIDE the ledger (split
+     ratio), history or a report — it must stack above all of them */
+  #inputSheet{z-index:72;}
   /* v44: structured medication / routine capture */
   .med-lab{display:block; font-size:.78rem; color:var(--muted); margin:8px 0 3px;}
   .med-inp{width:100%; background:var(--bg); border:1px solid var(--border); border-radius:9px;
@@ -738,7 +741,7 @@
       <input type="file" id="importFile" accept=".json,application/json" style="display:none">
       <button class="btn ghost" id="wipeBtn">Delete all data</button>
     </div>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v89<br><span id="envInfo"></span></p>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v90<br><span id="envInfo"></span></p>
   </section>
 </main>
 
@@ -1289,6 +1292,29 @@ function setDone(td, done, silent){
   }
   store.set('winsLog', log);
   if (!silent) logEvent(done ? 'ticked' : 'unticked', td);
+  // v90 (persona study #12): sub-daily rhythm — ticking "Feed Ivy every three
+  // hours" records the tick, then respawns the NEXT slot N hours on (rolling
+  // to tomorrow past midnight). The day carries the whole rhythm; the tick
+  // history is the feed log. No alarms promised — the time chip is the guide.
+  if (done && !silent && td.recur && td.recur.type === 'hours'){
+    const every = td.recur.every || 3;
+    setTimeout(() => {
+      if (!td.done) return;                       // unticked in the meantime — let it be
+      setDone(td, false, true);                   // respawn, not a real un-tick
+      if (td.time){
+        const hm = td.time.split(':').map(Number);
+        const next = hm[0] * 60 + hm[1] + every * 60;
+        td.time = String(Math.floor(next / 60) % 24).padStart(2, '0') + ':' + String(next % 60).padStart(2, '0');
+        if (next >= 24 * 60) td.date = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+      } else {
+        const n = new Date(Date.now() + every * 3600000);
+        td.time = String(n.getHours()).padStart(2, '0') + ':' + String(n.getMinutes()).padStart(2, '0');
+        if (n.getDate() !== new Date().getDate()) td.date = n.toISOString().slice(0, 10);
+      }
+      saveTodos(); renderTodos(); updateBadge();
+      toast(`Logged — next ${td.text.length > 30 ? 'one' : '“' + td.text + '”'} at ${fmtTime(td.time)}`);
+    }, 1400);
+  }
 }
 
 function fmtWhen(ts, always){
@@ -1438,23 +1464,59 @@ function fmtTime(hhmm){
   return h12 + (m ? ':' + String(m).padStart(2, '0') : '') + ap;
 }
 
-/* ---------- recurrence ---------- */
-// td.recur: {type:'daily'} | {type:'weekly', dow:[0-6]} | {type:'monthly', day:N}
+/* ---------- recurrence ----------
+   td.recur: {type:'daily'} | {type:'weekly', dow:[0-6]} | {type:'monthly', day:N}
+   v90 (persona study #12) — real bodies don't run on office rhythms:
+   | {type:'fortnightly', dow:0-6, anchor:'YYYY-MM-DD'}   FIFO swings, pay
+   |   cycles, injections ("every second Thursday")
+   | {type:'months', every:N, day:D, anchorMonth:y*12+m}  quarterly skin
+   |   checks, worming, seasonal jobs ("every three months")
+   | {type:'hours', every:N}                              newborn feeds, sub-
+   |   daily meds ("every three hours") — due daily; ticking respawns the next
+   |   slot N hours on, so the day holds the whole rhythm without alarms */
+const SMALL_NUMS = {one:1, two:2, second:2, other:2, three:3, four:4, five:5, six:6, eight:8, twelve:12};
+const numWord = (s) => /^\d+$/.test(s) ? parseInt(s, 10) : SMALL_NUMS[s] || null;
 function parseRecur(text){
   const t = ' ' + String(text).toLowerCase() + ' ';
+  // sub-daily first: "every three hours", "every 4 hours", "hourly"
+  let m = t.match(/\bevery (\d{1,2}|one|two|other|second|three|four|six|eight|twelve) ?hours?\b/) ||
+          (/\bhourly\b/.test(t) ? [null, '1'] : null) ||
+          (/\bevery hour\b/.test(t) ? [null, '1'] : null);
+  if (m){ const n = numWord(m[1]); if (n && n >= 1 && n <= 12) return {type: 'hours', every: n}; }
+  // fortnights: "every second Thursday", "every other week", "fortnightly"
+  m = t.match(/\bevery (?:second|other) (sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b/);
+  if (m){
+    const dow = WEEKDAYS.indexOf(m[1]);
+    return {type: 'fortnightly', dow, anchor: nextOccurrence({type: 'weekly', dow: [dow]}, todayStr())};
+  }
+  if (/\b(every fortnight|fortnightly|every (?:second|other) week)\b/.test(t)){
+    const dow = new Date().getUTCDay();
+    return {type: 'fortnightly', dow, anchor: nextOccurrence({type: 'weekly', dow: [dow]}, todayStr())};
+  }
   if (/\b(every (day|morning|night|evening|afternoon)|daily|each day)\b/.test(t)) return {type: 'daily'};
   const w = t.match(/\bevery (sunday|monday|tuesday|wednesday|thursday|friday|saturday)s?\b/) ||
             t.match(/\bon (sunday|monday|tuesday|wednesday|thursday|friday|saturday)s\b/);
   if (w) return {type: 'weekly', dow: [WEEKDAYS.indexOf(w[1])]};
   if (/\b(every week|weekly)\b/.test(t)) return {type: 'weekly', dow: [new Date().getUTCDay()]};
-  const m = t.match(/\b(\d{1,2})(?:st|nd|rd|th)? of (?:every|each) month\b/) ||
-            t.match(/\bevery month on the (\d{1,2})(?:st|nd|rd|th)\b/);
+  // month multiples: "every three months", "quarterly", "every second month"
+  m = t.match(/\bevery (\d{1,2}|two|other|second|three|four|six) months?\b/) ||
+      (/\bquarterly\b/.test(t) ? [null, '3'] : null);
+  if (m){
+    const n = numWord(m[1]);
+    if (n && n >= 2 && n <= 12){
+      const now = new Date();
+      return {type: 'months', every: n, day: now.getUTCDate(), anchorMonth: now.getUTCFullYear() * 12 + now.getUTCMonth()};
+    }
+  }
+  m = t.match(/\b(\d{1,2})(?:st|nd|rd|th)? of (?:every|each) month\b/) ||
+      t.match(/\bevery month on the (\d{1,2})(?:st|nd|rd|th)\b/);
   if (m) return {type: 'monthly', day: parseInt(m[1], 10)};
   if (/\b(every month|monthly)\b/.test(t)) return {type: 'monthly', day: new Date().getUTCDate()};
   return null;
 }
 
-// Compact form used in the AI prompt/response: "daily" | "weekly:tue,fri" | "monthly:14"
+// Compact form used in the AI prompt/response: "daily" | "weekly:tue,fri" |
+// "monthly:14" — v90 adds "fortnightly:thu" | "months:3" | "hours:3"
 function parseRecurCode(s){
   s = String(s || '').toLowerCase().trim();
   if (!s || s === 'null' || s === 'none') return null;
@@ -1467,16 +1529,48 @@ function parseRecurCode(s){
   }
   m = s.match(/^monthly:(\d{1,2})$/);
   if (m && +m[1] >= 1 && +m[1] <= 31) return {type: 'monthly', day: +m[1]};
+  m = s.match(/^fortnightly:([a-z]+)$/);
+  if (m){
+    const dow = WEEKDAYS.findIndex(w => w.startsWith(m[1].slice(0, 3)));
+    if (dow >= 0) return {type: 'fortnightly', dow, anchor: nextOccurrence({type: 'weekly', dow: [dow]}, todayStr())};
+  }
+  m = s.match(/^months:(\d{1,2})$/);
+  if (m && +m[1] >= 2 && +m[1] <= 12){
+    const now = new Date();
+    return {type: 'months', every: +m[1], day: now.getUTCDate(), anchorMonth: now.getUTCFullYear() * 12 + now.getUTCMonth()};
+  }
+  m = s.match(/^hours:(\d{1,2})$/);
+  if (m && +m[1] >= 1 && +m[1] <= 12) return {type: 'hours', every: +m[1]};
   return null;
 }
 
 function nextOccurrence(recur, from){        // smallest YYYY-MM-DD >= from matching the rule
   const start = new Date(from + 'T00:00:00Z').getTime();
+  if (recur.type === 'months'){
+    // every N months on day D, anchored to the first occurrence's month —
+    // the 62-day scan below can't see a quarter ahead
+    const f = new Date(from + 'T00:00:00Z');
+    const every = recur.every || 3;
+    const anchor = recur.anchorMonth != null ? recur.anchorMonth : f.getUTCFullYear() * 12 + f.getUTCMonth();
+    for (let k = 0; k <= every; k++){
+      const mi = f.getUTCFullYear() * 12 + f.getUTCMonth() + k;
+      if ((((mi - anchor) % every) + every) % every !== 0) continue;
+      const y = Math.floor(mi / 12), mo = mi % 12;
+      const dim = new Date(Date.UTC(y, mo + 1, 0)).getUTCDate();   // clamp "the 31st" in short months
+      const d = new Date(Date.UTC(y, mo, Math.min(recur.day || 1, dim)));
+      if (d.getTime() >= start) return d.toISOString().slice(0, 10);
+    }
+    return from;
+  }
   for (let i = 0; i < 62; i++){
     const d = new Date(start + i * 86400000);
     const ds = d.toISOString().slice(0, 10);
-    if (recur.type === 'daily') return ds;
+    if (recur.type === 'daily' || recur.type === 'hours') return ds;
     if (recur.type === 'weekly' && (recur.dow || []).includes(d.getUTCDay())) return ds;
+    if (recur.type === 'fortnightly'){
+      const a = new Date((recur.anchor || from) + 'T00:00:00Z').getTime();
+      if (((Math.round((d.getTime() - a) / 86400000) % 14) + 14) % 14 === 0) return ds;
+    }
     if (recur.type === 'monthly' && d.getUTCDate() === recur.day) return ds;
   }
   return from;
@@ -1485,7 +1579,10 @@ function nextOccurrence(recur, from){        // smallest YYYY-MM-DD >= from matc
 function recurLabel(recur){
   if (!recur) return '';
   if (recur.type === 'daily') return '↻ daily';
+  if (recur.type === 'hours') return '↻ every ' + recur.every + ' h';
   if (recur.type === 'weekly') return '↻ ' + (recur.dow || []).map(i => WEEKDAYS[i].slice(0, 3)).join(', ');
+  if (recur.type === 'fortnightly') return '↻ fortnightly (' + WEEKDAYS[recur.dow].slice(0, 3) + ')';
+  if (recur.type === 'months') return '↻ every ' + recur.every + ' months';
   return '↻ monthly (' + recur.day + ')';
 }
 
@@ -3080,7 +3177,9 @@ function renderJournal(){
     name.className = 'rname';
     setIconLabel(name, SPACE_ICON[sp.type] || 'users', sp.name);
     row.appendChild(name);
-    if (sp.type === 'coparenting'){
+    if (sp.type === 'coparenting' || sp.type === 'family'){
+      // v90 (persona study #9): the ledger is not a co-parenting exclusive —
+      // share-houses and family-run businesses split bills too
       const led = document.createElement('button');
       led.className = 'btn ghost';
       setIconLabel(led, 'dollar', 'Ledger');
@@ -4636,7 +4735,8 @@ const EVENT_LABEL = {created: 'added', edited: 'edited', ticked: 'ticked off',
   'session-start': 'started a support session',
   'session-end': 'ended a support session',
   incident: 'reported an incident',
-  'prn-gap': 'updated the PRN gap:'};
+  'prn-gap': 'updated the PRN gap:',
+  split: 'changed the cost split:'};
 
 /* ---------- support session brackets (v79 — Cooee Phase 2) ----------
    A generic bracket record: paired session-start / session-end events sharing
@@ -5036,6 +5136,7 @@ async function startSpaceSync(sp){
       if (!d) return;
       if (d.custody){ setLocalCustody(sp.hid, d.custody); }
       if (typeof d.prnGap === 'number' && d.prnGap > 0){ const pm = store.get('prnGap', {}); pm[sp.hid] = d.prnGap; store.set('prnGap', pm); }
+      if (d.split && typeof d.split === 'object'){ const sm = store.get('splitRatio', {}); sm[sp.hid] = d.split; store.set('splitRatio', sm); }
       if (d.profile){ setLocalProfile(sp.hid, d.profile); }
       if (Array.isArray(d.memberNames)){ setSpaceMembers(sp.hid, d.memberNames); }
       if (Array.isArray(d.planGoals)){ setPlanGoals(sp.hid, d.planGoals); }   // v80
@@ -5755,6 +5856,21 @@ function weekReflectionHtml(){
     (openList.length > 10 ? `<p style="font-size:12px;color:#555;margin-top:6px;">…and ${openList.length - 10} more, waiting on Today.</p>` : '');
 }
 
+// v90 (persona study #9): family-type spaces split money too — share-houses,
+// family businesses, plain households. Same ledger, same N-way settlement.
+function famExpSec(sp, now){
+  const period = 28 * 86400000;
+  const exp = todos.filter(t => t.space === sp.hid && t.amount && (t.expenseAt || 0) >= now - period);
+  if (!exp.length) return '';
+  const lb = ledgerBalances(exp.map(t => ({who: t.expenseBy, amount: t.amount})), sp.hid);
+  return repSec('Expenses — last 4 weeks',
+    [`Total logged: <b>$${lb.total.toFixed(2)}</b> across ${exp.length} item${exp.length === 1 ? '' : 's'}` +
+      (lb.split ? repMeta('split ' + repEsc(splitDesc(lb.split))) : repMeta('split equally'))]
+      .concat(exp.slice().sort((a, b) => (b.expenseAt || 0) - (a.expenseAt || 0)).slice(0, 10).map(t =>
+        repEsc(t.text) + ` — $${t.amount.toFixed(2)}` + repMeta(`paid by ${repEsc(capName(t.expenseBy) || 'unattributed')} · ${repWhen(t.expenseAt)}`)))
+      .concat(lb.settle.map(s => `${repEsc(s.from)} owes ${repEsc(s.to)} <b>$${s.amount.toFixed(2)}</b>`)));
+}
+
 function familyReportHtml(sp){
   const now = Date.now(), wk = 7 * 86400000;
   const inSp = t => t.space === sp.hid;
@@ -5775,6 +5891,7 @@ function familyReportHtml(sp){
       repEsc(t.text) + repMeta(`${repEsc(capName(t.doneBy) || 'someone')} · ${repWhen(t.doneAt)}`))) +
     repSec('Who added what', Object.entries(added).sort((a, b) => b[1] - a[1]).map(([w, n]) => `${repEsc(w)} added ${n}`)) +
     repSec('Notes this week', repNotes(evs, 8)) +
+    famExpSec(sp, now) +
     repSec('Coming up', upcoming) +
     repSec('Still open', open.filter(t => !t.date || t.date <= todayStr()).slice(0, 10).map(t =>
       repEsc(t.text) + ((t.assignees || []).length ? repMeta('for ' + repEsc(t.assignees.map(capName).join(', '))) : '')));
@@ -5787,18 +5904,16 @@ function coparentReportHtml(sp){
   const per = {};
   done.forEach(t => { const w = capName(t.doneBy) || 'unattributed'; per[w] = (per[w] || 0) + 1; });
   const exp = todos.filter(t => inSp(t) && t.amount && (t.expenseAt || 0) >= now - period);
+  // v90 (persona study #8): the balance is N-way and honours the space's
+  // configured split — three payers get settlement lines too, and an 80/20
+  // reality is never silently printed as 50/50 arithmetic
+  const lb = ledgerBalances(exp.map(t => ({who: t.expenseBy, amount: t.amount})), sp.hid);
+  const total = lb.total;
   const paid = {};
-  let total = 0;
-  exp.forEach(t => { const w = capName(t.expenseBy) || 'unattributed'; paid[w] = (paid[w] || 0) + t.amount; total += t.amount; });
-  const names = Object.keys(paid);
-  let balance = '';
-  if (names.length === 2){
-    const [a, b] = names;
-    const diff = (paid[a] - paid[b]) / 2;
-    if (Math.abs(diff) >= 0.01)
-      balance = `${repEsc(diff > 0 ? b : a)} owes ${repEsc(diff > 0 ? a : b)} <b>$${Math.abs(diff).toFixed(2)}</b> to even the period up`;
-    else balance = 'Spending is even for the period';
-  }
+  lb.balances.forEach(b => { if (b.paid > 0) paid[b.who] = b.paid; });
+  const balanceLines = lb.settle.length
+    ? lb.settle.map(s => `${repEsc(s.from)} owes ${repEsc(s.to)} <b>$${s.amount.toFixed(2)}</b> to even the period up`)
+    : (exp.length ? ['Spending is even for the period'] : []);
   const evs = store.get('events', []).filter(e => e.space === sp.hid && e.ts >= now - period);
   const open = todos.filter(t => inSp(t) && !t.done && !t.someday).length;
   return repHead(sp.name + ' — records summary',
@@ -5812,9 +5927,11 @@ function coparentReportHtml(sp){
         .concat(exp.slice().sort((a, b) => (b.expenseAt || 0) - (a.expenseAt || 0)).slice(0, 15).map(t =>
           repEsc(t.text) + ` — $${t.amount.toFixed(2)}` + repMeta(`paid by ${repEsc(capName(t.expenseBy) || 'unattributed')} · ${repWhen(t.expenseAt)}`)))
         .concat(Object.entries(paid).map(([w, a]) => `${repEsc(w)} paid $${a.toFixed(2)}`))
-        .concat(balance ? [balance] : [])) : '') +
+        .concat(balanceLines)) : '') +
     repSec('Notes on the record (as written)', repNotes(evs, 10)) +
-    `<p style="font-size:11px;color:#555;margin-top:12px;">The balance line assumes a 50/50 split. The full, unedited history can be exported as CSV or PDF from the History screen.</p>`;
+    `<p style="font-size:11px;color:#555;margin-top:12px;">${lb.split
+      ? 'Balance lines use the split set in the ledger: ' + repEsc(splitDesc(lb.split)) + '.'
+      : 'Balance lines assume an equal split — a different ratio can be set in the ledger.'} The full, unedited history can be exported as CSV or PDF from the History screen.</p>`;
 }
 
 function openReflection(){
@@ -6449,6 +6566,23 @@ async function openLedger(sp){
   renderLedger();
 }
 
+/* ---------- split ratio (v90 — persona study #8) ----------
+   The balance maths used to hard-assume exactly two payers splitting 50/50.
+   Real spaces: three tri-parenting adults, five housemates, an informal 80/20.
+   A per-space ratio {nameLower: percent} is shared on the household doc; no
+   ratio = equal split across everyone (members + payers), any count. */
+function getSplit(hid){ return store.get('splitRatio', {})[hid] || null; }
+function setSplit(hid, map){
+  const m = store.get('splitRatio', {});
+  if (map && Object.keys(map).length) m[hid] = map; else delete m[hid];
+  store.set('splitRatio', m);
+  const rt = spaceRt[hid];
+  if (rt && rt.db) fbFs.setDoc(fbFs.doc(rt.db, 'households', hid), {split: map || null}, {merge: true}).catch(() => {});
+}
+const splitDesc = (split) => split
+  ? Object.entries(split).map(([k, v]) => capName(k) + ' ' + v + '%').join(' / ')
+  : null;
+
 function ledgerBalances(rcs, hid){
   // normalize payer names case-insensitively so "Sam"/"sam" aren't two people
   const disp = {}, paid = {};
@@ -6467,17 +6601,36 @@ function ledgerBalances(rcs, hid){
     if (!(key in paid)) paid[key] = 0;
     if (!(key in disp)) disp[key] = capName(n);
   });
+  const split = hid ? getSplit(hid) : null;
+  if (split) Object.keys(split).forEach(k => {
+    const key = k.toLowerCase();
+    if (!(key in paid)) paid[key] = 0;
+    if (!(key in disp)) disp[key] = capName(k);
+  });
   const keys = Object.keys(paid);
   const total = Object.values(paid).reduce((a, b) => a + b, 0);
+  // each person's share: their configured percentage, else an equal cut
+  const pctOf = k => split ? (split[k] != null ? split[k] : (split[disp[k]] != null ? split[disp[k]] : 0)) : null;
   const share = keys.length ? total / keys.length : 0;
-  const balances = keys.map(k => ({who: disp[k], paid: paid[k], net: paid[k] - share}));
-  let owes = null;
-  if (keys.length === 2){
-    const [a, b] = balances;
-    const diff = Math.abs(a.net);
-    if (diff >= 0.01) owes = {from: a.net < 0 ? a.who : b.who, to: a.net < 0 ? b.who : a.who, amount: diff};
+  const balances = keys.map(k => {
+    const owed = split ? total * (pctOf(k) || 0) / 100 : share;
+    return {who: disp[k], paid: paid[k], owed, net: paid[k] - owed};
+  });
+  // v90: N-way settlement — biggest debtor pays biggest creditor until flat.
+  // At most (people − 1) lines; works for 2 parents, 3 households, 5 flatmates.
+  const settle = [];
+  const debt = balances.filter(b => b.net < -0.005).map(b => ({who: b.who, net: b.net})).sort((a, b) => a.net - b.net);
+  const cred = balances.filter(b => b.net > 0.005).map(b => ({who: b.who, net: b.net})).sort((a, b) => b.net - a.net);
+  let i = 0, j = 0;
+  while (i < debt.length && j < cred.length){
+    const amt = Math.min(-debt[i].net, cred[j].net);
+    if (amt >= 0.01) settle.push({from: debt[i].who, to: cred[j].who, amount: amt});
+    debt[i].net += amt; cred[j].net -= amt;
+    if (debt[i].net > -0.005) i++;
+    if (cred[j].net < 0.005) j++;
   }
-  return {total, share, balances, owes};
+  const owes = settle.length === 1 ? settle[0] : null;   // legacy shape for 2-person spaces
+  return {total, share, balances, owes, settle, split};
 }
 
 function renderLedger(){
@@ -6488,21 +6641,59 @@ function renderLedger(){
     list.innerHTML = '<p class="side-note">No expenses yet — open a task → <span class="ic ic-dollar" aria-hidden="true"></span> Expense to log the first one.</p>';
     return;
   }
-  const {total, balances, owes} = ledgerBalances(ledgerRcs, ledgerSpace && ledgerSpace.hid);
+  const {total, balances, settle, split} = ledgerBalances(ledgerRcs, ledgerSpace && ledgerSpace.hid);
   const bal = document.createElement('div');
   bal.className = 'ledger-balance';
-  bal.appendChild(document.createTextNode(`Total: $${total.toFixed(2)} · split equally between ${balances.length}`));
+  bal.appendChild(document.createTextNode(`Total: $${total.toFixed(2)} · ` +
+    (split ? `split ${splitDesc(split)}` : `split equally between ${balances.length}`)));
   balances.forEach(b => {
     bal.appendChild(document.createElement('br'));
     bal.appendChild(document.createTextNode(`${b.who} paid $${b.paid.toFixed(2)}`));
   });
-  if (owes){
+  // v90: N-way settlement lines — every debtor→creditor transfer, not just a
+  // two-person diff
+  settle.forEach(s => {
     bal.appendChild(document.createElement('br'));
     const o = document.createElement('span');
     o.className = 'ledger-owes';
-    o.textContent = `→ ${owes.from} owes ${owes.to} $${owes.amount.toFixed(2)}`;
+    o.textContent = `→ ${s.from} owes ${s.to} $${s.amount.toFixed(2)}`;
     bal.appendChild(o);
-  }
+  });
+  bal.appendChild(document.createElement('br'));
+  const splitBtn = document.createElement('button');
+  splitBtn.className = 'custody-set';
+  splitBtn.textContent = split ? `edit split (${splitDesc(split)})` : 'Not an even split? Set the ratio →';
+  splitBtn.addEventListener('click', async () => {
+    const cur = getSplit(ledgerSpace.hid);
+    const v = await askInput({title: 'How are costs split?',
+      value: cur ? Object.entries(cur).map(([k, p]) => capName(k) + ' ' + p).join(', ') : '',
+      placeholder: 'e.g. Zoe 70, Jay 30',
+      hint: 'Names and percentages, adding up to 100 — any number of people. Everyone in the space sees the same split. Leave empty to go back to an equal split.'});
+    if (v === null) return;
+    if (!v.trim()){
+      setSplit(ledgerSpace.hid, null);
+      logEvent('split', {id: 'split-' + ledgerSpace.hid, text: 'Cost split set back to equal shares', space: ledgerSpace.hid});
+      renderLedger(); return;
+    }
+    const map = {};
+    let ok = true;
+    v.split(/[,;]+/).forEach(part => {
+      const m = part.trim().match(/^(.+?)\s+(\d{1,3}(?:\.\d+)?)%?$/);
+      if (!m){ ok = false; return; }
+      map[m[1].trim().toLowerCase()] = parseFloat(m[2]);
+    });
+    const sum = Object.values(map).reduce((a, b) => a + b, 0);
+    if (!ok || Object.keys(map).length < 2 || Math.abs(sum - 100) > 1){
+      toast('Use "Name percent, Name percent" adding up to 100 — e.g. Zoe 70, Jay 30.');
+      return;
+    }
+    setSplit(ledgerSpace.hid, map);
+    // whose numbers the money maths runs on belongs in the append-only record
+    logEvent('split', {id: 'split-' + ledgerSpace.hid, text: 'Cost split set to ' + splitDesc(map), space: ledgerSpace.hid});
+    track('feature_used', {feature: 'split_ratio'});
+    renderLedger();
+  });
+  bal.appendChild(splitBtn);
   totals.appendChild(bal);
   ledgerRcs.slice(0, 300).forEach(rc => {
     const l = document.createElement('div');
