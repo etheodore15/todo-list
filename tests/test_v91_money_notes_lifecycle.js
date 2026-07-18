@@ -47,6 +47,14 @@ const { chromium } = require('playwright');
   check('#7 the captured task carries the expense', photo && photo.amount === 38 && photo.expenseBy === 'Beth',
     JSON.stringify(photo && {amount: photo.amount, by: photo.expenseBy}));
   check('#7 …aimed at the space, receipt queued for the shared ledger', photo && photo.space === 'hh-pip');
+  // Kai's past-tense expense claim: "I paid $180…" must become a ledger entry
+  await A.click('nav.tabs button[data-view="capture"]');
+  await A.fill('#liveText', 'I paid $180 for the carpet cleaner everyone owes me $36');
+  await A.click('#saveIdeaBtn');
+  await settle(A);
+  const carpet = await A.evaluate(() => JSON.parse(localStorage.getItem('todos') || '[]').find(t => /carpet/i.test(t.text)));
+  check('#7 "I paid \$180…" claims become expense records', carpet && carpet.amount === 180,
+    JSON.stringify(carpet && {amount: carpet.amount}));
   await A.evaluate(() => openLedger(spacesList()[0]));
   await A.waitForTimeout(400);
   check('#7 the ledger shows it without any re-typing',
