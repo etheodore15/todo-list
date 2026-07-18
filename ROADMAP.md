@@ -151,6 +151,33 @@ personal setting independent of any space. Rationale:
 Git branches remain for development (feature branches merging to `main`),
 not product lines.
 
+## Phase L — Bilingual & multilingual support (strategic, not yet scheduled)
+
+Added July 2026 from the 44-persona study (`Market-Research/personas/`):
+three personas — a Sydney↔Manila care triangle, a Greek-speaking care
+recipient, a newly settled Somali-speaking family — showed the same shape:
+**the bilingual CARER can use the app, the non-English-speaking
+RECIPIENT-USER can't.** In Australia's care demographics that's not an edge
+case; CALD elders are the centre of the caregiving market. Today non-English
+speech extracts no tasks (correctly no phantom ones); since v85 it degrades
+gracefully into a journal note the bilingual relative can read. That fallback
+is the floor, not the product.
+
+Tiered plan — each tier is independently shippable and valuable:
+
+| # | Tier | What ships | Notes |
+|---|------|-----------|-------|
+| L1 | **Hear their language** | Set the speech-recognition language from a per-user setting (device locale as default) so on-device ASR stops mangling Greek/Vietnamese/Arabic speech; keep the v85 note-fallback as the explicit story for unextracted captures | Near-zero cost: one `lang` hint on the recognizer + a Settings row. Do this first — transcription quality is upstream of everything |
+| L2 | **Understand their language** | Route non-English captures to the AI proxy for extraction (Gemini is already multilingual; only the LOCAL extractor is English-only) with an explicit language hint; extraction quality per language validated with native-speaker test scripts before enabling | Uses infra we already run (P2). Offline non-English capture stays notes-only — say so honestly in-app |
+| L3 | **Speak their language** | i18n of the surfaces the recipient-user touches daily: capture screen, Today, tick/undo toasts, onboarding. First languages chosen by AU care demographics: Greek, Italian, Vietnamese, Cantonese/Mandarin, Arabic, Tagalog, Somali | String-catalogue work; the app is one file, so extract strings behind a tiny `t()` first. Fonts/RTL (Arabic) handled here |
+| L4 | **Mixed-language households** | Per-member language; reports renderable in a chosen language (notes spoken in Tagalog → a briefing the English-speaking GP can read, and vice versa — the AI proxy translates at compose time, the record keeps the original); code-switching (Taglish) capture validated | The genuinely differentiating tier: no competitor in the family/care niche does cross-language briefings. Original text is always preserved — the record never contains only a translation |
+
+Sequencing intent: L1 is a quick win any release could carry; L2 rides the
+production AI proxy cutover; L3/L4 are post-launch bets to schedule when a
+CALD-community partner or channel (settlement services, ethnic community
+aged-care providers) makes the audience concrete. Not gating any current
+phase.
+
 ## Productization track (P) — zero-config for end users
 
 Decided July 2026 after reviewing setup friction: long-term, users must never

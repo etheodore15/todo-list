@@ -737,7 +737,7 @@
       <input type="file" id="importFile" accept=".json,application/json" style="display:none">
       <button class="btn ghost" id="wipeBtn">Delete all data</button>
     </div>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v85<br><span id="envInfo"></span></p>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v86<br><span id="envInfo"></span></p>
   </section>
 </main>
 
@@ -2567,8 +2567,20 @@ function localSummarize(text){
   // includes past/passive intent forms real speech uses: "she needed to be
   // dropped off", "had to be picked up by twelve"
   const ACTION_PHRASES = /\b(need(s|ed)? to|have to|has to|had to|must|should|remember to|don't forget|going to|gonna|want to|make sure|look into|follow up|set up|pick(ed|ing)? up|drop(ped|ping)? off|(be|get) (dropped off|picked up|taken|collected)|go to|sign up|book in|sort out|work on|put on)\b/i;
-  const ACTION_VERBS = /\b(call|ring|phone|text|message|email|buy|order|book|send|writ|finish|fix|repair|check|schedul|organis|organiz|plan|research|pay|clean|prepar|review|updat|creat|mak|build|contact|ask|cancel|renew|submit|tak|bring|grab|mov|sell|post|visit|regist|apply|install|download|print|wash|rins|brush|floss|remind|redesign|design|start|try|collect|return|deliver|water|feed|walk|arrang)(e|es|s|ed|ing)?\b/i;
-  let picked = sentences.filter(s => ACTION_PHRASES.test(s) || ACTION_VERBS.test(s));
+  const ACTION_VERBS = /\b(call|ring|phone|text|message|email|buy|order|book|send|writ|finish|fix|repair|check|schedul|organis|organiz|plan|research|pay|clean|prepar|review|updat|creat|mak|build|contact|ask|cancel|renew|submit|tak|bring|grab|mov|sell|post|visit|regist|apply|install|download|print|wash|rins|brush|floss|remind|redesign|design|start|try|collect|return|deliver|water|feed|walk|arrang|confirm|replac|hir|quot|invoic|attend|refill|chas|worm|weigh|practis|practic|mark|sign)(e|es|s|ed|ing)?\b/i;
+  // v86 (persona study, finding #1): carers, parents and patients speak
+  // ROUTINES as noun phrases — "Dad donepezil every day at 8am", "Ruby speech
+  // therapy Tuesday 10am", "shift Saturday 5 to 9". No action verb, still a
+  // task: a clause anchored by an appointment-ish noun, a clock time, or a
+  // recurrence counts. Erring toward capture is right here — a false task
+  // costs one delete; a silently dropped med routine costs the cohort.
+  const ROUTINE_NOUNS = '(?:appointments?|therapy|physio(?:therapy)?|hydro|audiology|assessments?|check(?:[ -]?ups?)?|scans?|x-?rays?|bloods?|blood tests?|reviews?|clinic|specialist|dentist|orthodontist|optometrist|doctor|dr\\b|gp\\b|vet\\b|hospital|surgery|injections?|jabs?|vaccinations?|immunisations?|needles?|meds?\\b|medications?|tablets?|pills?|doses?|puffer|inhaler|drops|insulin|antibiotics?|shifts?|lessons?|class|training|rehearsals?|carnival|excursion|formal\\b|ceremony|funeral|wedding|birthday)';
+  const ROUTINE_CUE = new RegExp('\\b' + ROUTINE_NOUNS +
+    '|\\b\\d{1,2}(?::\\d{2})?\\s*(?:am|pm)\\b|\\bat\\s+\\d{1,2}(?::\\d{2})?\\b' +
+    '|\\b(?:every|each)\\s+\\w+|\\b(?:daily|nightly|weekly|fortnightly)\\b', 'i');
+  // possessive need without "to": "Sofia needs new footy boots"
+  const NEEDS_THING = /\bneeds?\b(?!\s+to\b)\s+\w/i;
+  let picked = sentences.filter(s => ACTION_PHRASES.test(s) || ACTION_VERBS.test(s) || ROUTINE_CUE.test(s) || NEEDS_THING.test(s));
   // Drop clauses narrating something ALREADY DONE ("I already emailed the
   // accountant", "cleaned the kitchen yesterday") so past-tense speech doesn't
   // create open to-dos. Explicit future intent (ACTION_PHRASES) overrides.
@@ -2578,8 +2590,17 @@ function localSummarize(text){
   const INTENT = /\b(need(s|ed)? to|have to|has to|had to|must|should|remember to|don't forget|going to|gonna|want to|make sure|(be|get) (dropped off|picked up|taken|collected))\b/i;
   picked = picked.filter(s => INTENT.test(s) || !DONE_MARKER.test(s));
   // split compound actions: "...put on my pajamas and brush my teeth and rinse..."
-  const AND_ACTION = /\s+and\s+(?=(?:also\s+|then\s+|maybe\s+)?(?:make sure|put on|pick(?:ed|ing)? up|drop(?:ped|ping)? off|(?:had|needed?) to|(?:be|get) (?:dropped off|picked up)|go to|sign up|set up|call|ring|phone|text|message|email|buy|order|book|send|write|finish|fix|repair|check|schedule|organis\w*|organiz\w*|plan|research|pay|clean|prepare|review|update|create|make|build|contact|ask|cancel|renew|submit|take|bring|grab|move|sell|post|visit|register|apply|install|download|print|wash|rinse|brush|floss|start|try|collect|return|deliver|water|feed|walk|arrange)\b)/i;
+  const AND_ACTION = /\s+and\s+(?=(?:also\s+|then\s+|maybe\s+)?(?:make sure|put on|pick(?:ed|ing)? up|drop(?:ped|ping)? off|(?:had|needed?) to|(?:be|get) (?:dropped off|picked up)|go to|sign up|set up|call|ring|phone|text|message|email|buy|order|book|send|write|finish|fix|repair|check|schedule|organis\w*|organiz\w*|plan|research|pay|clean|prepare|review|update|create|make|build|contact|ask|cancel|renew|submit|take|bring|grab|move|sell|post|visit|register|apply|install|download|print|wash|rinse|brush|floss|start|try|collect|return|deliver|water|feed|walk|arrange|confirm|replace|hire|quote|invoice|attend|refill|chase|worm|weigh|practise|practice|mark|sign)\b)/i;
   picked = picked.flatMap(s => s.split(AND_ACTION));
+  // v86: also split before a routine noun-phrase or a "<who> needs/has" clause
+  // ("…and Diego has a dentist appointment Thursday", "…and Ayaan audiology
+  // Thursday", "…and someone needs to fix the flyscreen")
+  const AND_ROUTINE = new RegExp("\\s+and\\s+(?=(?:[\\w’']+\\s+){0,3}\\b" + ROUTINE_NOUNS +
+    "|(?:[\\w’']+\\s+){0,2}(?:needs?|has)\\b)", 'i');
+  picked = picked.flatMap(s => s.split(AND_ROUTINE))
+    // a fragment must still look like a task on its own — keeps an eager
+    // "and it has…" split from minting junk
+    .filter(s => ACTION_PHRASES.test(s) || ACTION_VERBS.test(s) || ROUTINE_CUE.test(s) || NEEDS_THING.test(s));
   const tasks = picked.slice(0,6).map(t => {
     const priority = detectPriority(t);
     const recur = parseRecur(t);
