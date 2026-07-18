@@ -738,7 +738,7 @@
       <input type="file" id="importFile" accept=".json,application/json" style="display:none">
       <button class="btn ghost" id="wipeBtn">Delete all data</button>
     </div>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v88<br><span id="envInfo"></span></p>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v89<br><span id="envInfo"></span></p>
   </section>
 </main>
 
@@ -2944,7 +2944,11 @@ function noteSpace(){
 let captureDest;   // undefined = auto (follow Today's space filter); null = private; hid = that space
 function captureDestVal(){
   if (captureDest && !spacesList().some(s => s.hid === captureDest)) captureDest = undefined;   // space left/deleted
-  return captureDest === undefined ? newTaskSpace() : captureDest;
+  const v = captureDest === undefined ? newTaskSpace() : captureDest;
+  // v89: defense in depth — a read-only space is never the effective
+  // destination, whatever path set it
+  const sp = spacesList().find(s => s.hid === v);
+  return v && !canWriteSpace(sp) ? null : v;
 }
 function renderDestChips(){
   const row = document.getElementById('destRow');
@@ -2965,7 +2969,24 @@ function renderDestChips(){
     host.appendChild(b);
   };
   mk('Private', null, 'lock');
-  spaces.forEach(sp => mk(sp.name, sp.hid, SPACE_ICON[sp.type] || 'users'));
+  spaces.forEach(sp => {
+    if (!canWriteSpace(sp)){
+      // v89: show WHY the read-only space can't be a destination instead of
+      // hiding it — to someone who sees the space everywhere else, a missing
+      // chip reads as a bug; a chip that explains reads as a rule
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'fchip';
+      b.style.opacity = '.55';
+      b.setAttribute('aria-disabled', 'true');
+      setIconLabel(b, 'lock', sp.name);
+      b.addEventListener('click', () =>
+        toast(`You follow “${sp.name}” as a viewer — you can read everything there, but only members with a writing role can add to it.`));
+      host.appendChild(b);
+      return;
+    }
+    mk(sp.name, sp.hid, SPACE_ICON[sp.type] || 'users');
+  });
 }
 
 function refreshCaptureMode(){
@@ -3199,10 +3220,20 @@ function inActiveSpace(td){
 }
 
 // the space a NEW task lands in: the one being viewed, else the default
+// v89 (persona study #6): a read-only role must never be offered a writable-
+// looking destination. A viewer's "shared" task would exist only on their own
+// device — the rules reject the sync — so they'd believe the circle saw
+// something it never did. One test, used EVERYWHERE a task can be aimed at a
+// space (capture chips, capture default, quick-add, move-between-spaces).
+function canWriteSpace(sp){ return !!sp && !(sp.type === 'circle' && (sp.role || '') === 'viewer'); }
+
 function newTaskSpace(){
   if (activeSpace === 'personal') return null;
-  if (activeSpace !== 'all') return activeSpace;
-  return store.get('defaultSpace', null) || null;
+  const pick = activeSpace !== 'all' ? activeSpace : (store.get('defaultSpace', null) || null);
+  const sp = spacesList().find(s => s.hid === pick);
+  // viewing a read-only space is fine; ADDING to it from that view is not —
+  // the capture quietly stays private instead of phantom-sharing
+  return canWriteSpace(sp) ? pick : null;
 }
 
 function renderSpaceFilter(){
@@ -4413,9 +4444,13 @@ function openScopeSheet(td){
   // with several spaces, offer to move the task between them
   const spWrap = document.getElementById('scopeSpaces');
   spWrap.innerHTML = '';
-  const spaces = spacesList();
+  // v89: a read-only space is not a move target either
+  const spaces = spacesList().filter(canWriteSpace);
   const famBtn = document.getElementById('scopeFamily');
-  famBtn.style.display = spaces.length > 1 ? 'none' : '';
+  // one writable space → the named button; legacy no-space household → the
+  // generic Family button; several writable → per-space buttons below; a
+  // viewer with ONLY read-only spaces gets no share target at all
+  famBtn.style.display = (spaces.length === 1 || !spacesList().length) ? '' : 'none';
   // v74: name the actual space — "Family" read wrong on a care or co-parenting space
   if (spaces.length === 1)
     setIconLabel(famBtn, SPACE_ICON[spaces[0].type] || 'users', `Everyone in “${spaces[0].name}”`);
