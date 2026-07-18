@@ -737,7 +737,7 @@
       <input type="file" id="importFile" accept=".json,application/json" style="display:none">
       <button class="btn ghost" id="wipeBtn">Delete all data</button>
     </div>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v86<br><span id="envInfo"></span></p>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v87<br><span id="envInfo"></span></p>
   </section>
 </main>
 
@@ -1379,14 +1379,15 @@ function fmtDay(dateStr){
 
 /* ---------- time of day (C2b) ---------- */
 // "give mum her ramipril at 8am" → "08:00"; null when no time is spoken
-function parseTaskTime(text){
+// normalize spoken time forms — voice transcripts spell hours out: "nine AM",
+// "half past nine", "twelve o'clock" (shared by parseTaskTime + allTaskTimes)
+function normSpokenTimes(text){
   let t = String(text).toLowerCase();
-  // voice transcripts spell hours out: "nine AM", "half past nine", "twelve o'clock"
   const HOUR_WORDS = {one:1, two:2, three:3, four:4, five:5, six:6, seven:7,
     eight:8, nine:9, ten:10, eleven:11, twelve:12};
   t = t.replace(/\b(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\b(?=\s*(?:am|pm|a\.m|p\.m|o'?clock|thirty|fifteen|forty[- ]?five|:))/g,
     w => HOUR_WORDS[w]);
-  t = t.replace(/\b(?:midday|noon)\b/g, '12 pm').replace(/\bmidnight\b/g, '12 am')
+  return t.replace(/\b(?:midday|noon)\b/g, '12 pm').replace(/\bmidnight\b/g, '12 am')
        .replace(/\ba\.m\.?\b/g, 'am').replace(/\bp\.m\.?\b/g, 'pm')
        .replace(/\bo'?clock\b/g, '')
        .replace(/\bhalf past (\d{1,2})\b/g, '$1:30')
@@ -1395,6 +1396,9 @@ function parseTaskTime(text){
        .replace(/\b(\d{1,2}) thirty\b/g, '$1:30')
        .replace(/\b(\d{1,2}) fifteen\b/g, '$1:15')
        .replace(/\b(\d{1,2}) forty[- ]?five\b/g, '$1:45');
+}
+function parseTaskTime(text){
+  const t = normSpokenTimes(text);
   const m = t.match(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/) ||
             t.match(/\b(?:at|by|before|around|until|till|from)\s+(\d{1,2})(?::(\d{2}))?\b/);
   if (!m) return null;
@@ -1404,6 +1408,26 @@ function parseTaskTime(text){
   if (m[3] === 'pm' && h < 12) h += 12;
   if (m[3] === 'am' && h === 12) h = 0;
   return String(h).padStart(2, '0') + ':' + String(min).padStart(2, '0');
+}
+// v87 (persona study #2): EVERY am/pm-marked time in the text, in spoken
+// order — "levodopa at 7am 1pm and 7pm" → ['07:00','13:00','19:00']. Only
+// unambiguous (am/pm-marked) times count; bare "at 7 and 1" stays single via
+// parseTaskTime. Used to fan a multi-dose routine into one task per dose.
+function allTaskTimes(text){
+  const t = normSpokenTimes(text);
+  const out = [];
+  const re = /\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/g;
+  let m;
+  while ((m = re.exec(t))){
+    let h = parseInt(m[1], 10);
+    const min = m[2] ? parseInt(m[2], 10) : 0;
+    if (h > 23 || min > 59) continue;
+    if (m[3] === 'pm' && h < 12) h += 12;
+    if (m[3] === 'am' && h === 12) h = 0;
+    const v = String(h).padStart(2, '0') + ':' + String(min).padStart(2, '0');
+    if (!out.includes(v)) out.push(v);
+  }
+  return out;
 }
 function fmtTime(hhmm){
   if (!hhmm) return '';
@@ -2601,7 +2625,10 @@ function localSummarize(text){
     // a fragment must still look like a task on its own — keeps an eager
     // "and it has…" split from minting junk
     .filter(s => ACTION_PHRASES.test(s) || ACTION_VERBS.test(s) || ROUTINE_CUE.test(s) || NEEDS_THING.test(s));
-  const tasks = picked.slice(0,6).map(t => {
+  // v87 (persona study #10): cap what one capture can mint, but COUNT the
+  // overflow — silent loss is the one sin a capture tool can't afford
+  const dropped = Math.max(0, picked.length - 8);
+  const tasks = picked.slice(0,8).map(t => {
     const priority = detectPriority(t);
     const recur = parseRecur(t);
     const date = recur ? nextOccurrence(recur, parseTaskDate(t) || todayStr()) : parseTaskDate(t);
@@ -2623,7 +2650,7 @@ function localSummarize(text){
             date, recur, time: parseTaskTime(t), energy, minutes: ENERGY_MIN[energy]};
   }).filter(t => t.text.length > 2);
 
-  return {summary, tasks, priority: detectPriority(text)};
+  return {summary, tasks, dropped, priority: detectPriority(text)};
 }
 
 function detectPriority(text){
@@ -2795,13 +2822,28 @@ async function structureIdea(idea){
   delete idea.pending; delete idea.dest;
 
   const t = todayStr();
+  // v87 (persona study #2): a recurring routine spoken with several clock
+  // times — "Keppra every day at 8am and 8pm", "levodopa at 7am 1pm and 7pm
+  // every day" — becomes one task PER dose, each with its own reminder slot,
+  // tick and missed-dose record. One task can only hold one time; a second
+  // seizure-critical dose must never ride along invisibly. Applies to every
+  // engine (AI or local) since it keys off the task's own text.
+  const doseTasks = [];
+  result.tasks.forEach(task => {
+    const times = task.recur ? allTaskTimes(task.text) : [];
+    if (times.length > 1) times.forEach(tm => doseTasks.push({...task, time: tm}));
+    else doseTasks.push(task);
+  });
   const norm = s => s.toLowerCase().replace(/[^a-z0-9\s]/g,'').replace(/\s+/g,' ').trim();
-  const existing = new Set(todos.filter(td => !td.done).map(td => norm(td.text)));
+  // dedupe by text + time slot, so the 8pm dose isn't "already listed" just
+  // because the 8am dose shares its wording
+  const dupKey = (text, time) => norm(text) + '|' + (time || '');
+  const existing = new Set(todos.filter(td => !td.done).map(td => dupKey(td.text, td.time)));
   let added = 0, skipped = 0;
   const delegated = [];
   const scheduled = [];
-  result.tasks.forEach((task, i) => {
-    if (existing.has(norm(task.text))){ skipped++; return; }   // already on the list
+  doseTasks.forEach((task, i) => {
+    if (existing.has(dupKey(task.text, task.time))){ skipped++; return; }   // already on the list
     todos.push({id: idea.id + '-' + i, text: task.text, priority: task.priority, tags: task.tags || [],
       assignees: (task.assignees || []).map(capName), done:false, date: task.date || t, recur: task.recur || null,
       energy: task.energy || detectEnergy(task.text), minutes: task.minutes || null,
@@ -2828,8 +2870,11 @@ async function structureIdea(idea){
   renderTodos();   // keep the (possibly hidden) list fresh; showView also re-renders on switch
   if (document.getElementById('view-ideas').classList.contains('active')) renderIdeas();
 
+  // v87 (persona study #10): if the engine heard more than it kept, SAY SO —
+  // the raw transcript is safe in the Journal either way
+  const overflow = result.dropped ? ` — ${result.dropped} more didn’t fit, the full note is in your Journal` : '';
   const msg = added
-    ? `${added} task${added===1?'':'s'} live${destSp ? ` in “${destSp.name}”` : ' on Today'}${scheduled.length ? ` (${scheduled.join(', ')})` : ''}${delegated.length ? ` (→ ${delegated.join('; ')})` : ''}${skipped ? ` (${skipped} already listed)` : ''}`
+    ? `${added} task${added===1?'':'s'} live${destSp ? ` in “${destSp.name}”` : ' on Today'}${scheduled.length ? ` (${[...new Set(scheduled)].join(', ')})` : ''}${delegated.length ? ` (→ ${delegated.join('; ')})` : ''}${skipped ? ` (${skipped} already listed)` : ''}${overflow}`
     : (skipped ? 'Those tasks are already on your list'
                : destSp ? `No to-dos detected — saved to the ${destSp.name} journal instead`
                         : 'Saved to your Journal — no to-dos detected, your note is kept');
