@@ -2702,7 +2702,7 @@ function localSummarize(text){
   // includes past/passive intent forms real speech uses: "she needed to be
   // dropped off", "had to be picked up by twelve"
   const ACTION_PHRASES = /\b(need(s|ed)? to|have to|has to|had to|must|should|remember to|don't forget|going to|gonna|want to|make sure|look into|follow up|set up|pick(ed|ing)? up|drop(ped|ping)? off|(be|get) (dropped off|picked up|taken|collected)|go to|sign up|book in|sort out|work on|put on)\b/i;
-  const ACTION_VERBS = /\b(call|ring|phone|text|message|email|buy|order|book|send|writ|finish|fix|repair|check|schedul|organis|organiz|plan|research|pay|clean|prepar|review|updat|creat|mak|build|contact|ask|cancel|renew|submit|tak|bring|grab|mov|sell|post|visit|regist|apply|install|download|print|wash|rins|brush|floss|remind|redesign|design|start|try|collect|return|deliver|water|feed|walk|arrang|confirm|replac|hir|quot|invoic|attend|refill|chas|worm|weigh|practis|practic|mark|sign)(e|es|s|ed|ing)?\b/i;
+  const ACTION_VERBS = /\b(call|ring|phone|text|message|email|buy|order|book|send|writ|finish|fix|repair|check|schedul|organis|organiz|plan|research|pay|clean|prepar|review|updat|creat|mak|build|contact|ask|cancel|renew|submit|tak|bring|grab|mov|sell|post|visit|regist|apply|install|download|print|wash|rins|brush|floss|remind|redesign|design|start|try|collect|return|deliver|water|feed|walk|arrang|confirm|replac|hir|quot|invoic|attend|refill|chas|worm|weigh|practis|practic|mark|sign)(e|es|s|ed|ing)?\b|\bpaid\b/i;
   // v86 (persona study, finding #1): carers, parents and patients speak
   // ROUTINES as noun phrases — "Dad donepezil every day at 8am", "Ruby speech
   // therapy Tuesday 10am", "shift Saturday 5 to 9". No action verb, still a
