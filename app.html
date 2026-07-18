@@ -575,6 +575,7 @@
     <div id="careHandoff" style="display:none;"></div>
     <div id="profileCards" style="display:none;"></div>
     <div id="custodyBanner" style="display:none;"></div>
+    <div id="prnBanner" style="display:none;"></div>
     <div id="spaceBar" style="display:none;"></div>
     <div id="adhdStrip" style="display:none;"></div>
     <button class="btn ghost" id="focusBtn" style="display:none; width:100%; margin-bottom:12px;"><span class="ic ic-target" aria-hidden="true"></span> Just one thing</button>
@@ -737,7 +738,7 @@
       <input type="file" id="importFile" accept=".json,application/json" style="display:none">
       <button class="btn ghost" id="wipeBtn">Delete all data</button>
     </div>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v87<br><span id="envInfo"></span></p>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v88<br><span id="envInfo"></span></p>
   </section>
 </main>
 
@@ -3399,6 +3400,7 @@ function renderTodos(){
   renderCareHandoff();
   renderProfileCards();
   renderCustodyBanner();
+  renderPrnBanner();
   renderSpaceBar();
   renderAdhdStrip();
   renderSpaceHeader();
@@ -4598,7 +4600,8 @@ const EVENT_LABEL = {created: 'added', edited: 'edited', ticked: 'ticked off',
   'circle-owner': 'recorded', expense: 'logged an expense on',
   'session-start': 'started a support session',
   'session-end': 'ended a support session',
-  incident: 'reported an incident'};
+  incident: 'reported an incident',
+  'prn-gap': 'updated the PRN gap:'};
 
 /* ---------- support session brackets (v79 — Cooee Phase 2) ----------
    A generic bracket record: paired session-start / session-end events sharing
@@ -4997,6 +5000,7 @@ async function startSpaceSync(sp){
       const d = snap && snap.exists && snap.exists() ? snap.data() : (snap && snap.data && snap.data());
       if (!d) return;
       if (d.custody){ setLocalCustody(sp.hid, d.custody); }
+      if (typeof d.prnGap === 'number' && d.prnGap > 0){ const pm = store.get('prnGap', {}); pm[sp.hid] = d.prnGap; store.set('prnGap', pm); }
       if (d.profile){ setLocalProfile(sp.hid, d.profile); }
       if (Array.isArray(d.memberNames)){ setSpaceMembers(sp.hid, d.memberNames); }
       if (Array.isArray(d.planGoals)){ setPlanGoals(sp.hid, d.planGoals); }   // v80
@@ -6004,6 +6008,102 @@ async function saveCustody(sp, days, alternate){
   track('feature_used', {feature: 'custody'});
   toast('Custody schedule saved ');
 }
+
+/* ---------- PRN interval line (v88 — persona study #3) ----------
+   The palliative near-miss: one carer gives PRN pain relief, the next carer
+   can't see it and wonders "was it already given? is it safe yet?". The
+   journal already holds the dose note; this banner does the arithmetic AT the
+   moment it matters, on Today. The minimum gap is the PRESCRIBER'S number,
+   entered by a carer and shared with the whole space — the app only computes
+   on it, it never advises. */
+function getPrnGap(hid){ return store.get('prnGap', {})[hid] || null; }
+function setPrnGap(hid, hours){
+  const m = store.get('prnGap', {});
+  if (hours) m[hid] = hours; else delete m[hid];
+  store.set('prnGap', m);
+  const rt = spaceRt[hid];
+  if (rt && rt.db) fbFs.setDoc(fbFs.doc(rt.db, 'households', hid), {prnGap: hours || null}, {merge: true}).catch(() => {});
+}
+function lastPrn(hid){
+  const all = store.get('events', []);
+  // a share that was taken back takes its dose marker with it (v73 pairing)
+  const removed = new Set(all.filter(e => e.space === hid && e.kind === 'note-removed').map(e => e.taskId));
+  const doses = all.filter(e => e.space === hid && e.kind === 'note'
+    && /\bprn\b/i.test(e.text || '') && !removed.has(e.taskId));
+  if (!doses.length) return null;
+  const latest = doses.reduce((a, b) => (b.ts > a.ts ? b : a));
+  let at = latest.ts;
+  // "given at 2:15pm" inside the note beats the moment it was typed —
+  // same day only, never the future
+  const tt = parseTaskTime(latest.text);
+  if (tt){
+    const d = new Date(latest.ts), hm = tt.split(':').map(Number);
+    const cand = new Date(d.getFullYear(), d.getMonth(), d.getDate(), hm[0], hm[1]).getTime();
+    if (cand <= latest.ts + 5 * 60000) at = cand;
+  }
+  return {at, who: latest.who};
+}
+const prnGapLabel = h => h < 1 ? Math.round(h * 60) + ' min' : (Number.isInteger(h) ? h : h.toFixed(1)) + ' h';
+const prnAgo = ms => {
+  const m = Math.max(1, Math.round(ms / 60000));
+  if (m < 60) return m + ' min';
+  return Math.floor(m / 60) + ' h' + (m % 60 ? ' ' + (m % 60) + ' min' : '');
+};
+function renderPrnBanner(){
+  const host = document.getElementById('prnBanner');
+  if (!host) return;
+  const shown = spacesList().filter(s => s.type === 'care')
+    .filter(s => activeSpace === 'all' || activeSpace === s.hid);
+  host.innerHTML = '';
+  let any = false;
+  shown.forEach(sp => {
+    const p = lastPrn(sp.hid);
+    if (!p || Date.now() - p.at > 24 * 3600000) return;   // >24h old — the gap question has answered itself
+    any = true;
+    const gap = getPrnGap(sp.hid);
+    const tfmt = ts => new Date(ts).toLocaleTimeString(undefined, {hour: 'numeric', minute: '2-digit'});
+    const line = document.createElement('div');
+    line.className = 'custody-line';
+    const b = document.createElement('b');
+    setIconLabel(b, 'pill', `${sp.name}:`);
+    line.appendChild(b);
+    const span = document.createElement('span');
+    const by = p.who ? ' by ' + capName(p.who) : '';
+    if (gap){
+      const until = p.at + gap * 3600000;
+      span.textContent = until > Date.now()
+        ? ` PRN recorded ${tfmt(p.at)}${by} — the ${prnGapLabel(gap)} minimum gap you set ends at ${tfmt(until)}`
+        : ` last PRN ${tfmt(p.at)}${by} — clear of the ${prnGapLabel(gap)} gap you set`;
+    } else {
+      span.textContent = ` PRN recorded ${tfmt(p.at)}${by} (${prnAgo(Date.now() - p.at)} ago)`;
+    }
+    line.appendChild(span);
+    const setBtn = document.createElement('button');
+    setBtn.className = 'custody-set';
+    setBtn.textContent = gap ? 'edit gap' : 'Set minimum gap →';
+    setBtn.addEventListener('click', async () => {
+      const v = await askInput({title: 'Minimum gap between PRN doses',
+        value: gap ? String(gap) : '', placeholder: 'Hours — e.g. 4, or 0.5 for 30 minutes',
+        hint: 'Enter the prescriber’s instruction. The app only does the arithmetic on the number you set — it never advises. Everyone in the space sees the same countdown. Leave empty to remove.'});
+      if (v === null) return;
+      if (v.trim() === ''){ setPrnGap(sp.hid, null); renderPrnBanner(); return; }
+      const h = parseFloat(v);
+      if (!isFinite(h) || h <= 0 || h > 48){ toast('Enter the gap in hours (e.g. 4, or 0.5 for 30 minutes).'); return; }
+      setPrnGap(sp.hid, h);
+      // the change itself belongs in the append-only record — co-carers must
+      // be able to see who set the number their countdown runs on
+      logEvent('prn-gap', {id: 'prn-gap-' + sp.hid, text: `PRN minimum gap set to ${prnGapLabel(h)}`, space: sp.hid});
+      renderPrnBanner();
+      track('feature_used', {feature: 'prn_gap'});
+      toast(`Gap saved — everyone in ${sp.name} sees the same countdown.`);
+    });
+    line.appendChild(setBtn);
+    host.appendChild(line);
+  });
+  host.style.display = any ? '' : 'none';
+}
+// the countdown must not go stale while the phone sits on the kitchen bench
+setInterval(() => { if (document.getElementById('prnBanner')) renderPrnBanner(); }, 60000);
 
 function openCustody(sp){
   const wrap = document.getElementById('custodyDays');
