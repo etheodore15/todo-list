@@ -746,7 +746,7 @@
       <input type="file" id="importFile" accept=".json,application/json" style="display:none">
       <button class="btn ghost" id="wipeBtn">Delete all data</button>
     </div>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v93<br><span id="envInfo"></span></p>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v94<br><span id="envInfo"></span></p>
   </section>
 </main>
 
@@ -3224,8 +3224,12 @@ function refreshCaptureMode(){
       ? 'Speak or type — pull out tasks, or save it as a care observation…'
       : `Speak or type — pull out tasks, or save the note to the ${sp.name} journal…`);
   } else {
-    noteBtn.style.display = 'none';
-    lt.setAttribute('placeholder', 'Your transcribed idea appears here… you can also just type.');
+    // v94: Private is a journal too. A deliberate "keep this as a note" must
+    // not require aiming at a shared space — or detouring through
+    // Summarize & Add and hoping no tasks fall out of it.
+    noteBtn.style.display = '';
+    setIconLabel(noteBtn, 'note', 'Save to my Journal');
+    lt.setAttribute('placeholder', 'Speak or type — pull out tasks, or keep it as a private note…');
   }
 }
 document.getElementById('saveNoteBtn').addEventListener('click', async () => {
@@ -3237,7 +3241,20 @@ document.getElementById('saveNoteBtn').addEventListener('click', async () => {
   if (!raw0 && !capturePhoto){ toast('Nothing to save — speak, type, or snap a photo first.'); return; }
   const raw = raw0 || 'Photo note';       // v93: a photo can BE the note
   const sp = noteSpace();
-  if (!sp) return;
+  if (!sp){
+    // v94: private journal note — stays on this device, no space record,
+    // no task extraction. (This is also what a circle VIEWER gets: their
+    // words keep a home without any phantom share.)
+    const idea = {id: uid(), raw, summary: raw.length > 120 ? raw.slice(0, 117) + '…' : raw,
+      priority: 'low', engine: 'note', ts: Date.now(),
+      ...(capturePhoto ? {photo: capturePhoto} : {})};
+    ideas.unshift(idea); saveIdeas();
+    capturePhoto = null; renderPhotoStrip();
+    liveText.value = ''; baseText = '';
+    track('feature_used', {feature: 'private_note'});
+    toast('Saved to your Journal — private to you', () => { showView('ideas'); highlightIdea(idea.id); }, 'View');
+    return;
+  }
   // keep a private copy in Ideas too, marked already-shared to this space
   const idea = {id: uid(), raw, summary: raw.length > 120 ? raw.slice(0, 117) + '…' : raw,
     priority: 'low', engine: 'note', ts: Date.now(), sharedTo: [sp.hid],
