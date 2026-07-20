@@ -746,7 +746,22 @@
       <input type="file" id="importFile" accept=".json,application/json" style="display:none">
       <button class="btn ghost" id="wipeBtn">Delete all data</button>
     </div>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v95<br><span id="envInfo"></span></p>
+    <h2 class="set-section">Developer functions</h2>
+    <details class="set-block" id="devBlock">
+      <summary>Diagnostics &amp; developer functions</summary>
+      <p style="margin-top:8px;">Tools for checking the machinery under the hood. Nothing here
+         sends your tasks or notes anywhere.</p>
+      <h3>Smart AI health check</h3>
+      <p>Walks the whole AI chain — configuration, sign-in, then one tiny real AI call (it counts
+         as one of your daily AI calls) — and shows exactly which step fails.</p>
+      <button class="btn primary" id="aiDiagBtn">Test AI</button>
+      <ul id="aiDiagOut" style="list-style:none; padding-left:0; margin-top:10px;" aria-live="polite"></ul>
+      <p id="devLastFallback" style="color:var(--muted); font-size:.85rem;"></p>
+      <h3>Environment</h3>
+      <pre id="devEnvInfo" style="white-space:pre-wrap; font-size:.78rem; color:var(--muted); background:var(--card2, rgba(148,151,169,.08)); border-radius:10px; padding:10px 12px; overflow-x:auto;"></pre>
+      <button class="btn ghost" id="copyDiagBtn">Copy diagnostics</button>
+    </details>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v96<br><span id="envInfo"></span></p>
   </section>
 </main>
 
@@ -2246,7 +2261,7 @@ async function breakDown(td){
     toast('Breaking it down…');
     const srcIdea = td.ideaId ? ideas.find(i => i.id === td.ideaId) : null;
     try { steps = await geminiBreakdown(td.text, {date: td.date, time: td.time, raw: srcIdea && srcIdea.raw}); }
-    catch (e) { toast('AI unavailable (' + e.message + ') — trying built-in split.'); }
+    catch (e) { noteAiFallback('break it down', e); toast('AI unavailable (' + aiFriendlyErr(e) + ') — trying built-in split.'); }
   }
   if (!steps) steps = localBreakdown(td.text, td);
   if (!steps){
@@ -2953,12 +2968,19 @@ async function structureIdea(idea){
   let result = null, engine = 'built-in';
   const cKey = store.get('apiKey', '');
   if (aiEnabled()){
-    try { result = await geminiSummarize(idea.raw); engine = aiViaProxy() ? 'ai' : 'gemini'; } catch(_){}
+    try { result = await geminiSummarize(idea.raw); engine = aiViaProxy() ? 'ai' : 'gemini'; }
+    catch(e){ noteAiFallback('capture', e); }
   }
   if (!result && cKey){
-    try { result = await claudeSummarize(idea.raw, cKey); engine = 'claude'; } catch(_){}
+    try { result = await claudeSummarize(idea.raw, cKey); engine = 'claude'; }
+    catch(e){ noteAiFallback('capture (Claude backup)', e); }
   }
-  if (!result) result = localSummarize(idea.raw);
+  if (!result){
+    // AI was supposed to do this — say why it didn't, AFTER the "N tasks live"
+    // toast below has had its moment (toasts are single-slot; last one wins)
+    if (aiEnabled() || cKey) setTimeout(toastAiFallback, 3400);
+    result = localSummarize(idea.raw);
+  }
   if (!ideas.some(i => i.id === idea.id)){ renderProcStrip(); return; }   // deleted while pending
   idea.summary = result.summary; idea.priority = result.priority; idea.engine = engine;
   const dest = idea.dest || null;   // destination captured at QUEUE time, not completion time
@@ -4533,6 +4555,106 @@ document.getElementById('importFile').addEventListener('change', async (e) => {
     toast('Import failed: ' + err.message);
   }
 });
+
+/* ---------- developer functions (v96) ----------
+   The AI path fails SILENTLY by design on the capture flow (capture must never
+   block), which historically left users staring at "built-in" chips with no
+   clue why. These tools make the machinery visible: every fallback is recorded
+   with an honest reason, and "Test AI" walks the whole chain — config →
+   sign-in → one real call — and reports exactly which step fails. */
+function aiFriendlyErr(e){
+  const msg = (e && e.message) || String(e || 'unknown error');
+  if (/not signed in/i.test(msg)) return 'sign-in to the hosted service failed';
+  if (/daily AI limit/i.test(msg)) return 'daily AI limit reached — resets overnight, or add your own key';
+  if (/timed out/i.test(msg)) return 'the AI service timed out';
+  if (/failed to fetch|networkerror|load failed|err_/i.test(msg))
+    return 'couldn’t reach the AI service — network drop, or a content blocker blocking Google endpoints';
+  if (/API 401|API 403|invalid auth|API key/i.test(msg)) return 'the AI key or sign-in was rejected (' + msg + ')';
+  return msg;
+}
+function noteAiFallback(where, e){
+  store.set('aiLastFallback', {ts: Date.now(), where, reason: aiFriendlyErr(e)});
+  refreshDevPanel();
+}
+// One honest toast when the built-in engine covered for AI — throttled so a
+// broken key doesn't nag on every capture, but the first one always speaks.
+let aiToastAt = 0;
+function toastAiFallback(){
+  const f = store.get('aiLastFallback', null);
+  if (!f) return;
+  if (Date.now() - aiToastAt < 10 * 60000) return;
+  aiToastAt = Date.now();
+  toast('Smart AI unavailable (' + f.reason + ') — the built-in engine did this one.',
+    () => { showView('settings'); const d = document.getElementById('devBlock'); if (d){ d.open = true; d.scrollIntoView(); } }, 'Details');
+}
+const AI_DIAG_PROBE = {contents: [{role: 'user', parts: [{text: 'Reply with exactly: OK'}]}]};
+async function runAiDiag(){
+  const out = [];
+  const host = document.getElementById('aiDiagOut');
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+  const draw = () => {
+    host.innerHTML = out.map(s => `<li style="margin-bottom:6px;">` +
+      `<span class="ic ic-${s.ok ? 'check' : 'x'}" aria-hidden="true"></span> ${esc(s.label)}</li>`).join('');
+  };
+  const step = (ok, label) => { out.push({ok, label}); draw(); return ok; };
+  const key = userGeminiKey();
+  try {
+    if (!key && !aiProxyUrl()){
+      step(false, 'No AI configured — this build has no hosted AI service and no pasted key.');
+      return;
+    }
+    step(true, key ? 'Route: your own pasted Gemini key (it always wins over the hosted service).'
+                   : 'Route: the hosted AI service — no key needed.');
+    if (!key){
+      try { await managedIdToken(); step(true, 'Signed in to the hosted service.'); }
+      catch (e){ step(false, 'Sign-in failed: ' + aiFriendlyErr(e)); return; }
+    } else {
+      try { const m = await geminiModel(key); step(true, 'Key accepted — model ' + m + '.'); }
+      catch (e){ step(false, 'Key rejected at model discovery: ' + aiFriendlyErr(e) +
+        ' — clear the key in Smart AI settings to use the hosted service instead.'); return; }
+    }
+    const t0 = Date.now();
+    try {
+      const data = await geminiGenerate(AI_DIAG_PROBE);
+      const text = geminiText(data).trim().slice(0, 40);
+      step(true, `Live AI call succeeded in ${Date.now() - t0}ms (“${text || 'empty reply'}”). Smart AI is working.`);
+    } catch (e){
+      step(false, 'Live AI call failed: ' + aiFriendlyErr(e) +
+        (key ? ' — clear the key in Smart AI settings to use the hosted service instead.' : ''));
+    }
+    if (store.get('apiKey', '')) step(true, 'Claude backup key present (only used if Gemini fails; not tested here).');
+  } finally { refreshDevPanel(); }
+}
+function refreshDevPanel(){
+  const last = document.getElementById('devLastFallback');
+  if (!last) return;
+  const f = store.get('aiLastFallback', null);
+  last.textContent = f
+    ? `Last AI fallback: ${f.reason} — during ${f.where}, ${new Date(f.ts).toLocaleString()}.`
+    : 'No AI fallbacks recorded on this device yet.';
+  const env = document.getElementById('devEnvInfo');
+  if (env) env.textContent = devDiagText();
+}
+function devDiagText(){
+  const f = store.get('aiLastFallback', null);
+  return ['Idea → Todo v96',
+    'AI route: ' + (userGeminiKey() ? 'own Gemini key' : (aiProxyUrl() ? 'hosted proxy' : 'none (built-in only)')),
+    'Claude backup key: ' + (store.get('apiKey', '') ? 'set' : 'not set'),
+    'Hosted service: ' + (window.MANAGED ? window.MANAGED.projectId : 'none (self-hosted build)'),
+    'Spaces: ' + spacesAll().length + ' (' + spacesList().length + ' active) · tasks: ' + todos.length + ' · notes: ' + ideas.length,
+    'Last AI fallback: ' + (f ? f.reason + ' (' + f.where + ', ' + new Date(f.ts).toISOString() + ')' : 'none'),
+    'Platform: ' + navigator.userAgent].join('\n');
+}
+document.getElementById('aiDiagBtn').addEventListener('click', async () => {
+  const b = document.getElementById('aiDiagBtn');
+  b.disabled = true; b.textContent = 'Testing…';
+  try { await runAiDiag(); } finally { b.disabled = false; b.textContent = 'Test AI'; }
+});
+document.getElementById('copyDiagBtn').addEventListener('click', async () => {
+  try { await navigator.clipboard.writeText(devDiagText()); toast('Diagnostics copied — no task or note content included.'); }
+  catch (_) { toast('Couldn’t copy — select the text above instead.'); }
+});
+document.getElementById('devBlock').addEventListener('toggle', (e) => { if (e.target.open) refreshDevPanel(); });
 
 /* ---------- settings: Gemini key ---------- */
 const gemInput = document.getElementById('geminiKeyInput');
