@@ -741,7 +741,7 @@
       <input type="file" id="importFile" accept=".json,application/json" style="display:none">
       <button class="btn ghost" id="wipeBtn">Delete all data</button>
     </div>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v91<br><span id="envInfo"></span></p>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v92<br><span id="envInfo"></span></p>
   </section>
 </main>
 
@@ -880,6 +880,15 @@
       <input type="checkbox" id="custodyAlt">
       <span>Alternates every other week (this pattern one week, swapped the next)</span>
     </label>
+    <h3 style="font-size:.95rem; margin:10px 0 2px;"><span class="ic ic-calendar" aria-hidden="true"></span> School terms, holidays &amp; other carers</h3>
+    <p class="side-note">Date ranges override the weekly pattern — school holidays with Dad, a week with Grandma. Name whoever has the kids; it doesn’t have to be a parent.</p>
+    <div id="custodyRanges" style="margin:4px 0 6px;"></div>
+    <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px;">
+      <input type="date" id="crFrom" aria-label="Range start" style="flex:1; min-width:120px;">
+      <input type="date" id="crTo" aria-label="Range end" style="flex:1; min-width:120px;">
+      <input id="crWho" placeholder="Who? e.g. Duc, Grandma" aria-label="Who has the kids for these dates" style="flex:1; min-width:120px;">
+      <button class="btn ghost" id="crAddBtn" type="button">Add dates</button>
+    </div>
     <button class="btn primary" id="custodySave">Save schedule</button>
     <button class="btn ghost" id="custodyCancel">Cancel</button>
   </div>
@@ -5500,6 +5509,48 @@ function auditCsv(events, spName){
    Turns the last 4 weeks of the care space — journal notes, med adherence
    from tick/missed events, open tasks — into a one-page printable brief.
    Coordination summary only: no dosing advice, no medical claims. */
+/* ---------- structured observations (v92 — persona study #15) ----------
+   "BGL 4.2 before lunch", "sats 93", "80ml at 2am", "rating it a 7" — the
+   numbers clinicians actually want live inside prose notes. This parses the
+   FIRST recognisable reading from a note; the briefing turns the series into
+   a trend line. Deliberately conservative: a named metric (or an unambiguous
+   unit) next to a number — never a bare number. */
+function parseObservation(text){
+  const t = ' ' + String(text || '').toLowerCase() + ' ';
+  let m;
+  if ((m = t.match(/\b(?:bgl|blood sugar|glucose|sugars?)(?: was| is| at)?\s*[:\-]?\s*(\d{1,2}(?:\.\d)?)\b/)))
+    return {kind: 'bgl', label: 'BGL', unit: 'mmol/L', value: parseFloat(m[1])};
+  if ((m = t.match(/\b(?:sats?|spo2|oxygen)(?: was| is| at)?\s*[:\-]?\s*(\d{2,3})\s*%?(?=[\s.,!]|$)/)))
+    return {kind: 'sats', label: 'Sats', unit: '%', value: parseInt(m[1], 10)};
+  if ((m = t.match(/\b(?:bp|blood pressure)(?: was| is| at)?\s*[:\-]?\s*(\d{2,3})\s*(?:\/|over)\s*(\d{2,3})\b/)))
+    return {kind: 'bp', label: 'BP', unit: 'mmHg', value: m[1] + '/' + m[2]};
+  if ((m = t.match(/\btemp(?:erature)?(?: was| is| of)?\s*[:\-]?\s*(\d{2}(?:\.\d)?)\b/)))
+    return {kind: 'temp', label: 'Temp', unit: '°C', value: parseFloat(m[1])};
+  if ((m = t.match(/\b(\d{1,4})\s?ml\b/)))
+    return {kind: 'feed', label: 'Volume', unit: 'ml', value: parseInt(m[1], 10)};
+  if ((m = t.match(/\b(\d{1,3}(?:\.\d{1,2})?)\s?(?:kg|kilos?)\b/)))
+    return {kind: 'weight', label: 'Weight', unit: 'kg', value: parseFloat(m[1])};
+  if ((m = t.match(/\b(?:pain|rat(?:e|ed|ing)(?: it)?)(?: was| is| at)?\s*(?:a|an)?\s*[:\-]?\s*(\d{1,2})\b(?:\s*\/\s*10)?/)))
+    return {kind: 'rating', label: 'Self-rating', unit: '/10', value: parseInt(m[1], 10)};
+  return null;
+}
+// the series clinicians ask for: one trend line per metric, oldest → newest
+function readingsFrom(evs){
+  const series = {};
+  evs.forEach(e => {
+    const o = parseObservation(e.text);
+    if (!o) return;
+    (series[o.kind] = series[o.kind] || {label: o.label, unit: o.unit, pts: []}).pts.push({ts: e.ts, v: o.value});
+  });
+  return Object.values(series).map(s => {
+    s.pts.sort((a, b) => a.ts - b.ts);
+    const vals = s.pts.map(p => p.v);
+    const nums = vals.filter(v => typeof v === 'number');
+    const range = nums.length > 1 ? ` · range ${Math.min(...nums)}–${Math.max(...nums)}` : '';
+    return `${s.label} (${s.unit}): ${vals.join(' → ')} · ${vals.length} reading${vals.length === 1 ? '' : 's'}${range}`;
+  });
+}
+
 function briefingInput(sp){
   const since = Date.now() - 28 * 86400000;
   const evs = histEvents.filter(e => e.ts >= since);
@@ -5516,7 +5567,9 @@ function briefingInput(sp){
     ticked: evs.filter(e => e.kind === 'ticked').map(line),
     missed: evs.filter(e => e.kind === 'missed').map(missedLine),
     open: todos.filter(t => t.space === sp.hid && !t.done)
-      .map(t => t.text + (t.recur ? ' (' + recurLabel(t.recur).replace('↻ ', 'repeats ') + (t.time ? ' at ' + fmtTime(t.time) : '') + ')' : ''))
+      .map(t => t.text + (t.recur ? ' (' + recurLabel(t.recur).replace('↻ ', 'repeats ') + (t.time ? ' at ' + fmtTime(t.time) : '') + ')' : '')),
+    // v92: the numeric series hiding in the notes — BGLs, sats, feeds, ratings
+    readings: readingsFrom(evs.filter(e => e.kind === 'note' && !removed.has(e.taskId)))
   };
 }
 
@@ -5587,6 +5640,7 @@ function briefingInner(sp, b){
   return `<h1 style="font-size:18px;margin:0 0 2px;">${esc(sp.name)} — doctor briefing</h1>` +
     `<p style="color:#555;font-size:11px;margin:0 0 8px;">Covers the last 4 weeks of shared care records · prepared ${new Date().toLocaleDateString()}. Family coordination summary, not medical advice.</p>` +
     `<p style="font-size:13px;line-height:1.55;">${esc(b.overview)}</p>` +
+    sec('Readings — from the notes, as recorded', b.readings) +
     sec('Observations', b.observations) +
     sec('Routines &amp; medications (as recorded)', b.routines) +
     sec('Concerns to raise', b.concerns) +
@@ -5606,6 +5660,7 @@ p,li{font-size:13px; line-height:1.55;} ul{margin:0; padding-left:20px;}
 <p class="meta">Covers the last 4 weeks of shared care records · prepared ${new Date().toLocaleDateString()} with Idea → Todo.
 Family coordination summary, not medical advice.</p>
 <p>${esc(b.overview)}</p>
+${sec('Readings — from the notes, as recorded', b.readings)}
 ${sec('Observations', b.observations)}
 ${sec('Routines & medications (as recorded)', b.routines)}
 ${sec('Concerns to raise', b.concerns)}
@@ -5659,6 +5714,9 @@ async function openBriefing(sp){
         catch (_) { /* fall through to the plain summary */ }
       }
       if (!b) b = localBriefing(sp);   // no AI, or AI failed/timed out → always works
+      // v92: readings come from the INPUT, not the composer — the trend line
+      // renders identically with or without AI
+      if (!b.readings || !b.readings.length) b.readings = inp.readings;
       return briefingInner(sp, b);
     });
 }
@@ -6070,7 +6128,20 @@ function custodyFlipped(c, dateStr){
 // 'me' | 'them' | 'setter' | 'other' | null
 function custodyOn(hid, dateStr){
   const c = getCustody(hid);
-  if (!c || !Array.isArray(c.days)) return null;
+  if (!c) return null;
+  // v92 (persona study #13): a calendar range — school term, holidays, a week
+  // at Grandma's — overrides the weekly pattern. `who` is a NAME, so a third
+  // caregiver is finally a first-class answer ('name:Grandma').
+  const r = (c.ranges || []).find(x => x.from && x.to && x.from <= dateStr && dateStr <= x.to);
+  if (r && r.who){
+    const me = (myName() || '').toLowerCase();
+    const w = String(r.who).trim().toLowerCase();
+    if (me && w === me) return 'me';
+    const parents = [(c.by || ''), (c.other || '')].map(s => s.toLowerCase());
+    if (me && parents.includes(w)) return 'them';
+    return 'name:' + String(r.who).trim();
+  }
+  if (!Array.isArray(c.days) || !c.days.length) return null;
   const weekday = new Date(dateStr + 'T00:00:00Z').getUTCDay();
   let isBySetDay = c.days.includes(weekday);
   if (custodyFlipped(c, dateStr)) isBySetDay = !isBySetDay;   // alternating week
@@ -6086,6 +6157,7 @@ function custodyLabel(hid, dateStr){
   // the co-parent from the viewer's side is whichever of {by, other} isn't me
   const me = (myName() || '').toLowerCase();
   const coParent = (c.by || '').toLowerCase() === me ? (c.other || 'the other parent') : (c.by || 'the other parent');
+  if (who && who.startsWith('name:')) return 'kids with ' + capName(who.slice(5));
   if (who === 'me') return 'your day with the kids';
   if (who === 'them') return coParent + '’s day';
   if (who === 'setter') return (c.by || 'Parent A') + '’s day';
@@ -6191,12 +6263,15 @@ function weekAnchor(){
   return sun.toISOString().slice(0, 10);
 }
 
-async function saveCustody(sp, days, alternate){
+async function saveCustody(sp, days, alternate, ranges){
   const others = (spaceMembers(sp.hid) || []).filter(m => m.toLowerCase() !== (myName() || '').toLowerCase());
   const prev = getCustody(sp.hid);
   const c = {days: days.slice().sort(), by: myName() || 'Parent A',
              other: others[0] || 'the other parent', alternate: !!alternate,
              anchor: (prev && prev.anchor && prev.alternate === !!alternate) ? prev.anchor : weekAnchor(),
+             // v92 (persona study #13): calendar ranges — terms, holidays,
+             // third caregivers — ride the same synced custody object
+             ranges: Array.isArray(ranges) ? ranges : ((prev && prev.ranges) || []),
              updated: Date.now()};
   setLocalCustody(sp.hid, c);
   const rt = spaceRt[sp.hid];
@@ -6319,16 +6394,53 @@ function openCustody(sp){
     lab.appendChild(document.createTextNode(name.charAt(0).toUpperCase() + name.slice(1)));
     wrap.appendChild(lab);
   });
+  custodyRangeDraft = (c && Array.isArray(c.ranges)) ? c.ranges.slice() : [];
+  renderCustodyRangeDraft();
   document.getElementById('custodySheet').dataset.hid = sp.hid;
   document.getElementById('custodySheet').style.display = 'flex';
 }
+// v92: the working list of date-range overrides while the sheet is open
+let custodyRangeDraft = [];
+function renderCustodyRangeDraft(){
+  const host = document.getElementById('custodyRanges');
+  host.innerHTML = '';
+  const fmt = d => new Date(d + 'T00:00:00Z').toLocaleDateString(undefined, {day: 'numeric', month: 'short', year: 'numeric'});
+  custodyRangeDraft.slice().sort((a, b) => a.from < b.from ? -1 : 1).forEach(r => {
+    const row = document.createElement('div');
+    row.className = 'scope-member';
+    const span = document.createElement('span');
+    span.textContent = `${fmt(r.from)} – ${fmt(r.to)} — ${capName(r.who)}`;
+    row.appendChild(span);
+    const x = document.createElement('button');
+    x.className = 'custody-set';
+    x.textContent = 'remove';
+    x.setAttribute('aria-label', `Remove the ${fmt(r.from)} range`);
+    x.addEventListener('click', () => {
+      custodyRangeDraft = custodyRangeDraft.filter(q => q !== r);
+      renderCustodyRangeDraft();
+    });
+    row.appendChild(x);
+    host.appendChild(row);
+  });
+}
+document.getElementById('crAddBtn').addEventListener('click', () => {
+  const from = document.getElementById('crFrom').value;
+  const to = document.getElementById('crTo').value;
+  const who = document.getElementById('crWho').value.trim();
+  if (!from || !to || !who){ toast('Pick both dates and say who has the kids.'); return; }
+  if (to < from){ toast('The end date is before the start date.'); return; }
+  custodyRangeDraft.push({from, to, who});
+  document.getElementById('crFrom').value = ''; document.getElementById('crTo').value = '';
+  document.getElementById('crWho').value = '';
+  renderCustodyRangeDraft();
+});
 document.getElementById('custodySave').addEventListener('click', () => {
   const hid = document.getElementById('custodySheet').dataset.hid;
   const sp = spacesList().find(s => s.hid === hid);
   const days = [...document.querySelectorAll('#custodyDays input:checked')].map(c => +c.value);
   const alt = document.getElementById('custodyAlt').checked;
   document.getElementById('custodySheet').style.display = 'none';
-  if (sp) saveCustody(sp, days, alt);
+  if (sp) saveCustody(sp, days, alt, custodyRangeDraft);
 });
 document.getElementById('custodyCancel').addEventListener('click', () => {
   document.getElementById('custodySheet').style.display = 'none';
