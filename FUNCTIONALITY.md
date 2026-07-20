@@ -6,12 +6,17 @@ to them would require. Everything below describes working software unless marked
 otherwise. Landing page: https://etheodore15.github.io/todo-list/*
 
 *This is a **living document** — it is amended with every release so it never
-drifts from the shipped product. Last updated: v83 (v81–v83: cloud voice
-hardening — proxy model auto-discovery, voice-pool quotas with refunds,
-structured JSON transcripts, and near-real-time live transcription on every
-browser: one continuous recording, cumulatively re-transcribed on an
-adaptive tick, so words appear as they're spoken and self-correct — an
-accessibility requirement).*
+drifts from the shipped product. Last updated: **v94**. Recent arc (v84–v94):
+a 44-persona study (executable simulations across ADHD, family, co-parenting,
+care, NDIS-circle and edge audiences — see `Market-Research/personas/`) drove
+eleven releases closing its top findings: capture that understands the care
+register of speech, one task per medication dose, a PRN safety line, spoken
+dollar amounts landing in the ledger, N-way money with configurable splits,
+fortnightly/quarterly/sub-daily recurrence, term-and-holiday custody with
+third caregivers, numeric readings trended in the doctor briefing, space
+archive/close with export-and-purge, photo capture with text recognition,
+and a private journal. Each finding was re-verified against the persona that
+surfaced it.*
 
 > **Caveat:** the product is in active development. Some features are new and may
 > behave unpredictably; the AI layer currently runs on a built-in heuristic for
@@ -94,6 +99,25 @@ solves that once; each new cohort is mostly a new surface on the same engine.
   to coin a new tag) — no comma-separated text entry
 - **Quiet visual mode**: a calmer, lower-stimulus theme
 - Undo on destructive actions; edit-in-place for text, dates, tags, scope
+- **Real-life recurrence** (v90): beyond daily/weekly/monthly — fortnightly
+  ("every second Thursday" — FIFO swings, pay cycles, injections),
+  month-multiples ("every three months", "quarterly"), and sub-daily
+  ("every three hours" — newborn feeds: ticking respawns the next slot N
+  hours on, so the tick history is the feed log; no false alarm promises)
+- **Spoken amounts are expenses** (v91): "$38 school photo money", "invoice
+  the Hendersons $480", "I paid $180 for the carpet cleaner" carry
+  amount/payer/date onto the task and into the shared ledger at capture time
+- **Honest counting** (v87): a long monologue caps at 8 extracted tasks and
+  the toast says what didn't fit — silent loss is the one sin a capture tool
+  can't afford
+- **Photo capture** (v93): snap a photo (school notice, appointment letter,
+  medication label, whiteboard) — "Read text from photo" runs it through the
+  AI and drops the words into the capture box so the whole pipeline applies;
+  or the photo simply rides the note into the journal and shared record.
+  Offline: no OCR promises, the photo still attaches
+- **A private journal** (v94): "Save to my Journal" whenever the destination
+  is Private — text and/or photo kept on-device, no task extraction, no
+  space record, shareable later from its Notes card
 
 ### Per-cohort reports (one overlay, one print path, a different question each)
 - **Care — doctor briefing**: "what does the doctor need to know?" (see below)
@@ -102,8 +126,17 @@ solves that once; each new cohort is mostly a new surface on the same engine.
   completions, who did what / who added what (load sharing made visible without
   blame), the next week's dated tasks
 - **Co-parenting — Records summary**: "what would we both sign off on?" —
-  completions per parent, expenses as recorded with a 50/50 balance line,
+  completions per parent, expenses as recorded with **N-way settlement lines
+  honouring the space's configured split** (v90 — three co-parents or an
+  80/20 reality both compute correctly; the fine print states the split),
   neutral wording, drawn from the append-only record
+- **Notes in every report** (v85): the family week report gains "Notes this
+  week", the records summary "Notes on the record (as written)" — journal
+  notes stopped being care-exclusive
+- **Readings — from the notes** (v92): the doctor briefing lifts numeric
+  observations out of prose ("BGL 4.2", "sats 93", "80ml", "rating it a 7")
+  into one trend line per metric with count and range — computed at report
+  time, so all existing history benefits, with or without AI
 - Every report opens instantly with a progress state and composes locally
   (the care briefing optionally uses AI); all are printable/saveable as PDF
 - Reports itemize the record: finished tasks with who ticked them and when,
@@ -143,6 +176,18 @@ back (Journal)**. Three sections:
 - Invite links / paste codes; anonymous-first accounts with optional Google or
   email sign-in that links (not replaces) the anonymous identity, restoring
   spaces across devices
+- **Read-only roles can't phantom-write** (v89): a circle viewer is never
+  offered a writable-looking destination — the chip explains the role instead
+  of vanishing, and their captures stay private (v94 gives those words a
+  proper private-journal home)
+- **Notes never silently diverge** (v91): the shared-note cap is generous
+  (2,000 chars) and the rare over-cap note gets an honest toast — a local
+  copy and a shared copy are never quietly different
+- **Spaces can close with dignity** (v91): Archive keeps the record on-device
+  read-only and leaves every daily surface, with the closure itself an
+  append-only entry; Reopen restores it; "Export & remove" downloads the
+  record as CSV then purges it from this device only, behind a name-typed
+  confirmation — the foster-carer/placement-end obligation
 - **Role-scoped circles** (v78, Cooee flavor / behind the `circle` flag):
   circle spaces carry roles — owner, co-admin, worker, viewer — enforced by
   the Firestore rules, not the UI. Per-item visibility (circle / team /
@@ -171,9 +216,17 @@ back (Journal)**. Three sections:
 
 ### Co-parenting pack
 - **Custody days**: whose day it is (supports alternating weeks), shown on
-  Today, with a "handover tomorrow" heads-up
-- **Expense ledger**: amounts on tasks, receipt photos (compressed on-device),
-  who-paid/who-owes ledger with per-task deduplication
+  Today, with a "handover tomorrow" heads-up. **Calendar custody** (v92):
+  date ranges override the weekly pattern — school terms with one parent,
+  holidays with the other — and the range names a person, so a **third
+  caregiver** ("kids with Grandma") is a first-class answer
+- **Expense ledger**: amounts on tasks (spoken amounts parse at capture,
+  v91), receipt photos (compressed on-device), who-paid/who-owes with
+  per-task deduplication, **N-way settlement and a configurable split
+  ratio** (v90) — set "Zoe 70, Jay 30" in the ledger, everyone sees the same
+  maths, and the change is an append-only record entry. The ledger and an
+  expenses report section also serve **family-type spaces** (share-houses,
+  family businesses)
 - **Tone check** (AI): a task heading to the shared list is screened for
   hostile/blaming wording; a neutral, fact-preserving rewrite is offered before
   it lands (fails open when AI is off)
@@ -190,8 +243,21 @@ back (Journal)**. Three sections:
 - **Shift handoff**: "since your last visit" card — what happened while you
   were away
 - **Doctor briefing**: one tap turns the last 4 weeks of journal notes, med
-  records and misses into a printable visit brief (AI-composed with a
-  plain-summary fallback; explicitly "coordination summary, not medical advice")
+  records, misses and **numeric readings trends** (v92) into a printable
+  visit brief (AI-composed with a plain-summary fallback; explicitly
+  "coordination summary, not medical advice")
+- **The care register of speech extracts** (v86): "Dad donepezil every day at
+  8am", "Ruby speech therapy Tuesday 10am" — med and appointment noun-phrases
+  with no action verb become tasks (they used to extract nothing)
+- **One task per dose** (v87): "Keppra at 8am and 8pm" fans into two daily
+  tasks, each with its own reminder slot, tick and missed-dose record
+- **PRN interval line** (v88): Today shows the last PRN dose from the record
+  ("PRN recorded 2:15 pm by Ines — 1 h 40 min ago") and, once a carer enters
+  the prescriber's minimum gap, when it ends. The gap is the prescriber's
+  number — the app computes, never advises, and says so; setting it is an
+  append-only entry; the countdown refreshes every minute
+- **Photo notes** (v93): the rash, the discharge sheet, the whiteboard roster
+  — photographed, captioned, in the journal, the history and the handoff
 
 ### ADHD / executive-function pack
 - Voice brain-dump (capture without organising), Break it down, Just One
@@ -276,7 +342,10 @@ This is the part that matters for "where else could this apply":
 
 - AI structuring/breakdown/briefing/tone-check run on the heuristic fallback
   until the operator proxy ships (users can bring their own Gemini key today)
-- English-only extraction heuristics; prompt is language-flexible but untested
+- English-only extraction heuristics (hardened against real care/family
+  speech by the persona study); non-English captures degrade gracefully to
+  journal notes. A four-tier multilingual strategy is planned (ROADMAP
+  Phase L) but not scheduled
 - Web Speech (default voice path) requires Chrome-family browsers and network;
   the offline Whisper path is an opt-in download; iOS voice needs a native
   wrapper (in progress)
