@@ -101,11 +101,11 @@ export function onSnapshot(col, cb){ cb({docChanges: () => []}); return () => {}
     JSON.parse(localStorage.getItem('events') || '[]')
       .some(e => e.kind === 'note' && e.space === 'hh-care' && /full dinner/.test(e.text))));
 
-  // back to Private → journal option leaves, primary unchanged
+  // back to Private → the journal save turns PRIVATE (v94), primary unchanged
   await A.locator('#destChips .fchip', { hasText: 'Private' }).click();
   await A.waitForTimeout(100);
-  check('v68: Private destination hides the journal save',
-    !(await A.locator('#saveNoteBtn').isVisible()));
+  check('v94: Private destination offers the private journal save',
+    /my Journal/.test(await A.locator('#saveNoteBtn').textContent()));
 
   // ---------- 3. week-in-review reachability ----------
   await A.click('nav.tabs button[data-view="today"]');
@@ -166,8 +166,8 @@ export function onSnapshot(col, cb){ cb({docChanges: () => []}); return () => {}
     /Mum's care journal/.test(await C.locator('#saveNoteBtn').textContent()));
   await C.locator('#destChips .fchip', { hasText: 'Private' }).click();
   await C.waitForTimeout(100);
-  check('v69: switching to Private hides it again',
-    !(await C.locator('#saveNoteBtn').isVisible()));
+  check('v94: switching to Private retargets it to my Journal',
+    /my Journal/.test(await C.locator('#saveNoteBtn').textContent()));
 
   // ---------- 7. v70 regression: briefing stacks ABOVE history; bar wraps ----------
   const D = await mk(() => {
