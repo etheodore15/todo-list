@@ -6,7 +6,7 @@ to them would require. Everything below describes working software unless marked
 otherwise. Landing page: https://etheodore15.github.io/todo-list/*
 
 *This is a **living document** — it is amended with every release so it never
-drifts from the shipped product. Last updated: **v94**. Recent arc (v84–v94):
+drifts from the shipped product. Last updated: **v96**. Recent arc (v84–v96):
 a 44-persona study (executable simulations across ADHD, family, co-parenting,
 care, NDIS-circle and edge audiences — see `Market-Research/personas/`) drove
 eleven releases closing its top findings: capture that understands the care
@@ -16,11 +16,14 @@ fortnightly/quarterly/sub-daily recurrence, term-and-holiday custody with
 third caregivers, numeric readings trended in the doctor briefing, space
 archive/close with export-and-purge, photo capture with text recognition,
 and a private journal. Each finding was re-verified against the persona that
-surfaced it.*
+surfaced it. v95 added joiner onboarding (every invite arrival gets a
+30-second welcome shaped by the space and role being joined); v96 added
+AI-fallback transparency and a Developer functions section in Settings.*
 
-> **Caveat:** the product is in active development. Some features are new and may
-> behave unpredictably; the AI layer currently runs on a built-in heuristic for
-> most users until the operator AI proxy is deployed (imminent).
+> **Caveat:** the product is in active development. Some features are new and
+> may behave unpredictably. The operator AI proxy is live in production —
+> Smart AI works out of the box with a per-user daily quota, falling back to
+> the built-in heuristic only when a call fails (and, since v96, saying why).
 
 ---
 
@@ -340,8 +343,9 @@ This is the part that matters for "where else could this apply":
 
 ## 6. Honest current limitations
 
-- AI structuring/breakdown/briefing/tone-check run on the heuristic fallback
-  until the operator proxy ships (users can bring their own Gemini key today)
+- AI structuring/breakdown/briefing/tone-check run through the live operator
+  proxy (30 calls/user/day free, UTC day boundary); past the quota or offline
+  they fall back to the built-in heuristic, now with the reason surfaced
 - English-only extraction heuristics (hardened against real care/family
   speech by the persona study); non-English captures degrade gracefully to
   journal notes. A four-tier multilingual strategy is planned (ROADMAP
