@@ -546,6 +546,11 @@
       <button id="micBtn" aria-label="Record idea"><span class="ic ic-mic" aria-hidden="true"></span></button>
       <div class="mic-hint" id="micHint" role="status" aria-live="polite">Tap the mic and speak your idea.<br>Or type below.</div>
     </div>
+    <div style="display:flex; justify-content:center; margin:0 0 8px;">
+      <button class="btn ghost" id="snapBtn"><span class="ic ic-camera" aria-hidden="true"></span> Snap a photo</button>
+      <input type="file" id="photoInput" accept="image/*" capture="environment" style="display:none;" aria-hidden="true" tabindex="-1">
+    </div>
+    <div id="photoStrip" style="display:none; align-items:center; gap:8px; flex-wrap:wrap; margin:0 0 8px;"></div>
     <textarea id="liveText" aria-label="Your idea — speak or type" placeholder="Your transcribed idea appears here… you can also just type."></textarea>
     <div id="destRow" class="dest-row" style="display:none;">
       <span class="dest-lbl">Add to</span>
@@ -741,7 +746,7 @@
       <input type="file" id="importFile" accept=".json,application/json" style="display:none">
       <button class="btn ghost" id="wipeBtn">Delete all data</button>
     </div>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v92<br><span id="envInfo"></span></p>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v93<br><span id="envInfo"></span></p>
   </section>
 </main>
 
@@ -1108,7 +1113,12 @@ const store = {
 };
 let ideas = store.get('ideas', []);      // {id, raw, summary, priority, ts}
 let todos = store.get('todos', []);      // {id, text, priority, done, date, ideaId}
-const saveIdeas = () => store.set('ideas', ideas);
+const saveIdeas = () => {
+  // v93: keep photos only on the newest 30 notes locally — text is never
+  // stripped, and shared copies already carry their own thumb in the record
+  ideas.filter(i => i.photo).slice(30).forEach(i => { delete i.photo; i.photoStripped = true; });
+  store.set('ideas', ideas);
+};
 const saveTodos = () => { store.set('todos', todos); syncPush(); };
 
 // ids must be globally unique once tasks sync across devices
@@ -2990,7 +3000,8 @@ async function structureIdea(idea){
   // private on the device. (Circle viewers are read-only; rules would refuse.)
   if (!added && !skipped && destSp && !(destSp.type === 'circle' && (destSp.role || '') === 'viewer')){
     idea.sharedTo = [...new Set([...(idea.sharedTo || []), destSp.hid])];
-    logEvent('note', {id: 'note-' + idea.id, text: noteShareText(idea.raw), space: destSp.hid});
+    logEvent('note', {id: 'note-' + idea.id, text: noteShareText(idea.raw), space: destSp.hid,
+      ...(idea.photo ? {thumb: idea.photo} : {})});
     track('feature_used', {feature: 'note_autoshare'});
   }
   saveIdeas(); saveTodos(); updateBadge(); renderProcStrip();
@@ -3026,15 +3037,95 @@ async function structureIdea(idea){
   }
 }
 
+/* ---------- photo capture (v93) ----------
+   Not everything is spoken: school notices, medication labels, whiteboards,
+   appointment letters. Snap → the photo rides the capture. With AI, "Read
+   text from photo" pulls the words into the box so the ENTIRE existing
+   pipeline applies — task extraction, dates, amounts, med routines, notes.
+   Offline, the photo still attaches to the note: honest, no OCR promises. */
+let capturePhoto = null;
+function renderPhotoStrip(){
+  const strip = document.getElementById('photoStrip');
+  if (!strip) return;
+  if (!capturePhoto){ strip.style.display = 'none'; strip.innerHTML = ''; return; }
+  strip.innerHTML = '';
+  const img = document.createElement('img');
+  img.src = capturePhoto; img.alt = 'Captured photo — attached to this capture';
+  img.style.cssText = 'max-height:72px; max-width:96px; border-radius:8px; cursor:zoom-in;';
+  img.addEventListener('click', () => {
+    const w = window.open('', '_blank');
+    if (w){ w.document.write('<img src="' + capturePhoto + '" style="max-width:100%">'); w.document.close(); }
+  });
+  strip.appendChild(img);
+  if (aiEnabled()){
+    const ocr = document.createElement('button');
+    ocr.className = 'btn ghost'; ocr.id = 'ocrBtn';
+    setIconLabel(ocr, 'sparkles', 'Read text from photo');
+    ocr.addEventListener('click', async () => {
+      ocr.disabled = true; setIconLabel(ocr, 'sparkles', 'Reading…');
+      try {
+        const text = await geminiOcr(capturePhoto);
+        if (!text) toast('No readable text found — the photo stays attached to your capture.');
+        else {
+          liveText.value = (liveText.value.trim() ? liveText.value.trim() + '\n' : '') + text;
+          baseText = liveText.value;
+          toast('Text added below — edit it, then Summarize & Add, or save it as a note.');
+          track('feature_used', {feature: 'photo_ocr'});
+        }
+      } catch (err) { toast('Couldn’t read the photo: ' + (err.message || err)); }
+      ocr.disabled = false; setIconLabel(ocr, 'sparkles', 'Read text from photo');
+    });
+    strip.appendChild(ocr);
+  }
+  const x = document.createElement('button');
+  x.className = 'btn ghost';
+  setIconLabel(x, 'x', 'Remove');
+  x.setAttribute('aria-label', 'Remove the photo');
+  x.addEventListener('click', () => { capturePhoto = null; renderPhotoStrip(); });
+  strip.appendChild(x);
+  strip.style.display = 'flex';
+}
+document.getElementById('snapBtn').addEventListener('click', () => document.getElementById('photoInput').click());
+document.getElementById('photoInput').addEventListener('change', async (e) => {
+  const file = e.target.files && e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  const thumb = await compressImage(file);
+  if (!thumb){ toast('That image couldn’t be compressed enough — try a closer, simpler shot.'); return; }
+  capturePhoto = thumb;
+  renderPhotoStrip();
+  track('feature_used', {feature: 'photo_capture'});
+});
+async function geminiOcr(dataUrl){
+  const b64 = dataUrl.split(',')[1];
+  const mime = (dataUrl.match(/^data:([^;]+)/) || [])[1] || 'image/jpeg';
+  const data = await geminiGenerate({contents: [{role: 'user', parts: [
+    {inline_data: {mime_type: mime, data: b64}},
+    {text: 'Read ALL text visible in this photo (a school notice, appointment letter, medication label, whiteboard, handwritten list, receipt…). Return just the text, faithfully — keep dates, times, names and dollar amounts exactly as written, one line per line. If nothing is readable, return exactly NO_TEXT.'}]}]});
+  const t = (geminiText(data) || '').trim();
+  return t === 'NO_TEXT' ? '' : t;
+}
+
 const saveIdeaBtn = document.getElementById('saveIdeaBtn');
 saveIdeaBtn.addEventListener('click', async () => {
   saveIdeaBtn.disabled = true;            // no double-fires while the tail lands
   await finishVoiceCapture();             // ends any recording + waits for the last words
   saveIdeaBtn.disabled = false;
   const raw = liveText.value.trim();
-  if (!raw){ toast('Nothing to save — speak or type an idea first.'); return; }
+  // v93: a photo with no words is still worth keeping — a plain photo note
+  if (!raw && capturePhoto){
+    const idea = {id: uid(), raw: 'Photo note', summary: 'Photo note', priority: 'low',
+      engine: 'note', ts: Date.now(), photo: capturePhoto};
+    ideas.unshift(idea); saveIdeas();
+    capturePhoto = null; renderPhotoStrip();
+    toast('Photo saved to your Notes — add words next time to turn it into tasks.', () => { showView('ideas'); highlightIdea(idea.id); }, 'View');
+    return;
+  }
+  if (!raw){ toast('Nothing to save — speak, type, or snap a photo first.'); return; }
   const idea = {id: uid(), raw, summary: raw.length > 120 ? raw.slice(0, 117) + '…' : raw,
-    priority: 'medium', engine: 'built-in', pending: true, dest: captureDestVal(), ts: Date.now()};
+    priority: 'medium', engine: 'built-in', pending: true, dest: captureDestVal(), ts: Date.now(),
+    ...(capturePhoto ? {photo: capturePhoto} : {})};
+  capturePhoto = null; renderPhotoStrip();
   ideas.unshift(idea); saveIdeas();
   liveText.value = ''; baseText = '';
   renderProcStrip();
@@ -3142,15 +3233,19 @@ document.getElementById('saveNoteBtn').addEventListener('click', async () => {
   noteBtn.disabled = true;
   await finishVoiceCapture();             // ends any recording + waits for the last words
   noteBtn.disabled = false;
-  const raw = liveText.value.trim();
-  if (!raw){ toast('Nothing to save — speak or type a note first.'); return; }
+  const raw0 = liveText.value.trim();
+  if (!raw0 && !capturePhoto){ toast('Nothing to save — speak, type, or snap a photo first.'); return; }
+  const raw = raw0 || 'Photo note';       // v93: a photo can BE the note
   const sp = noteSpace();
   if (!sp) return;
   // keep a private copy in Ideas too, marked already-shared to this space
   const idea = {id: uid(), raw, summary: raw.length > 120 ? raw.slice(0, 117) + '…' : raw,
-    priority: 'low', engine: 'note', ts: Date.now(), sharedTo: [sp.hid]};
+    priority: 'low', engine: 'note', ts: Date.now(), sharedTo: [sp.hid],
+    ...(capturePhoto ? {photo: capturePhoto} : {})};
   ideas.unshift(idea); saveIdeas();
-  logEvent('note', {id: 'note-' + idea.id, text: noteShareText(raw), space: sp.hid});
+  logEvent('note', {id: 'note-' + idea.id, text: noteShareText(raw), space: sp.hid,
+    ...(idea.photo ? {thumb: idea.photo} : {})});
+  capturePhoto = null; renderPhotoStrip();
   track('feature_used', {feature: 'care_note'});
   liveText.value = ''; baseText = '';
   // show WHERE it went — the journal lives behind "History & briefing", which
@@ -3256,6 +3351,17 @@ function renderIdeas(){
     const rawEl = card.querySelector('.raw');
     rawEl.textContent = idea.raw;
     rawEl.addEventListener('click', () => rawEl.classList.toggle('open'));
+    // v93: a snapped photo shows on its note card, tap to view full-size
+    if (idea.photo){
+      const ph = document.createElement('img');
+      ph.src = idea.photo; ph.alt = 'Photo attached to this note';
+      ph.style.cssText = 'max-height:96px; max-width:100%; border-radius:8px; margin:6px 0; cursor:zoom-in; display:block;';
+      ph.addEventListener('click', () => {
+        const w = window.open('', '_blank');
+        if (w){ w.document.write('<img src="' + idea.photo + '" style="max-width:100%">'); w.document.close(); }
+      });
+      card.insertBefore(ph, rawEl.nextSibling);
+    }
     // C2c: opt-in journal — ideas stay private unless shared to a space.
     // v73: a misdirected share can be taken back — the journal stops showing the
     // note (and the reports exclude it), but the append-only record keeps BOTH
@@ -3280,7 +3386,8 @@ function renderIdeas(){
           saveIdeas(); renderIdeas();
           toast(`Removed from the ${sp.name} journal — the record keeps both entries`, () => openHistory(sp), 'View');
         } else {
-          logEvent('note', {id: 'note-' + idea.id, text: noteShareText(idea.raw), space: sp.hid});
+          logEvent('note', {id: 'note-' + idea.id, text: noteShareText(idea.raw), space: sp.hid,
+            ...(idea.photo ? {thumb: idea.photo} : {})});
           idea.sharedTo = [...(idea.sharedTo || []), sp.hid];
           saveIdeas(); renderIdeas();
           toast(`Shared to the ${sp.name} journal`, () => openHistory(sp), 'View');
@@ -4529,7 +4636,7 @@ function renderCareHandoff(){
   const lineFor = (e) => {
     const clip = (s) => { s = String(s || ''); return s.length > 80 ? s.slice(0, 78) + '…' : s; };
     const at = (ts) => new Date(ts).toLocaleTimeString(undefined, {hour: 'numeric', minute: '2-digit'});
-    if (e.kind === 'note')    return '' + (capName(e.who) || 'A carer') + ' noted: “' + clip(e.text) + '”';
+    if (e.kind === 'note')    return '' + (capName(e.who) || 'A carer') + ' noted: “' + clip(e.text) + '”' + (e.thumb ? ' (photo attached)' : '');
     if (e.kind === 'missed')  return '' + clip(e.text) + ' — not recorded' + (e.detail ? ' (' + e.detail + ')' : '');
     if (e.kind === 'ticked')  return '' + (capName(e.who) || 'Someone') + ' did “' + clip(e.text) + '”';
     if (e.kind === 'created') return '' + (capName(e.who) || 'Someone') + ' added “' + clip(e.text) + '”';
@@ -4733,6 +4840,8 @@ function logEvent(kind, td, detail, whoOverride){
   const who = whoOverride !== undefined ? whoOverride : (myName() || null);
   const ev = {id: uid(), ts: Date.now(), who, kind,
               taskId: td.id, text: td.text, space: td.space || null, detail: detail || null};
+  // v93: a photo note carries its (compressed) image into the shared record
+  if (td.thumb) ev.thumb = td.thumb;
   // circle spaces (v79): stamp visibility + author UID so the role-scoped
   // rules can enforce who reads this — and workers' filtered queries match it.
   // td.vis lets a caller scope tighter (incidents are 'team': owner/co-admins
@@ -4749,6 +4858,11 @@ function logEvent(kind, td, detail, whoOverride){
   const evs = store.get('events', []);
   evs.push(ev);
   if (evs.length > 2000) evs.splice(0, evs.length - 2000);
+  // v93: photos are big — keep full images only on the newest 20 photo events
+  // LOCALLY (the synced copy already left this device; text is never stripped)
+  const withThumb = evs.filter(e => e.thumb);
+  if (withThumb.length > 20)
+    withThumb.slice(0, withThumb.length - 20).forEach(e => { delete e.thumb; e.photoStripped = true; });
   store.set('events', evs);
   if (ev.space && spaceRt[ev.space] && spaceRt[ev.space].db){
     fbFs.setDoc(fbFs.doc(spaceRt[ev.space].db, 'households', ev.space, 'events', ev.id), ev)
@@ -5490,6 +5604,17 @@ function renderHistory(){
       body.appendChild(d);
     }
     l.appendChild(when); l.appendChild(body);
+    // v93: a photo note shows its image in the record
+    if (ev.thumb){
+      const ph = document.createElement('img');
+      ph.src = ev.thumb; ph.alt = 'Photo attached to this note';
+      ph.style.cssText = 'max-height:64px; max-width:84px; border-radius:6px; cursor:zoom-in;';
+      ph.addEventListener('click', () => {
+        const w = window.open('', '_blank');
+        if (w){ w.document.write('<img src="' + ev.thumb + '" style="max-width:100%">'); w.document.close(); }
+      });
+      l.appendChild(ph);
+    }
     el.appendChild(l);
   });
 }
@@ -5555,7 +5680,7 @@ function briefingInput(sp){
   const since = Date.now() - 28 * 86400000;
   const evs = histEvents.filter(e => e.ts >= since);
   const line = (e) => new Date(e.ts).toLocaleDateString() + ' — ' + (capName(e.who) || 'someone') + ': ' + e.text +
-    (e.detail ? ' (' + e.detail + ')' : '');
+    (e.detail ? ' (' + e.detail + ')' : '') + (e.thumb ? ' [photo attached — see the app]' : '');
   // missed doses aren't attributable to a person — phrase as "not recorded"
   const missedLine = (e) => new Date(e.ts).toLocaleDateString() + ' — ' + e.text + ' — not recorded as done' +
     (e.detail ? ' (' + e.detail + ')' : '');
