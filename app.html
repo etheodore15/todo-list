@@ -746,7 +746,7 @@
       <input type="file" id="importFile" accept=".json,application/json" style="display:none">
       <button class="btn ghost" id="wipeBtn">Delete all data</button>
     </div>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v94<br><span id="envInfo"></span></p>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v95<br><span id="envInfo"></span></p>
   </section>
 </main>
 
@@ -799,6 +799,19 @@
   </div>
 </div>
 
+<div id="joinerOb" role="dialog" aria-modal="true" aria-labelledby="joTitle" style="display:none; position:fixed; inset:0; z-index:80; background:var(--bg); overflow-y:auto;">
+  <div class="ob-inner">
+    <p class="ob-eyebrow" id="joEyebrow">You're in</p>
+    <h2 id="joTitle">You've joined</h2>
+    <p class="ob-sub" id="joSub"></p>
+    <ul id="joPoints" style="margin:0 0 14px; padding-left:20px;"></ul>
+    <label class="ag-lab" for="joName">Your name</label>
+    <input id="joName" class="ag-inp" autocomplete="name" placeholder="Shown on everything you add or tick">
+    <p class="side-note" style="margin:4px 0 12px;">Everyone in the space sees actions with names on them — that's the whole trust model.</p>
+    <button class="btn primary" id="joCapture" style="width:100%;">Try your first capture →</button>
+    <button class="btn ghost" id="joLater" style="width:100%;">Explore first</button>
+  </div>
+</div>
 <div id="onboarding" role="dialog" aria-modal="true" aria-labelledby="obTitle" style="display:none;">
   <div class="ob-inner">
     <div id="obStep1">
@@ -7470,6 +7483,64 @@ document.getElementById('createHhBtn').addEventListener('click', async () => {
   }
 });
 
+/* ---------- joiner onboarding (v95 — persona study #21) ----------
+   Invite-joiners used to skip onboarding ENTIRELY — the FIFO partner, the
+   grandmother, the support worker arrived to a bare app with no idea what
+   the space does or why their name matters. Thirty seconds, shaped by the
+   space they just joined. Also the foundation for professional handover
+   (a caseworker sets up WITH a client, the app carries the welcome). */
+const JOINER_COPY = {
+  family: ['Speak or type on the capture screen — tasks land in this space for everyone to see and share.',
+    'Tick something off and it\'s recorded with your name — who did what, made visible without nagging.',
+    'The Journal tab reads it all back: the Week report shows who carried what, kindly.'],
+  coparenting: ['Everything in this space is a shared, append-only record — nothing can be silently edited or deleted, by either of you.',
+    'Put amounts on tasks and the ledger does the who-owes-whom; receipts attach as photos.',
+    'The records summary turns the record into a neutral report either parent can print.'],
+  care: ['Tick a medication and it becomes a record — who gave it, when. A missed dose is flagged for the next carer.',
+    'Save observations with the Save-note button — they feed the shift handoff and the doctor briefing.',
+    'Open the app at each shift and the "since your last visit" card catches you up.'],
+  circle: ['Tap Start support when you arrive — your ticks and notes read as part of that session in the record.',
+    'Notes you save land in the circle journal and group under plan goals in the Plan Review Pack.',
+    'Incidents are structured and private to you and the circle\'s admins — nothing notifies anyone outside the space.'],
+  'circle-viewer': ['You can read everything this circle shares — tasks, notes, the whole history.',
+    'You can\'t add to the circle (you\'re a viewer), but "Save to my Journal" keeps your own notes, private to you.',
+    'The circle\'s story lives in the Journal tab — reports, notes, records.'],
+};
+function showJoinerOnboarding(sp){
+  const seen = store.get('joinerObSeen', {});
+  if (seen[sp.hid]){ toast(`Joined "${sp.name}" `); return; }
+  const key = sp.type === 'circle' ? ((sp.role || '') === 'viewer' ? 'circle-viewer' : 'circle') : sp.type;
+  const points = JOINER_COPY[key] || JOINER_COPY.family;
+  document.getElementById('joTitle').textContent = `You've joined "${sp.name}"`;
+  document.getElementById('joSub').textContent = sp.type === 'circle'
+    ? ((sp.role || '') === 'viewer' ? 'You follow this circle as a viewer.' : 'You support this circle — here\'s how your work is seen.')
+    : 'Here\'s how this space works in three lines.';
+  const ul = document.getElementById('joPoints');
+  ul.innerHTML = '';
+  points.forEach(p => {
+    const li = document.createElement('li');
+    li.style.cssText = 'font-size:.92rem; line-height:1.5; margin-bottom:8px;';
+    li.textContent = p;
+    ul.appendChild(li);
+  });
+  document.getElementById('joName').value = myName() || '';
+  const done = (toCapture) => {
+    const v = document.getElementById('joName').value.trim();
+    if (v && v !== myName()) setMyName(v);
+    const m = store.get('joinerObSeen', {}); m[sp.hid] = true; store.set('joinerObSeen', m);
+    document.getElementById('joinerOb').style.display = 'none';
+    if (toCapture){
+      if (canWriteSpace(sp)) captureDest = sp.hid;
+      showView('capture');
+      refreshCaptureMode();
+    }
+  };
+  document.getElementById('joCapture').onclick = () => done(true);
+  document.getElementById('joLater').onclick = () => done(false);
+  document.getElementById('joinerOb').style.display = 'flex';
+  track('feature_used', {feature: 'joiner_onboarding'});
+}
+
 document.getElementById('joinBtn').addEventListener('click', async () => {
   try {
     const inv = inviteDecode(document.getElementById('inviteInput').value);
@@ -7487,7 +7558,7 @@ document.getElementById('joinBtn').addEventListener('click', async () => {
     }
     if (await addSpace({hid: inv.hid, name: inv.name, type: inv.type, cfg: inv.cfg, managed: !!inv.managed,
         ...(inv.type === 'circle' ? {role: inv.role || 'worker'} : {})}))
-      toast(`Joined "${inv.name}" `);
+      showJoinerOnboarding({hid: inv.hid, name: inv.name, type: inv.type, role: inv.role});
   } catch (err) {
     syncMsg(' ' + err.message);
   }
