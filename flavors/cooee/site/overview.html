@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0f7b6c">
+<title>Cooee — features, functionality &amp; business model</title>
+<meta name="description" content="The complete overview of Cooee: the participant-owned coordination record for NDIS support circles — every feature, the trust model, and the end-to-end business model.">
+<style>
+  :root{--accent:#0f7b6c; --accent-subtle:rgba(15,123,108,.09);
+    --text:#182420; --muted:#5c6b66; --bg:#fbfaf7; --card:#ffffff; --card2:rgba(92,107,102,.08);
+    --border:#e3e1d8;}
+  @media (prefers-color-scheme: dark){
+    :root{--accent:#4fc3ae; --accent-subtle:rgba(79,195,174,.12);
+      --text:#eef4f2; --muted:#9fb0aa; --bg:#121815; --card:#1a221e; --card2:rgba(159,176,170,.10);
+      --border:#2c352f;}
+  }
+  *{box-sizing:border-box; margin:0;}
+  body{font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; background:var(--bg);
+    color:var(--text); line-height:1.6;}
+  .wrap{max-width:880px; margin:0 auto; padding:32px 20px 80px;}
+  header.hero{padding:36px 0 8px;}
+  .brand{color:var(--accent); font-weight:800; letter-spacing:.02em; margin-bottom:10px;}
+  h1{font-size:2rem; line-height:1.2; margin-bottom:10px;}
+  .sub{color:var(--muted); font-size:1.05rem; max-width:640px;}
+  .ctas{margin:18px 0 6px; display:flex; gap:10px; flex-wrap:wrap;}
+  .btn{display:inline-block; text-decoration:none; font-weight:700; padding:11px 18px; border-radius:12px;}
+  .btn.primary{background:var(--accent); color:#fff;}
+  .btn.ghost{border:1.5px solid var(--border); color:var(--text);}
+  h2{font-size:1.35rem; margin:44px 0 6px; scroll-margin-top:20px;}
+  h3{font-size:1.02rem; margin:20px 0 6px;}
+  p{margin-bottom:12px;}
+  p.lead{color:var(--muted);}
+  ul{padding-left:22px; margin-bottom:12px;}
+  li{margin-bottom:6px;}
+  .grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:14px; margin:16px 0;}
+  .card{background:var(--card); border:1px solid var(--border); border-radius:16px; padding:16px 18px;}
+  .card h3{margin-top:0;}
+  .card p, .card li{font-size:.93rem;}
+  .pill{display:inline-block; background:var(--accent-subtle); color:var(--accent); font-weight:700;
+    font-size:.78rem; padding:2px 10px; border-radius:99px; margin-bottom:8px;}
+  .flow{display:flex; gap:10px; flex-wrap:wrap; margin:16px 0;}
+  .flow .step{flex:1; min-width:180px; background:var(--card2); border-radius:14px; padding:14px 16px; font-size:.92rem;}
+  .flow .step b{display:block; margin-bottom:4px;}
+  .tablewrap{overflow-x:auto; margin:14px 0;}
+  table{border-collapse:collapse; width:100%; font-size:.9rem; min-width:560px;}
+  th,td{border:1px solid var(--border); padding:8px 10px; text-align:left; vertical-align:top;}
+  th{background:var(--card2);}
+  .promise{background:var(--card); border:1.5px solid var(--accent); border-radius:16px;
+    padding:16px 20px; margin:16px 0; font-size:.95rem;}
+  .note{font-size:.85rem; color:var(--muted); border-top:1px solid var(--border); margin-top:48px; padding-top:16px;}
+  .toc{background:var(--card2); border-radius:14px; padding:14px 18px; font-size:.9rem; margin:20px 0;}
+  .toc a{color:var(--accent); text-decoration:none; margin-right:14px; white-space:nowrap; line-height:2;}
+  a{color:var(--accent);}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <p class="brand">Cooee</p>
+  <h1>Your support circle, on the same page — and the record is yours.</h1>
+  <p class="sub">The complete overview of Cooee: a coordination record owned by the NDIS
+    participant, for family and support workers who don't share an employer. Everything below
+    describes working software (currently in pilot) unless marked otherwise.</p>
+  <div class="ctas">
+    <a class="btn primary" href="app/">Open the app (pilot)</a>
+    <a class="btn ghost" href="index.html">Landing page</a>
+  </div>
+</header>
+
+<nav class="toc">
+  <a href="#what">What Cooee is</a><a href="#roles">Roles &amp; visibility</a>
+  <a href="#worker">A worker's day</a><a href="#goals">Plan goals &amp; the Pack</a>
+  <a href="#money">Money</a><a href="#engine">The shared engine</a>
+  <a href="#onboarding">Onboarding</a><a href="#trust">Trust promises</a>
+  <a href="#validation">Validation</a><a href="#business">Business model</a>
+</nav>
+
+<h2 id="what">What Cooee is</h2>
+<p class="lead">Most NDIS software is bought by providers and points at the workforce: rostering,
+clock-ins, compliance for the employer. Cooee flips the ownership. It's the
+<b>participant's</b> coordination record — family, independent support workers, and allied
+health all writing into one append-only history that the participant (or their nominee) owns,
+can export, and can walk away with.</p>
+<div class="flow">
+  <div class="step"><b>1 · Speak it once</b>A worker, parent or the participant talks (or types,
+    or snaps a photo) — tasks, observations and expenses structure themselves. No forms at the
+    moment of care.</div>
+  <div class="step"><b>2 · The circle stays in step</b>Everything lands in the circle with
+    attribution: who did what, when, in which support session. New workers read the handoff
+    instead of asking the parent to repeat it.</div>
+  <div class="step"><b>3 · It reads back when it matters</b>The record composes into a
+    goal-grouped Plan Review Pack, a claim-ready expense CSV, and everyday handoffs — instead of
+    living in one exhausted person's head.</div>
+</div>
+
+<h2 id="roles">Roles &amp; rules-enforced visibility</h2>
+<ul>
+  <li><b>Four roles:</b> owner (the participant or nominee), co-admin (usually family),
+    worker, and viewer — enforced by the database's security rules, not just by the interface.
+    A tampered client still can't read or write beyond its role.</li>
+  <li><b>Per-item visibility</b> — circle / team / assigned / private — with one invariant that
+    never bends: <b>nothing is ever hidden from the owner.</b> It's the participant's record.</li>
+  <li><b>Viewers are truly read-only:</b> a grandparent or case manager sees everything shared
+    with them and is never offered a writable-looking control (and keeps a private journal for
+    their own words).</li>
+  <li><b>Invites can only mint worker or viewer.</b> Elevation to co-admin is a deliberate act by
+    an owner or co-admin, never something a code can grant.</li>
+  <li>The whole permission matrix is proven by an 80-check automated test that gates every
+    release.</li>
+</ul>
+
+<h2 id="worker">A support worker's day</h2>
+<ul>
+  <li><b>Session brackets:</b> tap "Start support", do the shift, tap "End support" — every tick
+    and note in between reads as part of that session in the history and handoff. Sessions
+    auto-close after 12 hours with an honest marker.</li>
+  <li><b>Deliberately not time-tracking:</b> no per-worker duration totals, no GPS, no clock-in
+    surveillance. Cooee records care, not the workforce.</li>
+  <li><b>Observations aren't tasks:</b> "she seemed tired after the pool today" stays a note in
+    the record — the AI and the local engine both speak circle vocabulary (participant, session
+    talk, observations) instead of turning everything into a to-do.</li>
+  <li><b>Incident reports:</b> structured what / when / who / action-taken, voice-fillable from
+    the capture box, visible to the author and the circle's admins only, append-only — with plain
+    copy that it notifies nobody outside the space.</li>
+  <li><b>Meds &amp; routines</b> from the shared engine: one task per dose, ticks are records,
+    misses are flagged, and a PRN line shows the last dose and when the prescribed gap ends.
+    The app computes, never advises.</li>
+</ul>
+
+<h2 id="goals">Plan goals &amp; the Plan Review Pack</h2>
+<ul>
+  <li><b>Goals in the participant's words:</b> the circle records what the supports work toward.
+    Each goal derives a tag that the AI and the tag picker offer, so everyday work quietly
+    accumulates under the goal it serves.</li>
+  <li><b>The Plan Review Pack:</b> one tap composes 12 weeks of the record — goal progress,
+    support sessions, incidents, adherence, open tasks and expenses — into a document ready for a
+    plan review. AI-summarised with a local fallback; every render carries "Participant-owned
+    coordination record. Not medical, legal, or NDIS advice."</li>
+  <li>For families who walk into plan reviews with a shoebox of memories, this is the product's
+    defining moment: the year's evidence, already organised.</li>
+</ul>
+
+<h2 id="money">Money that's ready for a claim</h2>
+<ul>
+  <li>Spoken amounts become expenses at capture ("$42 for the taxi to hydro").</li>
+  <li>Circle expenses carry <b>provider, ABN and support date</b>; receipt photos compress
+    on-device and ride along.</li>
+  <li>The ledger CSV exports with <b>support_date / provider_abn / receipt_ref</b> columns —
+    shaped for plan-managed and self-managed claims paperwork.</li>
+</ul>
+
+<h2 id="engine">Everything the shared engine brings</h2>
+<p class="lead">Cooee is a flavor of the same engine that powers Idea → Todo — one codebase,
+so every coordination feature arrives in both products.</p>
+<div class="grid">
+  <div class="card"><span class="pill">Capture</span>
+    <h3>Voice, photo, text</h3>
+    <ul><li>Live in-browser transcription; opt-in fully offline speech-to-text</li>
+    <li>Photo capture: snap a letter or label — OCR into the pipeline, or the photo rides the note</li>
+    <li>Care-register speech extracts without action verbs ("Dad donepezil every day at 8am")</li>
+    <li>Honest counting: if a long monologue exceeds one capture, the app says what didn't fit</li></ul></div>
+  <div class="card"><span class="pill">Trust layer</span>
+    <h3>The record</h3>
+    <ul><li>Append-only history — deletes leave tombstones, nothing is silently rewritten</li>
+    <li>Attribution on every action</li>
+    <li>CSV + print/PDF export, always free</li>
+    <li>Spaces archive with dignity; "Export &amp; remove" for placement changes</li></ul></div>
+  <div class="card"><span class="pill">Daily life</span>
+    <h3>Tasks that fit real weeks</h3>
+    <ul><li>Real-life recurrence: fortnightly, quarterly, "every three hours"</li>
+    <li>Delegation by voice; assignees; per-person filters</li>
+    <li>No-shame carry-over — nothing ever goes red</li>
+    <li>Daily digest and a "while you were away" banner</li></ul></div>
+  <div class="card"><span class="pill">Read-back</span>
+    <h3>Reports</h3>
+    <ul><li>Doctor briefing with numeric readings trends (BGL, sats, feeds…)</li>
+    <li>Shift handoff for the next worker</li>
+    <li>Plan Review Pack (Cooee's own)</li>
+    <li>All compose locally in an instant; AI optionally enriches; all print</li></ul></div>
+</div>
+<p>Platform: an installable, offline-capable web app (no app store required), a managed
+zero-config backend with rules-enforced membership, on-device AI options for the
+privacy-sensitive, and accessibility built in.</p>
+
+<h2 id="onboarding">Onboarding — built for circles that grow</h2>
+<ul>
+  <li><b>First run:</b> guided setup creates the circle, names the participant's space, and
+    coaches the first capture.</li>
+  <li><b>Joining by invite:</b> every arrival gets a 30-second welcome shaped by their role — a
+    worker learns session brackets, plan-goal notes and private incidents; a viewer learns
+    they can read everything and write nothing. Then straight into a first capture.</li>
+  <li><b>Professionally hand-overable:</b> a support coordinator or OT can set the circle up
+    <i>with</i> a family and let the app carry the welcome from there. (A fuller professional
+    mode is a planned bet.)</li>
+</ul>
+
+<h2 id="trust">The trust promises</h2>
+<div class="promise">
+  <b>No GPS. No clock-in surveillance. Australian-hosted. Export and leave any time.</b><br>
+  Participant-owned coordination record. Not medical, legal, or NDIS advice.<br><br>
+  These aren't marketing lines — they're product constraints. The record, attribution and
+  exports are free forever; the permission matrix is enforced server-side and proven by tests;
+  and there is deliberately no worker-hours reporting, because the day Cooee becomes a
+  surveillance tool is the day workers stop writing honest notes in it.
+</div>
+
+<h2 id="validation">Validation — the 44-persona study</h2>
+<p>Cooee's flows were driven end-to-end by executable persona simulations as part of a 44-persona
+study across both products — including NDIS circles with independent workers, young carers,
+palliative rosters and foster placements. Every finding ranked P0–P2 has been shipped and
+re-verified against the personas that surfaced it. The pilot circle is the next validation
+layer: real families, real workers, real plan reviews.</p>
+
+<h2 id="business">The business model, end to end</h2>
+
+<h3>Who pays, and why they would</h3>
+<p>The buyer is the <b>participant or their family</b> — the people who own the record and walk
+into the plan review. Coordination costs in this cohort are real and budgeted; families
+routinely fund low-cost tools that reduce coordination load, often from Core–Consumables in a
+plan-managed or self-managed budget. (Whether a given purchase fits a given plan is between the
+participant and their plan manager — Cooee makes no funding claims.)</p>
+
+<h3>Pricing</h3>
+<div class="tablewrap"><table>
+  <tr><th></th><th>Free</th><th>Circle subscription — $19/mo · $190/yr per circle</th></tr>
+  <tr><td>The record, roles, sessions, incidents, exports</td><td colspan="2">Free forever — the trust layer is never paywalled</td></tr>
+  <tr><td>Support workers &amp; viewers</td><td colspan="2"><b>Free forever, always.</b> Workers are the adoption channel, not the customer</td></tr>
+  <tr><td>Plan Review Pack</td><td>12-week pack, goal-grouped, AI overview on the shared quota</td><td>Longer periods, polished export, concierge support</td></tr>
+  <tr><td>AI structuring &amp; voice</td><td>Generous daily quotas</td><td>Extended quotas across the circle</td></tr>
+  <tr><td>Priority support &amp; concierge onboarding</td><td>—</td><td>Included — it matters for this cohort</td></tr>
+</table></div>
+<ul>
+  <li><b>One subscription covers the whole circle</b> — family, every worker, every viewer.
+    No per-seat pricing, ever: each circle recruits its own members, and gating members would
+    strangle the growth loop.</li>
+  <li><b>The free Pack is the demo that sells the subscription:</b> the gate sits at period
+    depth and export polish, never at record access.</li>
+  <li><b>Trial shape:</b> full product until the first Plan Review Pack export — the value
+    moment prices itself.</li>
+</ul>
+
+<h3>Distribution — the worker is the wedge</h3>
+<div class="flow">
+  <div class="step"><b>Workers spread it</b>Independent support workers serve several
+    participants. A worker who lives in one Cooee circle introduces it to the next family —
+    free forever means zero friction.</div>
+  <div class="step"><b>Coordinators hand it over</b>Support coordinators and OTs teach
+    coordination habits already; role-shaped joiner onboarding makes Cooee something they can
+    set up with a family in one visit.</div>
+  <div class="step"><b>The Pack closes</b>The first plan review with an organised, goal-grouped
+    record is the retention event — and the neighbouring family hears about it.</div>
+</div>
+
+<h3>Unit economics</h3>
+<p>Cooee shares Idea → Todo's engine and infrastructure — one codebase, one backend, marginal
+cost per circle measured in cents. At $190/yr per circle with workers free, a small number of
+subscribed circles sustains the product; the engine's development cost amortises across both
+products.</p>
+
+<h3>Where it is honestly at</h3>
+<p>Cooee is in pilot with a small circle. The subscription is designed and priced but not yet
+switched on — the pilot runs on the full product while the payment plumbing (web billing first)
+and the production backend cutover land. Extraction is English-only today (a multilingual plan
+exists, unscheduled). The full site is on its way; this page and the app are the current front
+door.</p>
+
+<p class="note">Cooee · built on the Idea → Todo engine ·
+<a href="https://etheodore15.github.io/todo-list/overview.html">Idea → Todo overview</a> ·
+<a href="https://github.com/etheodore15/todo-list">source &amp; living docs</a><br>
+Participant-owned coordination record. Not medical, legal, or NDIS advice.<br>
+No GPS. No clock-in surveillance. Australian-hosted. Export and leave any time.<br>
+Figures above are internal operating numbers, not market forecasts.</p>
+
+</div>
+</body>
+</html>

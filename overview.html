@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#7132f5">
+<title>Idea → Todo — features, functionality &amp; business model</title>
+<meta name="description" content="The complete overview of Idea → Todo: the voice-first coordination app for ADHD focus, families, co-parents and care teams — every feature, and the end-to-end business model.">
+<style>
+  :root{--accent:#7132f5; --accent2:#5741d8; --accent-subtle:rgba(113,50,245,.08);
+    --text:#101114; --muted:#686b82; --bg:#ffffff; --card:#ffffff; --card2:rgba(148,151,169,.08);
+    --border:#dedee5; --ok:#149e61;}
+  @media (prefers-color-scheme: dark){
+    :root{--accent:#a687ff; --accent2:#8f75ec; --accent-subtle:rgba(166,135,255,.12);
+      --text:#eceaf4; --muted:#a3a1b8; --bg:#131218; --card:#1a1922; --card2:rgba(148,151,169,.10);
+      --border:#2e2c3a; --ok:#3dbd85;}
+  }
+  *{box-sizing:border-box; margin:0;}
+  body{font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; background:var(--bg);
+    color:var(--text); line-height:1.6;}
+  .wrap{max-width:880px; margin:0 auto; padding:32px 20px 80px;}
+  header.hero{padding:36px 0 8px;}
+  .brand{color:var(--accent); font-weight:800; letter-spacing:.02em; margin-bottom:10px;}
+  h1{font-size:2rem; line-height:1.2; margin-bottom:10px;}
+  .sub{color:var(--muted); font-size:1.05rem; max-width:640px;}
+  .ctas{margin:18px 0 6px; display:flex; gap:10px; flex-wrap:wrap;}
+  .btn{display:inline-block; text-decoration:none; font-weight:700; padding:11px 18px; border-radius:12px;}
+  .btn.primary{background:var(--accent); color:#fff;}
+  .btn.ghost{border:1.5px solid var(--border); color:var(--text);}
+  h2{font-size:1.35rem; margin:44px 0 6px; scroll-margin-top:20px;}
+  h3{font-size:1.02rem; margin:20px 0 6px;}
+  p{margin-bottom:12px;}
+  p.lead{color:var(--muted);}
+  ul{padding-left:22px; margin-bottom:12px;}
+  li{margin-bottom:6px;}
+  .grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:14px; margin:16px 0;}
+  .card{background:var(--card); border:1px solid var(--border); border-radius:16px; padding:16px 18px;}
+  .card h3{margin-top:0;}
+  .card p, .card li{font-size:.93rem;}
+  .pill{display:inline-block; background:var(--accent-subtle); color:var(--accent); font-weight:700;
+    font-size:.78rem; padding:2px 10px; border-radius:99px; margin-bottom:8px;}
+  .flow{display:flex; gap:10px; flex-wrap:wrap; margin:16px 0;}
+  .flow .step{flex:1; min-width:180px; background:var(--card2); border-radius:14px; padding:14px 16px; font-size:.92rem;}
+  .flow .step b{display:block; margin-bottom:4px;}
+  .tablewrap{overflow-x:auto; margin:14px 0;}
+  table{border-collapse:collapse; width:100%; font-size:.9rem; min-width:560px;}
+  th,td{border:1px solid var(--border); padding:8px 10px; text-align:left; vertical-align:top;}
+  th{background:var(--card2);}
+  .note{font-size:.85rem; color:var(--muted); border-top:1px solid var(--border); margin-top:48px; padding-top:16px;}
+  .toc{background:var(--card2); border-radius:14px; padding:14px 18px; font-size:.9rem; margin:20px 0;}
+  .toc a{color:var(--accent); text-decoration:none; margin-right:14px; white-space:nowrap; line-height:2;}
+  a{color:var(--accent);}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <p class="brand">Idea → Todo</p>
+  <h1>Speak it once. It becomes tasks, records, and a team that knows.</h1>
+  <p class="sub">The complete overview of the product — every shipped feature, how the cohort packs
+    fit together, and the end-to-end business model. Everything below describes working software
+    (currently v95) unless marked otherwise.</p>
+  <div class="ctas">
+    <a class="btn primary" href="app.html">Open the app</a>
+    <a class="btn ghost" href="index.html">Landing page</a>
+  </div>
+</header>
+
+<nav class="toc">
+  <a href="#engine">The engine</a><a href="#capture">Capture</a><a href="#tasks">Tasks</a>
+  <a href="#spaces">Spaces &amp; trust</a><a href="#packs">Cohort packs</a><a href="#reports">Reports</a>
+  <a href="#onboarding">Onboarding</a><a href="#platform">Platform</a>
+  <a href="#validation">Validation</a><a href="#business">Business model</a>
+</nav>
+
+<h2 id="engine">One engine, three moves</h2>
+<p class="lead">Idea → Todo is an installable web app that turns spoken, messy intentions into
+structured, shared, delegated to-do lists — and turns everyday actions into a record a family
+can trust.</p>
+<div class="flow">
+  <div class="step"><b>1 · Capture</b>Talk (live transcript), type, or snap a photo. No organising
+    required at the moment of thought — that's the whole point.</div>
+  <div class="step"><b>2 · Structure</b>AI + a hardened local engine split the ramble into tasks
+    with dates, times, recurrence, people, energy levels and dollar amounts. Anything that isn't a
+    task is kept as a note, never lost.</div>
+  <div class="step"><b>3 · Share &amp; trust</b>Tasks land in shared spaces with attribution on every
+    action. The history is append-only — nothing can be silently rewritten — and it reads back as
+    per-audience reports.</div>
+</div>
+
+<h2 id="capture">Capture</h2>
+<ul>
+  <li><b>Voice-first:</b> near-real-time live transcription in the browser; opt-in fully offline
+    speech-to-text (Whisper on-device) for privacy-sensitive users.</li>
+  <li><b>Understands how carers and parents actually speak:</b> "Dad donepezil every day at 8am",
+    "Ruby speech therapy Tuesday 10am", "Sofia needs new footy boots" — med and appointment
+    noun-phrases extract without an action verb.</li>
+  <li><b>Photo capture:</b> snap a school notice, appointment letter or medication label —
+    "Read text from photo" drops the words into the capture box so the whole pipeline applies;
+    or the photo simply rides the note into the journal and shared record.</li>
+  <li><b>Spoken money is an expense:</b> "$38 school photo money", "I paid $180 for the carpet
+    cleaner" carry amount, payer and date straight into the shared ledger.</li>
+  <li><b>Destination chips:</b> every capture says where it lands — Private or any space.
+    Read-only roles are never offered a writable-looking destination.</li>
+  <li><b>A private journal:</b> "Save to my Journal" keeps a note (text and/or photo) on-device
+    with no task extraction and no space record — shareable later, deliberately.</li>
+  <li><b>Honest counting:</b> if a long monologue exceeds what one capture keeps, the app says
+    what didn't fit. Silent loss is the one sin a capture tool can't afford.</li>
+</ul>
+
+<h2 id="tasks">Task management</h2>
+<ul>
+  <li>Today view with priority bands, progress bar and a time-remaining estimate; Upcoming and
+    Someday lanes; tags with a checkbox picker; per-person filters; undo everywhere.</li>
+  <li><b>Real-life recurrence:</b> daily/weekly/monthly plus fortnightly ("every second Thursday"),
+    month-multiples ("quarterly"), and sub-daily ("every three hours" — ticking respawns the next
+    slot, so the tick history is the feed log).</li>
+  <li><b>Break it down:</b> a daunting task becomes 3–7 tiny first steps (AI, with task-aware fallbacks).</li>
+  <li><b>Energy matching, easy-wins filter, Just One Thing</b> full-screen focus mode, and a
+    <b>no-shame carry-over</b>: nothing ever goes red; after five quiet days the app gently asks
+    "still matters?"</li>
+  <li>Delegation by voice ("Josh to feed the dog"), assignees, per-task move between spaces.</li>
+</ul>
+
+<h2 id="spaces">Spaces &amp; the trust layer</h2>
+<ul>
+  <li><b>Multiple spaces</b> per account — Home + Mum's care + co-parenting — with one Today.</li>
+  <li><b>Attribution on everything:</b> who added, who ticked, when.</li>
+  <li><b>Append-only history:</b> the shared record cannot be edited or deleted — a delete leaves a
+    tombstone. Exportable as CSV and print/PDF, always free.</li>
+  <li><b>Notes never silently diverge:</b> generous share caps with an honest notice on the rare hit.</li>
+  <li><b>Spaces can close with dignity:</b> Archive keeps the record read-only and out of daily view;
+    "Export &amp; remove" downloads the record then purges it from the device — the foster-carer /
+    placement-end obligation, behind a typed confirmation.</li>
+  <li><b>Invites are short codes</b> with no secrets inside; anonymous-first accounts with optional
+    Google/email sign-in that links (not replaces) the identity.</li>
+</ul>
+
+<h2 id="packs">Cohort packs — one engine, four audiences</h2>
+<p class="lead">Audiences are served by feature bundles keyed to the coordination load they carry,
+switched by space type and self-selected cohort — not by forks.</p>
+<div class="grid">
+  <div class="card"><span class="pill">Focus &amp; follow-through</span>
+    <h3>ADHD / executive function</h3>
+    <ul><li>Voice brain-dump, Break it down, Just One Thing</li>
+    <li>Energy matching + easy wins; time-blindness aids</li>
+    <li>No-shame carry-over; Wins view; quiet visual mode</li>
+    <li>"My week in review" — did using this actually help?</li></ul></div>
+  <div class="card"><span class="pill">Household &amp; family</span>
+    <h3>Families &amp; share-houses</h3>
+    <ul><li>Shared tasks with assignees and who-did-what</li>
+    <li>Expense ledger with N-way settlement (five flatmates settle too)</li>
+    <li>Daily digest; "while you were away" banner</li>
+    <li>Week report: who carried what, and what's coming</li></ul></div>
+  <div class="card"><span class="pill">Co-parenting</span>
+    <h3>The record keeper</h3>
+    <ul><li>Append-only record + exports — a defensible history</li>
+    <li>AI tone check offers neutral rewrites before words land</li>
+    <li>Ledger with receipts, configurable split (70/30 is real life)</li>
+    <li>Custody days incl. school terms, holidays, and third caregivers ("kids with Grandma")</li></ul></div>
+  <div class="card"><span class="pill">Caring for someone</span>
+    <h3>The care team</h3>
+    <ul><li>Meds &amp; routines: every tick a record; misses flagged; one task per dose</li>
+    <li>PRN interval line: last dose + when the prescriber's gap ends</li>
+    <li>Care journal (voice/typed/photo) + shift handoff</li>
+    <li>Doctor briefing with numeric readings trends (BGL, sats, feeds…)</li></ul></div>
+</div>
+
+<h2 id="reports">Reports — the read-back</h2>
+<p>One overlay, one print path, a different question per audience: the <b>doctor briefing</b>
+("what does the GP need to know?"), <b>My week in review</b> ("did this actually help me?"),
+the family <b>Week report</b> ("who carried what?"), and the co-parenting <b>Records summary</b>
+("what would we both sign off on?"). All compose locally in an instant (AI optionally enriches),
+all itemize the record rather than summarising it away, and all print. The <b>Journal tab</b> is
+the home of every report, every raw note, and every space's records and ledger.</p>
+
+<h2 id="onboarding">Onboarding — both doors</h2>
+<ul>
+  <li><b>First run:</b> "What brings you here?" cohort self-selection → a toolkit explainer mapped
+    to the selection → one-tap creation of the right space type → a guided setup checklist →
+    a first-capture coach.</li>
+  <li><b>Joining by invite (new in v95):</b> a 30-second welcome shaped by the space being joined —
+    what this space does in three lines, the name attribution runs on, and straight into a first
+    capture. This is the foundation for professionally-guided onboarding: a caseworker or OT sets
+    up <i>with</i> a client, and the app carries the welcome from there.</li>
+</ul>
+
+<h2 id="platform">Platform</h2>
+<ul>
+  <li>Installable PWA — offline-capable end to end (capture → tasks → reports run with zero network),
+    no app store required. Store distribution in progress (Google Play via TWA; Apple via wrapper).</li>
+  <li>Managed zero-config backend (Firebase, operator-run) with membership-enforcing security rules;
+    a self-hosted option for technical users; on-device AI options for the privacy-sensitive.</li>
+  <li>Consent-first anonymised analytics; first-party operator dashboard; accessibility built in
+    (screen-reader labels, reduced motion, large targets, live-region transcription).</li>
+</ul>
+
+<h2 id="validation">Validation — the 44-persona study</h2>
+<p>Before this document's last major revision, 44 personas — spanning ADHD students and FIFO
+workers, six-kid blended families, tri-parenting households, palliative rosters, young carers,
+NDIS circles, foster carers and more — were built as <i>executable simulations</i> and driven
+through the real product end-to-end. The study produced 30 ranked findings; the top fifteen
+(every P0, P1 and P2 item) have since been shipped and re-verified against the personas that
+surfaced them. The remaining items are growth-tier bets, tracked openly.</p>
+
+<h2 id="business">The business model, end to end</h2>
+
+<h3>Who pays, and why they would</h3>
+<p>The audiences are chosen because their pain is concentrated — they <i>need</i> coordination,
+not a nicer list — and willingness to pay is proven in-market (the incumbent co-parenting
+record app charges over $100/year <i>per parent</i>). The buyer is the household organiser,
+the co-parent who needs a record, or the care team's anchor person.</p>
+
+<h3>Pricing principles (constraints on every lever)</h3>
+<ul>
+  <li><b>Never paywall the trust layer.</b> The append-only record, attribution, exports, and
+    leaving-with-your-data are free forever. That's the ethical spine.</li>
+  <li><b>The app works without paying.</b> Heuristic engine, browser speech, core tasks and spaces
+    stay free — premium buys capacity and convenience, never basic function.</li>
+  <li><b>Meter what costs money; gift what doesn't.</b> Levers attach to real marginal cost
+    (AI calls, cloud transcription minutes, storage) or clearly-premium surfaces (deep report
+    history) — not arbitrary fences.</li>
+  <li><b>Members and invites are never gated.</b> Spaces are the growth loop.</li>
+</ul>
+
+<h3>The consumer offer</h3>
+<div class="tablewrap"><table>
+  <tr><th></th><th>Free</th><th>Premium (~$4–6/mo)</th></tr>
+  <tr><td>Voice transcription</td><td>~8–12 solid captures/day (metered pool, failed calls refunded)</td><td>Extended/unlimited captures</td></tr>
+  <tr><td>AI structuring, breakdowns, briefings, tone check</td><td>30 calls/day</td><td>High/unlimited quota, faster model</td></tr>
+  <tr><td>Report history</td><td>Current period (7/28-day windows)</td><td>Any period; quarter/annual packs</td></tr>
+  <tr><td>Receipt photos</td><td>Compressed thumbnails</td><td>Full-resolution originals, longer retention</td></tr>
+  <tr><td>Tasks, spaces, members, record, exports</td><td colspan="2">Free forever — never gated</td></tr>
+</table></div>
+<p>Enforcement is already built: per-user daily quotas at the AI proxy (server-side, can't be
+bypassed client-side), per-capture voice caps, and an entitlement-flag path ready for a payment
+webhook. Anchor: cheaper than one coffee a month.</p>
+
+<h3>Unit economics</h3>
+<p>Infrastructure runs ≈ <b>7¢ per family per month</b> at the free tier (managed Firebase +
+metered AI through one operator key), so roughly <b>1% paid conversion covers all
+infrastructure</b>. There is no per-seat marginal cost worth metering: members and invites stay
+free because each space recruits its own members.</p>
+
+<h3>Distribution</h3>
+<ul>
+  <li><b>The space is the growth loop:</b> every user pulls in the 2–6 people they coordinate with;
+    the v95 joiner welcome converts those arrivals instead of dropping them into a bare app.</li>
+  <li><b>Community channels, persona-mapped:</b> ADHD creators and forums, single-parent and
+    co-parenting groups, carer organisations, school newsletters, FIFO and Defence family networks.</li>
+  <li><b>Professional referral:</b> OTs, ADHD coaches, family lawyers and settlement caseworkers
+    already teach coordination habits — the guided first-run plus joiner welcome makes the app
+    hand-overable. (A fuller professional mode is a planned bet.)</li>
+  <li><b>Store presence</b> (in progress) unlocks search intent: "co-parenting record app",
+    "medication tracker for carers", "ADHD todo voice".</li>
+</ul>
+
+<h3>Path to revenue</h3>
+<div class="flow">
+  <div class="step"><b>Now</b>Production cutover of the managed backend + AI proxy; privacy/terms
+    pages; account deletion.</div>
+  <div class="step"><b>Next</b>Google Play (TWA) and Apple wrapper; web billing (Stripe) first,
+    store billing after.</div>
+  <div class="step"><b>Then</b>Premium tier live against the already-enforced quotas; cohort
+    channel pilots; the Cooee circle subscription (see the Cooee overview) shares the engine.</div>
+</div>
+
+<h3>Honest limitations</h3>
+<p>English-only extraction today (a four-tier multilingual plan exists, unscheduled); minute-exact
+alarms need the store wrapper (the app promises adherence records, not alarms); AI features run on
+a heuristic fallback wherever AI is off — by design, everything works offline; and the product is
+in active development with the rough edges that implies.</p>
+
+<p class="note">Idea → Todo · currently v95 · <a href="https://github.com/etheodore15/todo-list">source &amp; living docs</a> ·
+sister product: <a href="https://etheodore15.github.io/cooee/overview.html">Cooee for NDIS support circles</a><br>
+Coordination software, not medical or legal advice. Figures above are internal operating numbers, not market forecasts.</p>
+
+</div>
+</body>
+</html>
