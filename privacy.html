@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#7132f5">
+<title>Idea → Todo — privacy policy</title>
+<meta name="description" content="What Idea → Todo stores, where it lives, what leaves your device, and how to take it back.">
+<style>
+  :root{--accent:#7132f5; --text:#101114; --muted:#686b82; --bg:#ffffff;
+    --card2:rgba(148,151,169,.08); --border:#dedee5;}
+  @media (prefers-color-scheme: dark){
+    :root{--accent:#a687ff; --text:#eceaf4; --muted:#a3a1b8; --bg:#131218;
+      --card2:rgba(148,151,169,.10); --border:#2e2c3a;}
+  }
+  *{box-sizing:border-box; margin:0;}
+  body{font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; background:var(--bg);
+    color:var(--text); line-height:1.65;}
+  .wrap{max-width:760px; margin:0 auto; padding:32px 20px 80px;}
+  .brand{color:var(--accent); font-weight:800; letter-spacing:.02em; margin:24px 0 8px;}
+  h1{font-size:1.7rem; line-height:1.25; margin-bottom:6px;}
+  .date{color:var(--muted); font-size:.9rem; margin-bottom:20px;}
+  h2{font-size:1.15rem; margin:32px 0 8px;}
+  p, li{margin-bottom:10px;}
+  ul{padding-left:22px; margin-bottom:12px;}
+  li{margin-bottom:6px;}
+  a{color:var(--accent);}
+  .callout{background:var(--card2); border-radius:14px; padding:14px 18px; margin:16px 0; font-size:.95rem;}
+  .note{font-size:.85rem; color:var(--muted); border-top:1px solid var(--border); margin-top:44px; padding-top:16px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+<p class="brand"><a href="index.html" style="text-decoration:none;">Idea → Todo</a></p>
+<h1>Privacy policy</h1>
+<p class="date">Effective 21 July 2026 · applies to the Idea → Todo app and website</p>
+
+<div class="callout"><b>The short version.</b> Your tasks and notes live on your device.
+Nothing is uploaded unless you deliberately use a feature that needs it — creating or joining
+a shared space, signing in, or using Smart AI. We never sell data, never show ads, and never
+paywall getting your data out. You can export everything and delete your account yourself,
+in the app.</div>
+
+<h2>Who we are</h2>
+<p>Idea → Todo is operated by its developer ("we", "the operator") in Australia. Contact
+options are on the <a href="support.html">support page</a>.</p>
+
+<h2>What stays on your device</h2>
+<p>By default, everything: tasks, captured notes and transcripts, your private journal,
+photos you attach, settings, and any API key you paste. It is stored in your browser's local
+storage on your device and goes nowhere unless a feature below sends it somewhere at your
+request. Deleting the app's data (Settings → Your data → Delete all data) removes it.</p>
+
+<h2>What leaves your device, and when</h2>
+<ul>
+  <li><b>Shared spaces (optional).</b> When you create or join a space, the content of that
+    space — its tasks, shared notes, the append-only history, expenses, receipt photos, and
+    member display names — syncs through our hosted database (Google Firebase / Cloud
+    Firestore, project <i>todo-list-50050</i>, hosted on Google Cloud in the United States).
+    Access is enforced by server-side security rules: only signed-in members of a space can
+    read it. Your private journal and unshared tasks are never synced.</li>
+  <li><b>Your account (optional).</b> Sign-in is anonymous by default — an ID with no name or
+    email. If you choose Google or email sign-in, we store the email address, linked to the
+    same account. We also keep a small per-account record: your list of space memberships,
+    your onboarding cohort selection, and a daily Smart AI usage counter (a number only —
+    never content).</li>
+  <li><b>Smart AI (optional).</b> When Smart AI structures a capture, breaks a task down,
+    tone-checks a message, enriches a report, or reads text from a photo, the relevant text
+    or image is sent to Google's Gemini API — through our proxy server (which checks your
+    daily quota and forwards the request; it does not store your content), or directly with
+    your own key if you pasted one. Google processes it to return the result, under
+    <a href="https://ai.google.dev/gemini-api/terms" target="_blank" rel="noopener">Google's
+    API terms</a>. Turn Smart AI off, or never enable it, and the built-in engine does the work
+    entirely on your device.</li>
+  <li><b>Voice (optional).</b> Live transcription uses your browser's speech engine, which on
+    most browsers sends audio to the browser vendor's servers (e.g. Google's, on Chrome). Where
+    the browser has no engine, short recorded segments are transcribed via the Smart AI path
+    above. The opt-in on-device model (Whisper) transcribes entirely on your device and works
+    offline — nothing leaves it.</li>
+  <li><b>Analytics (off by default).</b> If we ever enable analytics, it is opt-in, anonymous,
+    and feature-level only — which buttons get used, never what you typed. No task, note, name,
+    or amount is ever sent. Off unless you turn it on; change your mind in Settings any time.</li>
+</ul>
+
+<h2>What we never do</h2>
+<ul>
+  <li>No selling or sharing of personal information with third parties for their purposes.</li>
+  <li>No advertising, no trackers, no fingerprinting.</li>
+  <li>No reading your content. The operator's dashboard sees counts and feature usage, not
+    what you wrote. Shared-space content is readable only by that space's members.</li>
+  <li>No paywall on your data: export (CSV, print/PDF, full JSON backup) is free, forever.</li>
+</ul>
+
+<h2>Shared spaces are shared</h2>
+<p>A space's history is deliberately append-only — that's the trust layer that makes the record
+worth keeping. Content you put into a shared space is visible to that space's members and
+carries your display name. If you later leave a space or delete your account, the record you
+contributed <b>stays with the space's remaining members</b>, the way sent messages stay with
+their recipients. Your name label remains on those entries; your account and its access are
+gone.</p>
+
+<h2>Retention and deletion</h2>
+<ul>
+  <li><b>Device data:</b> yours, on your device; delete it in Settings → Your data.</li>
+  <li><b>Account:</b> delete it yourself in Settings → Account → Delete account. This removes
+    your sign-in, your per-account records (space list, cohort selection), and your access to
+    every space. Server backups age out within about 35 days.</li>
+  <li><b>AI quota counters</b> (a daily number, no content) are deleted with the account or
+    age out naturally.</li>
+</ul>
+
+<h2>Children</h2>
+<p>The app is built for household coordination and may be used by families together, but
+accounts are for people 13 and over (or the age of digital consent where you live). Younger
+children should participate through a parent's or guardian's space.</p>
+
+<h2>Security</h2>
+<p>Hosted data is protected by Google Cloud's infrastructure security, transport encryption
+(HTTPS), and per-space membership rules enforced on the server and covered by automated tests
+in our public repository. No system is perfect; we run with the smallest data footprint we
+can so there is less to protect.</p>
+
+<h2>Your rights</h2>
+<p>We handle personal information in line with the Australian Privacy Principles. Wherever you
+are, you can access your data (export, in-app), correct it (edit, in-app), and delete it
+(in-app). For anything else — including complaints, or questions this page doesn't answer —
+use the <a href="support.html">support page</a>. If you're in Australia and unsatisfied with
+our response, you can contact the Office of the Australian Information Commissioner
+(<a href="https://www.oaic.gov.au" target="_blank" rel="noopener">oaic.gov.au</a>).</p>
+
+<h2>Changes</h2>
+<p>If this policy changes materially, the effective date above changes and the app's release
+notes say so. We won't quietly weaken it.</p>
+
+<p class="note"><a href="index.html">Idea → Todo</a> · <a href="terms.html">Terms of use</a> ·
+<a href="support.html">Support</a> · <a href="overview.html">Product overview</a><br>
+Coordination software, not medical or legal advice.</p>
+</div>
+</body>
+</html>

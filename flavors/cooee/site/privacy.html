@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0f7b6c">
+<title>Cooee — privacy policy</title>
+<meta name="description" content="What Cooee stores, where it lives (Australia), who in your circle can see what, and how to take it all back.">
+<style>
+  :root{--accent:#0f7b6c; --text:#182420; --muted:#5c6b66; --bg:#fbfaf7;
+    --card2:rgba(92,107,102,.08); --border:#e3e1d8;}
+  @media (prefers-color-scheme: dark){
+    :root{--accent:#4fc3ae; --text:#eef4f2; --muted:#9fb0aa; --bg:#121815;
+      --card2:rgba(159,176,170,.10); --border:#2c352f;}
+  }
+  *{box-sizing:border-box; margin:0;}
+  body{font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; background:var(--bg);
+    color:var(--text); line-height:1.65;}
+  .wrap{max-width:760px; margin:0 auto; padding:32px 20px 80px;}
+  .brand{color:var(--accent); font-weight:800; letter-spacing:.02em; margin:24px 0 8px;}
+  h1{font-size:1.7rem; line-height:1.25; margin-bottom:6px;}
+  .date{color:var(--muted); font-size:.9rem; margin-bottom:20px;}
+  h2{font-size:1.15rem; margin:32px 0 8px;}
+  p, li{margin-bottom:10px;}
+  ul{padding-left:22px; margin-bottom:12px;}
+  li{margin-bottom:6px;}
+  a{color:var(--accent);}
+  .callout{background:var(--card2); border-radius:14px; padding:14px 18px; margin:16px 0; font-size:.95rem;}
+  .note{font-size:.85rem; color:var(--muted); border-top:1px solid var(--border); margin-top:44px; padding-top:16px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+<p class="brand"><a href="index.html" style="text-decoration:none;">Cooee</a></p>
+<h1>Privacy policy</h1>
+<p class="date">Effective 21 July 2026 · applies to the Cooee app and website</p>
+
+<div class="callout"><b>The short version.</b> The record belongs to the participant. Circle
+data is hosted in Australia. Who sees what inside a circle is enforced by server-side rules —
+and nothing in a circle is ever hidden from its owner. No GPS, no clock-in surveillance, no
+selling data, no ads, and export is free forever. You can delete your account yourself, in
+the app.</div>
+
+<h2>Who we are</h2>
+<p>Cooee is operated by its developer ("we", "the operator") in Australia. Contact options are
+on the <a href="support.html">support page</a>.</p>
+
+<h2>What stays on your device</h2>
+<p>By default, everything you haven't shared into a circle: your own tasks, captured notes and
+transcripts, your private journal, photos, and settings — stored in your browser's local
+storage. Deleting the app's data (Settings → Your data → Delete all data) removes it from the
+device.</p>
+
+<h2>What leaves your device, and when</h2>
+<ul>
+  <li><b>Circles and shared spaces.</b> When you create or join a circle, that circle's content
+    — tasks, shared notes, the append-only history, support sessions, incident reports, plan
+    goals, expenses, receipt photos, and member display names — syncs through our hosted
+    database (Google Firebase / Cloud Firestore, project <i>cooee-dbde6</i>, hosted in
+    <b>Sydney, Australia</b> — australia-southeast1). Only signed-in members of the circle can
+    read it, and only within their role's visibility (below). The one data flow that leaves
+    Australia is Smart AI processing, described below.</li>
+  <li><b>Your account.</b> Sign-in is anonymous by default — an ID with no name or email. If
+    you choose Google or email sign-in, we store that email, linked to the same account. We
+    also keep your list of memberships, your onboarding selection, and a daily Smart AI usage
+    counter (a number only — never content).</li>
+  <li><b>Smart AI (optional).</b> When Smart AI structures a capture, summarises a Plan Review
+    Pack, or reads text from a photo, the relevant text or image is sent to Google's Gemini
+    API through our Sydney-hosted proxy (which checks your daily quota and forwards the
+    request without storing your content). Google processes it to return the result under
+    <a href="https://ai.google.dev/gemini-api/terms" target="_blank" rel="noopener">Google's
+    API terms</a>; the model API call is the one step that may exit Australia. Never enable
+    Smart AI and the built-in engine does the work entirely on your device.</li>
+  <li><b>Voice (optional).</b> Live transcription uses your browser's speech engine (which on
+    most browsers sends audio to the browser vendor's servers); the opt-in on-device model
+    transcribes entirely on your device and works offline.</li>
+  <li><b>Analytics (off by default).</b> If ever enabled, it is opt-in, anonymous and
+    feature-level only — never what anyone typed.</li>
+</ul>
+
+<h2>Who sees what inside a circle</h2>
+<p>Visibility is enforced by server-side security rules, not just the interface, and is
+covered by automated tests. The honest summary every member deserves:</p>
+<ul>
+  <li><b>The owner (the participant or their nominee) can read everything in their circle.</b>
+    That is the product's founding invariant — it is the participant's record. Workers and
+    family: nothing you write into a circle, including "private"-scoped notes, is hidden from
+    the circle's owner or co-admins.</li>
+  <li><b>Incident reports</b> are visible to their author and the circle's owner/co-admins
+    only — not to other workers or viewers. Filing one notifies nobody outside the circle.</li>
+  <li><b>Viewers</b> are read-only. <b>Workers</b> write within their scope. Roles can only be
+    raised by an owner or co-admin, and every change lands in the append-only history.</li>
+  <li><b>Deliberately not collected:</b> no GPS or location data, no clock-in/clock-out
+    surveillance, no per-worker duration analytics. Support sessions record what happened,
+    not where you stood or how many minutes you're worth.</li>
+</ul>
+
+<h2>What we never do</h2>
+<ul>
+  <li>No selling or sharing of personal information with third parties for their purposes.</li>
+  <li>No advertising, no trackers. No reading your content — the operator's dashboard sees
+    counts, not words.</li>
+  <li>No paywall on the record: the history, attribution, and every export (CSV, print/PDF,
+    full backup) are free, forever. Export and leave any time.</li>
+</ul>
+
+<h2>The record persists — that's its job</h2>
+<p>A circle's history is append-only. What you contribute to a circle stays part of that
+circle's record for its members, attributed to your display name, even if you later leave or
+delete your account — the way sent messages stay with recipients. A circle that ends can be
+archived, or exported and removed entirely by its members.</p>
+
+<h2>Retention and deletion</h2>
+<ul>
+  <li><b>Device data:</b> delete it in Settings → Your data.</li>
+  <li><b>Account:</b> delete it yourself in Settings → Account → Delete account. This removes
+    your sign-in, your per-account records, and your access to every circle. Server backups
+    age out within about 35 days.</li>
+  <li><b>Health-adjacent content</b> (medication routines, care notes) lives only inside the
+    circles you put it in, under the rules above — we apply the same minimal-footprint
+    handling to all of it.</li>
+</ul>
+
+<h2>Children</h2>
+<p>Circles often support children and young people; their information is entered and managed
+by the adults in their circle. Accounts themselves are for people 13 and over (or the age of
+digital consent where you live).</p>
+
+<h2>Your rights</h2>
+<p>We handle personal information in line with the Australian Privacy Principles. You can
+access your data (export, in-app), correct it (in-app), and delete it (in-app). For anything
+else — including complaints — use the <a href="support.html">support page</a>; if you're
+unsatisfied with our response you can contact the Office of the Australian Information
+Commissioner (<a href="https://www.oaic.gov.au" target="_blank" rel="noopener">oaic.gov.au</a>).</p>
+
+<h2>Changes</h2>
+<p>Material changes move the effective date above and are called out in release notes. We
+won't quietly weaken this policy — the trust promises are product constraints, not marketing.</p>
+
+<p class="note"><a href="index.html">Cooee</a> · <a href="terms.html">Terms of use</a> ·
+<a href="support.html">Support</a> · <a href="overview.html">Product overview</a><br>
+Participant-owned coordination record. Not medical, legal, or NDIS advice.<br>
+No GPS. No clock-in surveillance. Australian-hosted. Export and leave any time.</p>
+</div>
+</body>
+</html>

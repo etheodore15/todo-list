@@ -761,7 +761,11 @@
       <pre id="devEnvInfo" style="white-space:pre-wrap; font-size:.78rem; color:var(--muted); background:var(--card2, rgba(148,151,169,.08)); border-radius:10px; padding:10px 12px; overflow-x:auto;"></pre>
       <button class="btn ghost" id="copyDiagBtn">Copy diagnostics</button>
     </details>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v96<br><span id="envInfo"></span></p>
+    <p style="text-align:center; font-size:.85rem;">
+      <a class="legal-link" href="privacy.html" target="_blank" style="color:var(--accent)">Privacy</a> ·
+      <a class="legal-link" href="terms.html" target="_blank" style="color:var(--accent)">Terms</a> ·
+      <a class="legal-link" href="support.html" target="_blank" style="color:var(--accent)">Support</a></p>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v97<br><span id="envInfo"></span></p>
   </section>
 </main>
 
@@ -1188,6 +1192,10 @@ function applyFlavor(){
   }
   Object.entries(APP_FLAVOR.theme || {}).forEach(([k, v]) =>
     document.documentElement.style.setProperty('--' + k, v));
+  // legal pages live on each flavor's own site; a flavor whose app is deployed
+  // in a subdirectory (cooee: /app/) sets legalBase to reach them
+  if (APP_FLAVOR.legalBase) document.querySelectorAll('a.legal-link').forEach(a =>
+    a.setAttribute('href', APP_FLAVOR.legalBase + a.getAttribute('href').split('/').pop()));
   // circle pack (v78): let flagged builds create a circle from Settings too,
   // not just onboarding — creation there mints the owner role
   if (flagOn('circle')){
@@ -4637,7 +4645,7 @@ function refreshDevPanel(){
 }
 function devDiagText(){
   const f = store.get('aiLastFallback', null);
-  return ['Idea → Todo v96',
+  return ['Idea → Todo v97',
     'AI route: ' + (userGeminiKey() ? 'own Gemini key' : (aiProxyUrl() ? 'hosted proxy' : 'none (built-in only)')),
     'Claude backup key: ' + (store.get('apiKey', '') ? 'set' : 'not set'),
     'Hosted service: ' + (window.MANAGED ? window.MANAGED.projectId : 'none (self-hosted build)'),

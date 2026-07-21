@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#7132f5">
+<title>Idea → Todo — support</title>
+<meta name="description" content="Get help with Idea → Todo: quick fixes, how to reach us, and how to get your data out.">
+<style>
+  :root{--accent:#7132f5; --text:#101114; --muted:#686b82; --bg:#ffffff;
+    --card2:rgba(148,151,169,.08); --border:#dedee5;}
+  @media (prefers-color-scheme: dark){
+    :root{--accent:#a687ff; --text:#eceaf4; --muted:#a3a1b8; --bg:#131218;
+      --card2:rgba(148,151,169,.10); --border:#2e2c3a;}
+  }
+  *{box-sizing:border-box; margin:0;}
+  body{font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; background:var(--bg);
+    color:var(--text); line-height:1.65;}
+  .wrap{max-width:760px; margin:0 auto; padding:32px 20px 80px;}
+  .brand{color:var(--accent); font-weight:800; letter-spacing:.02em; margin:24px 0 8px;}
+  h1{font-size:1.7rem; line-height:1.25; margin-bottom:6px;}
+  .sub{color:var(--muted); margin-bottom:20px;}
+  h2{font-size:1.15rem; margin:32px 0 8px;}
+  h3{font-size:1rem; margin:18px 0 4px;}
+  p, li{margin-bottom:10px;}
+  ul{padding-left:22px; margin-bottom:12px;}
+  li{margin-bottom:6px;}
+  a{color:var(--accent);}
+  .callout{background:var(--card2); border-radius:14px; padding:14px 18px; margin:16px 0; font-size:.95rem;}
+  .note{font-size:.85rem; color:var(--muted); border-top:1px solid var(--border); margin-top:44px; padding-top:16px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+<p class="brand"><a href="index.html" style="text-decoration:none;">Idea → Todo</a></p>
+<h1>Support</h1>
+<p class="sub">Quick fixes for the common things, and how to reach a human.</p>
+
+<h2>Reach us</h2>
+<!-- Store listings need a monitored support email — add it here and in the
+     listing when it exists (e.g. support@…). Until then, GitHub issues is the
+     monitored channel. -->
+<p>The fastest channel is a <a href="https://github.com/etheodore15/todo-list/issues"
+target="_blank" rel="noopener">GitHub issue</a> — describe what you expected and what happened
+instead. Please never post screenshots that show other people's names or your tasks; the app's
+<b>Settings → Developer functions → Copy diagnostics</b> gives us what we need with no content
+in it.</p>
+
+<h2>Quick fixes</h2>
+
+<h3>"My captures say built-in instead of ai"</h3>
+<p>Open <b>Settings → Developer functions → Test AI</b>. It checks the whole chain and tells
+you which step is failing, with the fix in the message. The most common cause: an old pasted
+API key overriding the hosted service — clear it in Settings → Smart AI. Second most common:
+the fair-use daily AI limit (it resets overnight UTC).</p>
+
+<h3>"The mic doesn't transcribe"</h3>
+<p>Check the browser has microphone permission for the app. On iOS Safari, live word-by-word
+transcription isn't available — recordings transcribe in short segments instead, which needs a
+connection. For fully offline, private transcription, enable the on-device model in Settings →
+Private on-device voice recognition.</p>
+
+<h3>"My space isn't syncing to the other person"</h3>
+<p>Both devices need to be signed in (Settings → Account) and members of the same space —
+check Settings → Spaces on both. Changes sync when a device is online; the app works offline
+and catches up. If a space you expect is missing after switching devices, sign in with the
+same account and it restores.</p>
+
+<h3>"I got a new phone"</h3>
+<p>If you signed in with Google or email: install the app, sign in, and your spaces restore.
+Anonymous accounts live on the old device — link an email or Google sign-in in Settings →
+Account <i>before</i> switching, or use Settings → Your data → Export backup / Import backup
+to carry everything across manually.</p>
+
+<h3>"I want my data out"</h3>
+<p>Settings → Your data → <b>Export backup</b> gives you everything as JSON. Every space's
+record also exports as CSV, and every report prints to PDF. Export is free forever — that's
+a product promise, not a tier.</p>
+
+<h3>"I want to delete everything"</h3>
+<p>Two separate things: <b>Settings → Your data → Delete all data</b> wipes this device.
+<b>Settings → Account → Delete account</b> deletes your account and access on the server —
+see the <a href="privacy.html">privacy policy</a> for exactly what that removes and what
+remains with your former spaces.</p>
+
+<h2>Known limitations</h2>
+<ul>
+  <li>Task extraction is English-only today; other languages are kept safely as notes.</li>
+  <li>Exact-minute alarms need the upcoming store app; the web app promises records and
+    schedules, not alarms.</li>
+  <li>The product is in active development — see the
+    <a href="overview.html">product overview</a> for what's shipped versus planned.</li>
+</ul>
+
+<p class="note"><a href="index.html">Idea → Todo</a> · <a href="privacy.html">Privacy policy</a> ·
+<a href="terms.html">Terms of use</a> · <a href="overview.html">Product overview</a><br>
+Coordination software, not medical or legal advice.</p>
+</div>
+</body>
+</html>
