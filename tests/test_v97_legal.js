@@ -58,16 +58,17 @@ export function onSnapshot(col, cb){ cb({docChanges: () => []}); return () => {}
   const A = await mk();
   await A.click('nav.tabs button[data-view="settings"]');
   const hrefs = await A.evaluate(() => [...document.querySelectorAll('a.legal-link')].map(a => a.getAttribute('href')));
-  check('Settings shows Privacy · Terms · Support', hrefs.length === 3, JSON.stringify(hrefs));
+  check('Settings links Privacy · Terms · Support (delete zone adds its own privacy link)',
+    ['privacy.html', 'terms.html', 'support.html'].every(h => hrefs.includes(h)), JSON.stringify(hrefs));
   check('ideatodo links stay relative to the app root',
-    JSON.stringify(hrefs) === JSON.stringify(['privacy.html', 'terms.html', 'support.html']), JSON.stringify(hrefs));
+    hrefs.every(h => /^(privacy|terms|support)\.html$/.test(h)), JSON.stringify(hrefs));
 
   // ---------- 3. cooee flavor: legalBase rewrites to the site root ----------
   const B = await mk(`window.MANAGED=null; window.FLAVOR={id:'cooee', name:'Cooee', legalBase:'../'};`);
   await B.click('nav.tabs button[data-view="settings"]');
   const chrefs = await B.evaluate(() => [...document.querySelectorAll('a.legal-link')].map(a => a.getAttribute('href')));
   check('cooee links climb out of /app/ to the site pages',
-    JSON.stringify(chrefs) === JSON.stringify(['../privacy.html', '../terms.html', '../support.html']), JSON.stringify(chrefs));
+    chrefs.length >= 3 && chrefs.every(h => /^\.\.\/(privacy|terms|support)\.html$/.test(h)), JSON.stringify(chrefs));
 
   // ---------- 4. landing + overview footers link the pages ----------
   await P.goto('http://localhost:8906/index.html');

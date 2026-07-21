@@ -143,6 +143,9 @@ const MANAGED_CFG = `window.MANAGED = {apiKey: 'AizaManaged', authDomain: 'x.fir
   const B = await mkDevice('sam');
   await B.fill('#inviteInput', invite);
   await B.click('#joinBtn');
+  // v95: joining now opens the joiner welcome — dismiss it, this test is about sync
+  await B.waitForTimeout(400);
+  if (await B.locator('#joinerOb').isVisible()) await B.click('#joLater');
   await B.waitForTimeout(1000);
   const spB = await B.evaluate(() => store.get('spaces'));
   check('P1: B joined managed space by code alone', spB.length === 1 && spB[0].managed === true);
