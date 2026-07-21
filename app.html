@@ -615,6 +615,15 @@
       <button class="btn primary" id="googleSignInBtn">Sign in with Google</button>
       <button class="btn ghost" id="emailSignInBtn">Sign in with email</button>
       <button class="btn ghost" id="signOutBtn" style="display:none;">Sign out</button>
+      <div id="deleteAcctWrap" style="margin-top:14px; padding-top:12px; border-top:1px solid var(--border);">
+        <p style="font-size:.85rem; color:var(--muted);">Deleting your account removes your sign-in,
+          your account records, and your access to every space — on the server, permanently.
+          Spaces you shared keep their append-only record for their remaining members, with your
+          name on your entries (see the <a class="legal-link" href="privacy.html" target="_blank"
+          style="color:var(--accent)">privacy policy</a>). Tasks and notes on this device stay
+          unless you also delete them.</p>
+        <button class="btn ghost" id="deleteAcctBtn" style="color:var(--danger); border-color:var(--danger);">Delete account…</button>
+      </div>
     </div>
 
     <h2 class="set-section">You &amp; accessibility</h2>
@@ -765,7 +774,7 @@
       <a class="legal-link" href="privacy.html" target="_blank" style="color:var(--accent)">Privacy</a> ·
       <a class="legal-link" href="terms.html" target="_blank" style="color:var(--accent)">Terms</a> ·
       <a class="legal-link" href="support.html" target="_blank" style="color:var(--accent)">Support</a></p>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v97<br><span id="envInfo"></span></p>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v98<br><span id="envInfo"></span></p>
   </section>
 </main>
 
@@ -4645,7 +4654,7 @@ function refreshDevPanel(){
 }
 function devDiagText(){
   const f = store.get('aiLastFallback', null);
-  return ['Idea → Todo v97',
+  return ['Idea → Todo v98',
     'AI route: ' + (userGeminiKey() ? 'own Gemini key' : (aiProxyUrl() ? 'hosted proxy' : 'none (built-in only)')),
     'Claude backup key: ' + (store.get('apiKey', '') ? 'set' : 'not set'),
     'Hosted service: ' + (window.MANAGED ? window.MANAGED.projectId : 'none (self-hosted build)'),
@@ -5412,6 +5421,65 @@ async function signOutAccount(){
   refreshAccountUI();
   toast('Signed out');
 }
+
+/* ---------- account deletion (launch B2; Apple 5.1.1(v) / Play requirement) ----------
+   Deletes the server-side account a user can delete themselves: membership
+   entries where the rules allow self-removal, the per-account docs, then the
+   auth user (the point of no return). Shared records deliberately survive for
+   the remaining members — that's the trust layer, and the privacy policy says
+   so. Device data stays unless they opt to wipe it too. */
+async function deleteAccount(){
+  const sps = spacesAll().filter(sp => sp.managed);
+  if (!confirm('Delete your account?\n\nThis permanently removes your sign-in, your account records, and your access to ' +
+    (sps.length ? `your ${sps.length} space${sps.length === 1 ? '' : 's'}` : 'the hosted service') +
+    '.\n\nSpaces you shared keep their record for the other members, with your name on your entries. ' +
+    'Tasks and notes on THIS device are kept.')) return;
+  const typed = prompt('This cannot be undone. Type DELETE to confirm:');
+  if ((typed || '').trim().toUpperCase() !== 'DELETE'){ toast('Account deletion cancelled — nothing was changed.'); return; }
+  const btn = document.getElementById('deleteAcctBtn');
+  btn.disabled = true; btn.textContent = 'Deleting…';
+  try {
+    const {a} = await managedAuth();
+    const uid = a.currentUser && a.currentUser.uid;
+    if (!uid) throw new Error('not signed in');
+    // best-effort server cleanup BEFORE the auth deletion (the point of no return):
+    // self-removal from members where the rules allow it; a circle worker/viewer
+    // can't edit the members map, but deleting the auth user revokes their access
+    for (const sp of sps){
+      const rt = spaceRt[sp.hid]; if (rt && rt.unsub) rt.unsub(); delete spaceRt[sp.hid];
+      try {
+        await fbFs.updateDoc(fbFs.doc(managedDb, 'households', sp.hid),
+          {['members.' + uid]: fbFs.deleteField()});
+      } catch (_) {}
+    }
+    try { await fbFs.deleteDoc(fbFs.doc(managedDb, 'users', uid)); } catch (_) {}
+    try { await fbFs.deleteDoc(fbFs.doc(managedDb, 'cohorts', uid)); } catch (_) {}
+    await a.currentUser.delete();
+    // local: the account's spaces stop existing for this device; their tasks stay, personal now
+    store.set('spaces', spacesAll().filter(sp => !sp.managed));
+    todos.forEach(td => { if (sps.some(sp => sp.hid === td.space)) td.space = null; });
+    store.set('todos', todos);
+    activeSpace = 'all';
+    managedUid = null; accountEmail = ''; accountAnon = true;
+    syncLegacyMirror(); refreshSyncUI(); refreshAccountUI(); renderTodos(); updateBadge(); updateSwConfig();
+    track('account_deleted');
+    toast('Account deleted. Your tasks and notes are still on this device.');
+    setTimeout(() => {
+      if (confirm('Your account is deleted.\n\nAlso delete everything stored on THIS device — tasks, notes, journal, settings?')){
+        localStorage.clear();
+        location.reload();
+      }
+    }, 400);
+  } catch (e) {
+    const code = (e && (e.code || e.message)) || '';
+    toast('Couldn\u2019t delete the account — ' + (/recent-login/.test(code)
+      ? 'for security this needs a fresh sign-in. Sign out, sign back in, then delete again.'
+      : aiFriendlyErr(e)));
+  } finally {
+    btn.disabled = false; btn.textContent = 'Delete account…';
+  }
+}
+document.getElementById('deleteAcctBtn').addEventListener('click', deleteAccount);
 
 function refreshAccountUI(){
   const block = document.getElementById('accountBlock');
