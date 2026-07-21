@@ -81,7 +81,7 @@ const FAKE_FS = `
   await A.click('nav.tabs button[data-view="settings"]');
   await A.click('#copyDiagBtn');
   const clip = await A.evaluate(() => navigator.clipboard.readText());
-  check('Copy diagnostics: has version + AI route', /Idea → Todo v96/.test(clip) && /AI route: hosted proxy/.test(clip));
+  check('Copy diagnostics: has version + AI route', /Idea → Todo v\d+/.test(clip) && /AI route: hosted proxy/.test(clip));
   check('Copy diagnostics: never includes note content', !/plumber/.test(clip));
 
   // ---------- 2. quota exhausted: capture falls back LOUDLY, diag names the step ----------

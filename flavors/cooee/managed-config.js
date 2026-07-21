@@ -22,6 +22,7 @@ window.FLAVOR = {
   id: 'cooee',
   name: 'Cooee',
   shortName: 'Cooee',
+  legalBase: '../',   // app deploys at /app/; privacy/terms/support sit at the site root
   // circle first; the focus toolkit serves the participant's own list
   cohorts: ['ndis-circle', 'adhd'],
   flags: {circle: true},
