@@ -6,7 +6,7 @@ to them would require. Everything below describes working software unless marked
 otherwise. Landing page: https://etheodore15.github.io/todo-list/*
 
 *This is a **living document** — it is amended with every release so it never
-drifts from the shipped product. Last updated: **v98**. Recent arc (v84–v98):
+drifts from the shipped product. Last updated: **v99**. Recent arc (v84–v99):
 a 44-persona study (executable simulations across ADHD, family, co-parenting,
 care, NDIS-circle and edge audiences — see `Market-Research/personas/`) drove
 eleven releases closing its top findings: capture that understands the care
@@ -22,7 +22,11 @@ AI-fallback transparency and a Developer functions section in Settings;
 v97 shipped privacy/terms/support pages for both products, linked from the
 app; v98 added in-app account deletion (self-removal from spaces where the
 rules allow it, per-account docs, then the auth user — shared records
-deliberately survive for remaining members, as the privacy policy states).*
+deliberately survive for remaining members, as the privacy policy states);
+v99 added AI refresh — a capture structured by the built-in engine while AI
+was unavailable gains a "retry with AI" on its Journal card: the AI result
+replaces the unfinished first-pass tasks in every stream (tombstoned in
+shared records, done tasks kept, refresh logged, note flagged re-processed).*
 
 > **Caveat:** the product is in active development. Some features are new and
 > may behave unpredictably. The operator AI proxy is live in production —

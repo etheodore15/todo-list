@@ -774,7 +774,7 @@
       <a class="legal-link" href="privacy.html" target="_blank" style="color:var(--accent)">Privacy</a> ·
       <a class="legal-link" href="terms.html" target="_blank" style="color:var(--accent)">Terms</a> ·
       <a class="legal-link" href="support.html" target="_blank" style="color:var(--accent)">Support</a></p>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v98<br><span id="envInfo"></span></p>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v99<br><span id="envInfo"></span></p>
   </section>
 </main>
 
@@ -2981,6 +2981,120 @@ function renderProcStrip(){
     : `Structuring ${n} ideas in the background — keep going.`));
 }
 
+// The engine-agnostic second half of structuring: dose expansion, dedup,
+// task creation with record entries. Shared by first-pass structuring and the
+// v99 AI refresh (which re-runs a built-in capture once AI is back — idBase
+// keeps retry task ids from colliding with the first pass, extraDedup keeps a
+// completed first-pass task from being re-added as new work).
+function applyStructureResult(idea, result, dest, idBase, extraDedup){
+  const t = todayStr();
+  // v87 (persona study #2): a recurring routine spoken with several clock
+  // times — "Keppra every day at 8am and 8pm", "levodopa at 7am 1pm and 7pm
+  // every day" — becomes one task PER dose, each with its own reminder slot,
+  // tick and missed-dose record. One task can only hold one time; a second
+  // seizure-critical dose must never ride along invisibly. Applies to every
+  // engine (AI or local) since it keys off the task's own text.
+  const doseTasks = [];
+  result.tasks.forEach(task => {
+    const times = task.recur ? allTaskTimes(task.text) : [];
+    if (times.length > 1) times.forEach(tm => doseTasks.push({...task, time: tm}));
+    else doseTasks.push(task);
+  });
+  const norm = s => s.toLowerCase().replace(/[^a-z0-9\s]/g,'').replace(/\s+/g,' ').trim();
+  // dedupe by text + time slot, so the 8pm dose isn't "already listed" just
+  // because the 8am dose shares its wording
+  const dupKey = (text, time) => norm(text) + '|' + (time || '');
+  const existing = new Set(todos.filter(td => !td.done).map(td => dupKey(td.text, td.time)));
+  (extraDedup || []).forEach(td => existing.add(dupKey(td.text, td.time)));
+  let added = 0, skipped = 0;
+  const delegated = [];
+  const scheduled = [];
+  let expensed = 0;
+  doseTasks.forEach((task, i) => {
+    if (existing.has(dupKey(task.text, task.time))){ skipped++; return; }   // already on the list
+    // v91 (persona study #7): "$38 school photos" becomes a ledger-ready
+    // expense at capture time — the duplicate-payment problem is solved by
+    // the record existing, not by re-typing the number into a sheet later
+    const amt = parseAmount(task.text);
+    todos.push({id: idBase + '-' + i, text: task.text, priority: task.priority, tags: task.tags || [],
+      assignees: (task.assignees || []).map(capName), done:false, date: task.date || t, recur: task.recur || null,
+      energy: task.energy || detectEnergy(task.text), minutes: task.minutes || null,
+      time: task.time || null,
+      ...(amt ? {amount: amt, expenseBy: myName() || null, expenseAt: Date.now()} : {}),
+      space: dest, ideaId: idea.id, createdBy: myName() || null, createdAt: Date.now()});
+    logEvent('created', todos[todos.length - 1]);
+    if (amt && dest){ expensed += amt; syncReceipt(todos[todos.length - 1]); }
+    if ((task.assignees || []).length) delegated.push(task.assignees.map(capName).join(', '));
+    if (task.recur) scheduled.push(recurLabel(task.recur).replace('↻ ', '↻'));
+    else if (task.date && task.date > t) scheduled.push(fmtDay(task.date));
+    added++;
+  });
+  return {added, skipped, delegated, scheduled, expensed};
+}
+
+/* ---------- AI refresh (v99) ----------
+   A capture structured by the built-in engine (AI was down, quota hit, key
+   broken) can be re-processed once AI is back. REPLACE policy, per the
+   product owner: the AI result supersedes the built-in split in every stream
+   — un-done first-pass tasks are removed (tombstoned in shared records), done
+   ones stay as records; the refresh itself lands in the record; the note is
+   flagged re-processed. A failed retry costs nothing. */
+async function refreshIdeaAI(idea){
+  const cKey = store.get('apiKey', '');
+  if (!aiEnabled() && !cKey){ toast('Smart AI isn\u2019t set up — nothing to retry with.'); return; }
+  idea.pending = true; saveIdeas(); renderIdeas(); renderProcStrip();
+  let result = null, engine = 'built-in';
+  if (aiEnabled()){
+    try { result = await geminiSummarize(idea.raw); engine = aiViaProxy() ? 'ai' : 'gemini'; }
+    catch(e){ noteAiFallback('retry', e); }
+  }
+  if (!result && cKey){
+    try { result = await claudeSummarize(idea.raw, cKey); engine = 'claude'; }
+    catch(e){ noteAiFallback('retry (Claude backup)', e); }
+  }
+  delete idea.pending;
+  if (!ideas.some(i => i.id === idea.id)){ renderProcStrip(); return; }   // deleted while pending
+  if (!result){
+    saveIdeas(); renderIdeas(); renderProcStrip();
+    const f = store.get('aiLastFallback', null);
+    toast('Still no AI (' + (f ? f.reason : 'unavailable') + ') — your tasks are unchanged.');
+    return;
+  }
+  const linked = todos.filter(td => td.ideaId === idea.id);
+  const doneKept = linked.filter(td => td.done);
+  const toRemove = linked.filter(td => !td.done);
+  // the refresh lands where the first pass did (tasks may have been moved —
+  // follow the live tasks, not the long-gone capture chip)
+  const dest = (toRemove.find(td => td.space) || linked.find(td => td.space) || {}).space || null;
+  toRemove.forEach(td => logEvent('deleted', td, 're-processed with AI'));
+  const removeIds = new Set(toRemove.map(td => td.id));
+  todos = todos.filter(td => !removeIds.has(td.id));
+  const n = (idea.retries || 0) + 1;
+  idea.summary = result.summary; idea.priority = result.priority;
+  idea.engine = engine; idea.reprocessed = true; idea.retries = n;
+  // a completed first-pass task must not come back as new work just because
+  // the AI phrased it differently ("book the dentist" vs "book the dentist
+  // appointment") — fuzzy-match candidates against the DONE tasks of this note
+  const toks = (x) => new Set(x.toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/).filter(w => w.length > 2));
+  const doneAlready = (text) => doneKept.some(td => {
+    const a = toks(td.text), b = toks(text);
+    const inter = [...a].filter(w => b.has(w)).length;
+    return inter && inter >= Math.min(a.size, b.size) * 0.6;
+  });
+  const r = applyStructureResult(idea,
+    {...result, tasks: result.tasks.filter(task => !doneAlready(task.text))},
+    dest, idea.id + '-r' + n, doneKept);
+  const destSp = spacesList().find(sp => sp.hid === dest);
+  if (destSp) logEvent('refreshed', {id: 'refresh-' + idea.id + '-' + n, text: noteShareText(idea.raw, true), space: dest});
+  track('feature_used', {feature: 'ai_refresh'});
+  saveIdeas(); saveTodos(); updateBadge(); renderTodos(); renderProcStrip();
+  if (document.getElementById('view-ideas').classList.contains('active')) renderIdeas();
+  toast(`Re-processed with AI — ${r.added} task${r.added === 1 ? '' : 's'} live` +
+    (destSp ? ` in \u201C${destSp.name}\u201D` : '') +
+    (doneKept.length ? ` (${doneKept.length} done kept)` : '') +
+    (r.skipped ? ` (${r.skipped} already listed)` : ''));
+}
+
 async function structureIdea(idea){
   let result = null, engine = 'built-in';
   const cKey = store.get('apiKey', '');
@@ -3002,48 +3116,7 @@ async function structureIdea(idea){
   idea.summary = result.summary; idea.priority = result.priority; idea.engine = engine;
   const dest = idea.dest || null;   // destination captured at QUEUE time, not completion time
   delete idea.pending; delete idea.dest;
-
-  const t = todayStr();
-  // v87 (persona study #2): a recurring routine spoken with several clock
-  // times — "Keppra every day at 8am and 8pm", "levodopa at 7am 1pm and 7pm
-  // every day" — becomes one task PER dose, each with its own reminder slot,
-  // tick and missed-dose record. One task can only hold one time; a second
-  // seizure-critical dose must never ride along invisibly. Applies to every
-  // engine (AI or local) since it keys off the task's own text.
-  const doseTasks = [];
-  result.tasks.forEach(task => {
-    const times = task.recur ? allTaskTimes(task.text) : [];
-    if (times.length > 1) times.forEach(tm => doseTasks.push({...task, time: tm}));
-    else doseTasks.push(task);
-  });
-  const norm = s => s.toLowerCase().replace(/[^a-z0-9\s]/g,'').replace(/\s+/g,' ').trim();
-  // dedupe by text + time slot, so the 8pm dose isn't "already listed" just
-  // because the 8am dose shares its wording
-  const dupKey = (text, time) => norm(text) + '|' + (time || '');
-  const existing = new Set(todos.filter(td => !td.done).map(td => dupKey(td.text, td.time)));
-  let added = 0, skipped = 0;
-  const delegated = [];
-  const scheduled = [];
-  let expensed = 0;
-  doseTasks.forEach((task, i) => {
-    if (existing.has(dupKey(task.text, task.time))){ skipped++; return; }   // already on the list
-    // v91 (persona study #7): "$38 school photos" becomes a ledger-ready
-    // expense at capture time — the duplicate-payment problem is solved by
-    // the record existing, not by re-typing the number into a sheet later
-    const amt = parseAmount(task.text);
-    todos.push({id: idea.id + '-' + i, text: task.text, priority: task.priority, tags: task.tags || [],
-      assignees: (task.assignees || []).map(capName), done:false, date: task.date || t, recur: task.recur || null,
-      energy: task.energy || detectEnergy(task.text), minutes: task.minutes || null,
-      time: task.time || null,
-      ...(amt ? {amount: amt, expenseBy: myName() || null, expenseAt: Date.now()} : {}),
-      space: dest, ideaId: idea.id, createdBy: myName() || null, createdAt: Date.now()});
-    logEvent('created', todos[todos.length - 1]);
-    if (amt && dest){ expensed += amt; syncReceipt(todos[todos.length - 1]); }
-    if ((task.assignees || []).length) delegated.push(task.assignees.map(capName).join(', '));
-    if (task.recur) scheduled.push(recurLabel(task.recur).replace('↻ ', '↻'));
-    else if (task.date && task.date > t) scheduled.push(fmtDay(task.date));
-    added++;
-  });
+  const {added, skipped, delegated, scheduled, expensed} = applyStructureResult(idea, result, dest, idea.id);
   const destSp = spacesList().find(s => s.hid === dest);
   // v85: the destination chip is a promise. If the capture was aimed at a
   // space and nothing became a task, the note itself is saved to that space's
@@ -3413,9 +3486,20 @@ function renderIdeas(){
         <span class="chip">${d.toLocaleDateString(undefined,{day:'numeric',month:'short'})} ${d.toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'})}</span>
         ${linked.length ? `<span class="chip"><span class="ic ic-check" aria-hidden="true"></span> ${doneCount}/${linked.length}</span>` : ''}
         ${idea.pending ? `<span class="chip"><span class="spin" aria-hidden="true">◌</span> structuring…</span>`
-          : idea.engine ? `<span class="chip"><span class="ic ic-${idea.engine === 'built-in' ? 'settings' : 'sparkles'}" aria-hidden="true"></span> ${idea.engine}</span>` : ''}
+          : idea.engine ? `<span class="chip"><span class="ic ic-${idea.engine === 'built-in' ? 'settings' : 'sparkles'}" aria-hidden="true"></span> ${idea.engine}${idea.reprocessed ? ' · re-processed' : ''}</span>` : ''}
         <button class="del" aria-label="Delete idea"><span class="ic ic-trash" aria-hidden="true"></span></button>
       </div>`;
+    // v99: a built-in-structured note can be re-processed once AI is back
+    if (!idea.pending && idea.engine === 'built-in' && (aiEnabled() || store.get('apiKey', ''))){
+      const rb = document.createElement('button');
+      rb.className = 'chip retry-ai';
+      rb.style.cssText = 'border:none; cursor:pointer; color:var(--accent);';
+      rb.textContent = '\u21bb retry with AI';
+      rb.setAttribute('aria-label', 'Re-process this note with AI');
+      rb.title = 'Replaces the unfinished tasks from this note with the AI versions; done tasks stay';
+      rb.addEventListener('click', () => refreshIdeaAI(idea));
+      card.querySelector('.meta').insertBefore(rb, card.querySelector('.del'));
+    }
     card.querySelector('.summary').textContent = idea.summary;
     const rawEl = card.querySelector('.raw');
     rawEl.textContent = idea.raw;
@@ -4654,7 +4738,7 @@ function refreshDevPanel(){
 }
 function devDiagText(){
   const f = store.get('aiLastFallback', null);
-  return ['Idea → Todo v98',
+  return ['Idea → Todo v99',
     'AI route: ' + (userGeminiKey() ? 'own Gemini key' : (aiProxyUrl() ? 'hosted proxy' : 'none (built-in only)')),
     'Claude backup key: ' + (store.get('apiKey', '') ? 'set' : 'not set'),
     'Hosted service: ' + (window.MANAGED ? window.MANAGED.projectId : 'none (self-hosted build)'),
@@ -5070,6 +5154,7 @@ const EVENT_LABEL = {created: 'added', edited: 'edited', ticked: 'ticked off',
   'session-end': 'ended a support session',
   incident: 'reported an incident',
   'prn-gap': 'updated the PRN gap:',
+  refreshed: 're-processed a capture with AI:',
   split: 'changed the cost split:',
   archived: 'closed the space:', unarchived: 'reopened the space:'};
 
