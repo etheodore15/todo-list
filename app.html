@@ -774,7 +774,7 @@
       <a class="legal-link" href="privacy.html" target="_blank" style="color:var(--accent)">Privacy</a> ·
       <a class="legal-link" href="terms.html" target="_blank" style="color:var(--accent)">Terms</a> ·
       <a class="legal-link" href="support.html" target="_blank" style="color:var(--accent)">Support</a></p>
-    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v99<br><span id="envInfo"></span></p>
+    <p style="text-align:center; color:var(--muted); font-size:.75rem;">Idea → Todo v100<br><span id="envInfo"></span></p>
   </section>
 </main>
 
@@ -3673,11 +3673,37 @@ function renderEasyChip(list){
   if (!lows && !easyOnly) return;
   const b = document.createElement('button');
   b.className = 'fchip easy' + (easyOnly ? ' active' : '');
-  setIconLabel(b, 'battery', `easy wins (${lows})`);
-  b.title = 'Only quick, low-effort tasks';
+  setIconLabel(b, 'battery', easyOnly ? `easy wins (${lows}) \u00d7` : `easy wins (${lows})`);
+  b.title = easyOnly ? 'Tap to remove the easy-wins filter' : 'Only quick, low-effort tasks';
+  b.setAttribute('aria-pressed', easyOnly ? 'true' : 'false');
   b.addEventListener('click', () => { easyOnly = !easyOnly; renderTodos(); });
-  bar.appendChild(b);
+  // v100: an ACTIVE filter must never hide at the scrolled-off end of the bar
+  // — that's how "I can't remove easy wins" happens on a phone in a tag-heavy
+  // space. Active goes first, where the finger already is.
+  if (easyOnly) bar.insertBefore(b, bar.firstChild);
+  else bar.appendChild(b);
   bar.style.display = '';   // the bar may be empty of tag chips but still hold this one
+}
+
+// v100: one tap out of a stacked filter state. Shown only when MORE than one
+// filter is applied (a single filter clears from its own chip).
+function renderClearFilters(){
+  const bar = document.getElementById('tagFilter');
+  const active = (activeTag ? 1 : 0) + (easyOnly ? 1 : 0);
+  if (active < 2) return;
+  const b = document.createElement('button');
+  b.className = 'fchip clear-filters';
+  b.style.fontWeight = '700';
+  setIconLabel(b, 'x', 'clear filters');
+  b.title = 'Remove every filter (tag + easy wins)';
+  b.addEventListener('click', clearTodayFilters);
+  bar.insertBefore(b, bar.firstChild);
+  bar.style.display = '';
+}
+function clearTodayFilters(){
+  activeTag = null; easyOnly = false;
+  renderTodos();
+  toast('Filters cleared — showing everything again.');
 }
 
 // The single space the Today view is "about": the one being filtered to, or the
@@ -3780,7 +3806,9 @@ function firstOpenTask(){
 const ADHD_TOOLS = [
   ['target', 'Just one thing', () => openFocus()],
   ['wand', 'Break down a task', () => { const t = firstOpenTask(); if (t) breakDown(t); else toast('Add a task first, then I’ll break it into steps.'); }],
-  ['battery', 'Easy wins', () => { easyOnly = !easyOnly; renderTodos(); }],
+  ['battery', () => easyOnly ? 'Easy wins \u00b7 on' : 'Easy wins',
+    () => { easyOnly = !easyOnly; renderTodos();
+      toast(easyOnly ? 'Easy wins on — only low-energy tasks show. Tap again to turn it off.' : 'Easy wins off — showing everything.'); }],
   ['clipboard', 'Week in review', () => openReflection()],
   ['leaf', 'Quiet mode', () => { store.set('quietMode', !store.get('quietMode', false)); applyQuiet(); toast(store.get('quietMode', false) ? 'Quiet mode on' : 'Quiet mode off'); }]
 ];
@@ -3806,7 +3834,7 @@ function renderAdhdStrip(){
   ADHD_TOOLS.forEach(([icon, label, fn]) => {
     const b = document.createElement('button');
     b.className = 'btn ghost space-act';
-    setIconLabel(b, icon, label);
+    setIconLabel(b, icon, typeof label === 'function' ? label() : label);
     b.addEventListener('click', fn);
     row.appendChild(b);
   });
@@ -3829,6 +3857,8 @@ function renderTodos(){
   let list = todayTodos().filter(visibleToMe).filter(inActiveSpace);
   renderTagFilter(list);
   renderEasyChip(list);
+  renderClearFilters();
+  const preFilterOpen = list.filter(td => !td.done).length;
   if (activeTag) list = list.filter(td => (td.tags || []).includes(activeTag));
   if (easyOnly) list = list.filter(td => td.energy === 'low');
   el.innerHTML = '';
@@ -3859,7 +3889,25 @@ function renderTodos(){
   renderSomeday();
 
   if (!list.length && !upcoming.length){
-    el.innerHTML = '<div class="empty"><span class="ic ic-check" aria-hidden="true"></span><br><br>Nothing on the list yet.<br>Capture an idea or quick-add a task above.</div>';
+    if ((activeTag || easyOnly) && preFilterOpen){
+      // v100: the old message said "Nothing on the list yet" while filters hid
+      // real tasks — the honest state names the cause and hands over the exit
+      const empty = document.createElement('div');
+      empty.className = 'empty';
+      empty.innerHTML = '<span class="ic ic-battery" aria-hidden="true"></span><br><br>' +
+        `${preFilterOpen} open task${preFilterOpen === 1 ? ' is' : 's are'} hidden by your filter${(activeTag && easyOnly) ? 's' : ''}` +
+        `${easyOnly ? ' (easy wins' + (activeTag ? ' + \u201C' + activeTag + '\u201D)' : ')') : ' (\u201C' + activeTag + '\u201D)'}.<br><br>`;
+      const btn = document.createElement('button');
+      btn.className = 'btn primary';
+      btn.id = 'emptyClearFilters';
+      btn.textContent = 'Show them — clear filters';
+      btn.addEventListener('click', clearTodayFilters);
+      empty.appendChild(btn);
+      el.innerHTML = '';
+      el.appendChild(empty);
+    } else {
+      el.innerHTML = '<div class="empty"><span class="ic ic-check" aria-hidden="true"></span><br><br>Nothing on the list yet.<br>Capture an idea or quick-add a task above.</div>';
+    }
     updateBadge(); return;
   }
 
@@ -4738,7 +4786,7 @@ function refreshDevPanel(){
 }
 function devDiagText(){
   const f = store.get('aiLastFallback', null);
-  return ['Idea → Todo v99',
+  return ['Idea → Todo v100',
     'AI route: ' + (userGeminiKey() ? 'own Gemini key' : (aiProxyUrl() ? 'hosted proxy' : 'none (built-in only)')),
     'Claude backup key: ' + (store.get('apiKey', '') ? 'set' : 'not set'),
     'Hosted service: ' + (window.MANAGED ? window.MANAGED.projectId : 'none (self-hosted build)'),
