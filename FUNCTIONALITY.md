@@ -105,7 +105,11 @@ solves that once; each new cohort is mostly a new surface on the same engine.
 - **No-shame carry-over**: unfinished tasks never go red; after 5 quiet days the
   app gently asks "still matters?" (keep / someday / let it go)
 - **Energy matching**: tasks rated low/medium/high effort with minute
-  estimates; an "easy wins" filter surfaces low-effort items
+  estimates; an "easy wins" filter surfaces low-effort items. Filters are
+  honestly removable (v100): an active filter pins to the front of the chip
+  bar with a ×, stacked filters get a one-tap "clear filters" chip, and a
+  filtered-empty Today names what's hidden instead of claiming the list is
+  empty
 - **Just One Thing**: a full-screen single-task focus mode for overwhelm
 - **Wins view**: what got finished today/this week; streak counts activity and
   never punishes gaps
@@ -177,7 +181,12 @@ back (Journal)**. Three sections:
   A misdirected journal share can be taken back from here — the journal
   and doctor briefing stop showing the note, while the append-only record
   keeps both the entry and the removal. Each extracted task can also be
-  moved to another space or person from here (same sheet as Today)
+  moved to another space or person from here (same sheet as Today). A note
+  structured by the built-in engine while AI was unavailable carries a
+  **"retry with AI"** chip (v99): the AI result replaces the unfinished
+  first-pass tasks in every stream (tombstoned in shared records), done
+  tasks stay as records, the refresh lands in the record, and the note is
+  flagged re-processed
 - **Records** — per shared space: append-only history + CSV/PDF export,
   and the expense ledger for co-parenting spaces
 
@@ -289,6 +298,15 @@ back (Journal)**. Three sections:
 - On-device options: offline speech-to-text (Whisper) and on-device LLM
   summaries (opt-in downloads) for privacy-sensitive users
 - Consent-first, anonymised analytics (opt-in); first-party ops dashboard
+- **Developer functions** (v96, Settings): a Test AI health check that walks
+  the whole AI chain (route → sign-in → one live call) and pinpoints the
+  failing step; every AI fallback recorded with an honest reason; a
+  content-free Copy diagnostics for support
+- **Privacy policy, terms and support pages** (v97) for both products,
+  linked from Settings and every site footer; **in-app account deletion**
+  (v98, Settings → Account) — self-removal from spaces where the rules allow
+  it, per-account docs, then the auth user; shared records deliberately
+  survive for remaining members, exactly as the privacy policy states
 - Kraken-purple design system, IBM Plex type, monoline icon set, reduced-motion
   support, screen-reader labels, large tap targets
 
@@ -306,6 +324,15 @@ back (Journal)**. Three sections:
    and add a first medication (care)
 6. **First-task coach** — lands on capture with a nudge: "tap the mic and say
    what's on your mind"
+
+### Joining by invite (v95)
+1. Paste the invite code (or follow the link) → membership is minted within
+   the rules (circle codes can only mint worker or viewer)
+2. A 30-second welcome shaped by the joined space: three lines on what this
+   space does (care / co-parenting / circle-role specific), the name
+   attribution runs on, and a "Try your first capture" that lands on Capture
+   with the joined space active (viewers land on Private). Once per space;
+   "Explore first" dismisses cleanly
 
 ### Daily capture
 Speak (live transcript) → tap Summarize & Add (auto-stops recording, captures

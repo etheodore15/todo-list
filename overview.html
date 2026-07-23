@@ -60,7 +60,7 @@
   <h1>Speak it once. It becomes tasks, records, and a team that knows.</h1>
   <p class="sub">The complete overview of the product — every shipped feature, how the cohort packs
     fit together, and the end-to-end business model. Everything below describes working software
-    (currently v96) unless marked otherwise.</p>
+    (currently v100) unless marked otherwise.</p>
   <div class="ctas">
     <a class="btn primary" href="app.html">Open the app</a>
     <a class="btn ghost" href="index.html">Landing page</a>
@@ -107,6 +107,9 @@ can trust.</p>
     with no task extraction and no space record — shareable later, deliberately.</li>
   <li><b>Honest counting:</b> if a long monologue exceeds what one capture keeps, the app says
     what didn't fit. Silent loss is the one sin a capture tool can't afford.</li>
+  <li><b>AI refresh:</b> a capture structured by the built-in engine while AI was unavailable
+    can be re-processed later with one tap — the AI result replaces the unfinished first-pass
+    tasks (recorded in the shared history), completed ones stay as records.</li>
 </ul>
 
 <h2 id="tasks">Task management</h2>
@@ -194,6 +197,11 @@ the home of every report, every raw note, and every space's records and ledger.<
     a self-hosted option for technical users; on-device AI options for the privacy-sensitive.</li>
   <li>Consent-first anonymised analytics; first-party operator dashboard; accessibility built in
     (screen-reader labels, reduced motion, large targets, live-region transcription).</li>
+  <li>Self-diagnosing: Settings → Developer functions ships a "Test AI" health check that walks
+    the AI chain and names the failing step; every fallback is recorded with an honest reason.</li>
+  <li>Store-readiness shipped: <a href="privacy.html">privacy policy</a>,
+    <a href="terms.html">terms</a> and <a href="support.html">support</a> pages, and full
+    in-app account deletion (Apple 5.1.1(v) / Play compliant).</li>
 </ul>
 
 <h2 id="validation">Validation — the 44-persona study</h2>
@@ -258,9 +266,9 @@ free because each space recruits its own members.</p>
 
 <h3>Path to revenue</h3>
 <div class="flow">
-  <div class="step"><b>Now</b>Production cutover of the managed backend + AI proxy; privacy/terms
-    pages; account deletion.</div>
-  <div class="step"><b>Next</b>Google Play (TWA) and Apple wrapper; web billing (Stripe) first,
+  <div class="step"><b>Done</b>Managed backend + AI proxy live in production; privacy/terms/support
+    pages; in-app account deletion.</div>
+  <div class="step"><b>Now</b>Google Play (TWA) and Apple wrapper; web billing (Stripe) first,
     store billing after.</div>
   <div class="step"><b>Then</b>Premium tier live against the already-enforced quotas; cohort
     channel pilots; the Cooee circle subscription (see the Cooee overview) shares the engine.</div>
@@ -272,7 +280,7 @@ alarms need the store wrapper (the app promises adherence records, not alarms); 
 a heuristic fallback wherever AI is off — by design, everything works offline; and the product is
 in active development with the rough edges that implies.</p>
 
-<p class="note">Idea → Todo · currently v96 · <a href="privacy.html">privacy</a> ·
+<p class="note">Idea → Todo · currently v100 · <a href="privacy.html">privacy</a> ·
 <a href="terms.html">terms</a> · <a href="support.html">support</a> ·
 <a href="https://github.com/etheodore15/todo-list">source &amp; living docs</a> ·
 sister product: <a href="https://etheodore15.github.io/cooee/overview.html">Cooee for NDIS support circles</a><br>
